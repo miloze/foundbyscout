@@ -1,0 +1,127 @@
+"use client";
+
+import { Suspense, useRef, useState, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useGLTF, OrbitControls } from "@react-three/drei";
+import { useTheme } from "./ThemeProvider";
+import * as THREE from "three";
+import type { Group } from "three";
+
+function Model({ onLoad, modelFile, modelRotation, rotate }: { onLoad: () => void; modelFile: string; modelRotation: [number, number, number]; rotate: boolean }) {
+  const { scene } = useGLTF(modelFile);
+  const turntable = useRef<Group>(null);
+
+  useEffect(() => { onLoad(); }, [onLoad]);
+
+  useFrame((_, delta) => {
+    if (rotate && turntable.current) turntable.current.rotation.y += delta * 0.1;
+  });
+
+  return (
+    <group ref={turntable}>
+      <primitive object={scene} rotation={modelRotation} position={[0, 4, 0]} />
+    </group>
+  );
+}
+
+function PingPongCamera({ posA, posB, target }: {
+  posA: [number, number, number];
+  posB: [number, number, number];
+  target: [number, number, number];
+}) {
+  const { camera } = useThree();
+  const t   = useRef(0);
+  const dir = useRef(1);
+  const look = new THREE.Vector3(...target);
+
+  // Quadratic Bezier: control point = midpoint pushed away from the target
+  const vA   = new THREE.Vector3(...posA);
+  const vB   = new THREE.Vector3(...posB);
+  const vT   = new THREE.Vector3(...target);
+  const mid     = new THREE.Vector3().addVectors(vA, vB).multiplyScalar(0.5);
+  const awayXZ  = new THREE.Vector3().subVectors(mid, vT).setY(0).normalize().multiplyScalar(32);
+  const ctrl    = new THREE.Vector3().addVectors(mid, awayXZ).setY(mid.y);
+
+  const curve = new THREE.QuadraticBezierCurve3(vA, ctrl, vB);
+  const point = new THREE.Vector3();
+
+  useFrame((_, delta) => {
+    t.current += delta * 0.025 * dir.current;
+    if (t.current >= 1) { t.current = 1; dir.current = -1; }
+    if (t.current <= 0) { t.current = 0; dir.current =  1; }
+
+    // Smoothstep easing
+    const s = t.current * t.current * (3 - 2 * t.current);
+    curve.getPoint(s, point);
+    camera.position.copy(point);
+    camera.lookAt(look);
+  });
+
+  return null;
+}
+
+type OrbitLimits = { minPolar: number; maxPolar: number; minAzimuth: number; maxAzimuth: number };
+
+export default function ParkModel({
+  modelFile,
+  cameraPos     = [0, 18, 25],
+  cameraTarget  = [0, 0, 0],
+  modelRotation = [-Math.PI / 2, 0, 0] as [number, number, number],
+  orbitLimits   = { minPolar: Math.PI / 6, maxPolar: Math.PI / 2.8, minAzimuth: -Infinity, maxAzimuth: Infinity },
+  pingPong,
+}: {
+  modelFile: string;
+  cameraPos?: [number, number, number];
+  cameraTarget?: [number, number, number];
+  modelRotation?: [number, number, number];
+  orbitLimits?: OrbitLimits;
+  pingPong?: [[number, number, number], [number, number, number]];
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const { theme } = useTheme();
+
+  const filter = theme === "light"
+    ? "grayscale(1) contrast(1.15) brightness(0.85)"
+    : "grayscale(1) contrast(1.1)";
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {!loaded && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex",
+          alignItems: "center", justifyContent: "center",
+          color: "var(--muted)", fontSize: 11,
+          textTransform: "uppercase", letterSpacing: "0.12em",
+        }}>
+          Loading model…
+        </div>
+      )}
+      <Canvas
+        camera={{ position: pingPong ? pingPong[0] : cameraPos, fov: 50 }}
+        style={{ position: "absolute", inset: 0, filter }}
+        gl={{ antialias: true, alpha: true }}
+      >
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[-15, 30, 15]} intensity={2.5} color="#fff5e0" />
+        <directionalLight position={[20, 5, 10]}  intensity={0.8} color="#c8d8ff" />
+        <directionalLight position={[0, 10, -20]} intensity={1.2} color="#ffffff" />
+        <pointLight position={[0, -5, 0]} intensity={0.5} color="#ff8060" />
+        <Suspense fallback={null}>
+          <Model onLoad={() => setLoaded(true)} modelFile={modelFile} modelRotation={modelRotation} rotate={!pingPong} />
+        </Suspense>
+        {pingPong
+          ? <PingPongCamera posA={pingPong[0]} posB={pingPong[1]} target={cameraTarget} />
+          : <OrbitControls
+              enableZoom={false}
+              enablePan={false}
+              target={cameraTarget}
+              minPolarAngle={orbitLimits.minPolar}
+              maxPolarAngle={orbitLimits.maxPolar}
+              minAzimuthAngle={orbitLimits.minAzimuth}
+              maxAzimuthAngle={orbitLimits.maxAzimuth}
+            />
+        }
+      </Canvas>
+    </div>
+  );
+}
