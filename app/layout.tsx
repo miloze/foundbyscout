@@ -12,6 +12,7 @@ const monoFont    = DM_Mono({ subsets: ["latin"], weight: ["300","400"], variabl
 export const metadata: Metadata = {
   title: "Found By Scout — UK Skatepark Directory",
   description: "The UK's best skatepark resource. Find parks, read features, discover the scene.",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({

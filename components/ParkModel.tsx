@@ -10,7 +10,6 @@ import type { Group } from "three";
 function Model({ onLoad, modelFile, modelRotation, rotate }: { onLoad: () => void; modelFile: string; modelRotation: [number, number, number]; rotate: boolean }) {
   const { scene } = useGLTF(modelFile);
   const turntable = useRef<Group>(null);
-
   useEffect(() => { onLoad(); }, [onLoad]);
 
   useFrame((_, delta) => {
@@ -69,6 +68,8 @@ export default function ParkModel({
   modelRotation = [-Math.PI / 2, 0, 0] as [number, number, number],
   orbitLimits   = { minPolar: Math.PI / 6, maxPolar: Math.PI / 2.8, minAzimuth: -Infinity, maxAzimuth: Infinity },
   pingPong,
+  autoRotate,
+  fov           = 50,
 }: {
   modelFile: string;
   cameraPos?: [number, number, number];
@@ -76,6 +77,8 @@ export default function ParkModel({
   modelRotation?: [number, number, number];
   orbitLimits?: OrbitLimits;
   pingPong?: [[number, number, number], [number, number, number]];
+  autoRotate?: boolean;
+  fov?: number;
 }) {
   const [loaded, setLoaded] = useState(false);
   const { theme } = useTheme();
@@ -97,17 +100,18 @@ export default function ParkModel({
         </div>
       )}
       <Canvas
-        camera={{ position: pingPong ? pingPong[0] : cameraPos, fov: 50 }}
+        camera={{ position: pingPong ? pingPong[0] : cameraPos, fov }}
         style={{ position: "absolute", inset: 0, filter }}
         gl={{ antialias: true, alpha: true }}
       >
         <ambientLight intensity={0.4} />
-        <directionalLight position={[-15, 30, 15]} intensity={2.5} color="#fff5e0" />
-        <directionalLight position={[20, 5, 10]}  intensity={0.8} color="#c8d8ff" />
-        <directionalLight position={[0, 10, -20]} intensity={1.2} color="#ffffff" />
-        <pointLight position={[0, -5, 0]} intensity={0.5} color="#ff8060" />
+        <directionalLight position={[-15, 40, 15]} intensity={7.0} color="#ffffff" />
+        <directionalLight position={[20, 5, 10]}  intensity={1.5} color="#d0e4ff" />
+        <directionalLight position={[0, 10, -20]} intensity={2.0} color="#ffffff" />
+        <pointLight position={[0, 15, 0]} intensity={3.0} color="#ffffff" />
+        <pointLight position={[0, -8, 0]} intensity={2.5} color="#ff7040" />
         <Suspense fallback={null}>
-          <Model onLoad={() => setLoaded(true)} modelFile={modelFile} modelRotation={modelRotation} rotate={!pingPong} />
+          <Model onLoad={() => setLoaded(true)} modelFile={modelFile} modelRotation={modelRotation} rotate={autoRotate ?? !pingPong} />
         </Suspense>
         {pingPong
           ? <PingPongCamera posA={pingPong[0]} posB={pingPong[1]} target={cameraTarget} />
