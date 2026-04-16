@@ -122,8 +122,8 @@ export default function ContourModel({
             autoRotateSpeed={0.6}
             minPolarAngle={Math.PI * 0.05}
             maxPolarAngle={Math.PI * 0.38}
-            minDistance={20}
-            maxDistance={90}
+            minDistance={12}
+            maxDistance={70}
             mouseButtons={{
               LEFT:   THREE.MOUSE.ROTATE,
               MIDDLE: THREE.MOUSE.PAN,

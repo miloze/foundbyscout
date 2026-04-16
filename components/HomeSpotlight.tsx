@@ -41,6 +41,7 @@ const PARKS = [
 
 export default function HomeSpotlight() {
   const [park] = useState(() => PARKS[Math.floor(Math.random() * PARKS.length)]);
+  const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
 
   return (
     <section
@@ -61,8 +62,28 @@ export default function HomeSpotlight() {
           position: "absolute", inset: 0, width: "100%", height: "100%",
           objectFit: "cover", objectPosition: park.imagePosition,
           zIndex: 0,
+          filter: viewMode === "bw" ? "grayscale(1) contrast(1.05) brightness(0.95)" : "none",
+          transition: "filter 0.4s ease",
         }}
       />
+
+      {/* B&W / CLR toggle */}
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10, display: "flex", gap: 2 }}>
+        {(["bw", "colour"] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            style={{
+              padding: "5px 12px", border: "none", cursor: "pointer",
+              background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
+              color: "#fff", fontFamily: "monospace", fontSize: 10,
+              letterSpacing: "0.1em", borderRadius: 2,
+            }}
+          >
+            {mode === "bw" ? "B&W" : "CLR"}
+          </button>
+        ))}
+      </div>
 
       {/* Dark gradient — bottom-heavy so text stays legible */}
       <div style={{

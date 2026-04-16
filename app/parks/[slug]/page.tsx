@@ -95,8 +95,10 @@ const PARKS: Record<string, Park> = {
       { src: "/images/parks/crystal-palace/gallery-14.webp", span: "normal" },
     ],
     lat: 51.4156, lng: -0.0719,
-    modelFile: "/crystal_palace_skate_park.glb",
+    modelFile: "/crystal-palace-skate_park.glb",
     useContourModel: true,
+    cameraPos: [-18, 20, 20] as [number, number, number],
+    modelRotation: [-Math.PI / 2, 0, 0] as [number, number, number],
     socials: [
       { platform: "instagram", url: "https://instagram.com/crystalpalaceskatepark" },
       { platform: "facebook",  url: "https://facebook.com/crystalpalaceskatepark" },
@@ -137,7 +139,7 @@ const PARKS: Record<string, Park> = {
     opened: "c. 1973", builder: "Community",
     managed_by: "Long Live Southbank / Southbank Centre",
     lat: 51.5064, lng: -0.1153,
-    modelFile: "/southbank_undercroft.glb",
+    modelFile: "/southbank-undercroft.glb",
     modelRotation: [0, Math.PI, 0],
     cameraPos: [0, 7, 18],
     cameraTarget: [0, 7, 0],
@@ -209,6 +211,10 @@ const PARKS: Record<string, Park> = {
 
   "stockwell": {
     lat: 51.4671, lng: -0.1157,
+    modelFile: "/stockwell-skatepark.glb",
+    useContourModel: true,
+    modelRotation: [0, Math.PI / 2, 0] as [number, number, number],
+    cameraPos: [0, 5, 31] as [number, number, number],
     name: "Stockwell Skatepark",
     address: ["Stockwell Road", "Brixton", "London"],
     postcode: "SW9 9SL", borough: "Lambeth",
@@ -312,7 +318,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
         {park.useContourModel ? (
           /* ContourModel hero — same as home spotlight */
           <div style={{ position: "absolute", inset: 0 }}>
-            <ContourModelClient modelFile={park.modelFile!} />
+            <ContourModelClient modelFile={park.modelFile!} cameraPos={park.cameraPos} modelRotation={park.modelRotation} />
           </div>
         ) : park.modelFile ? (
           <>
