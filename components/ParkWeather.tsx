@@ -8,7 +8,7 @@ const CONFIG: Record<Status, { label: string; dot: string }> = {
   loading: { label: "Checking…", dot: "var(--muted)"    },
   dry:     { label: "Dry",       dot: "#4caf6e"          },
   drying:  { label: "Damp",      dot: "#f0a830"          },
-  wet:     { label: "Wet",       dot: "#ff5841"          },
+  wet:     { label: "Wet",       dot: "var(--accent)"    },
   unknown: { label: "Unknown",   dot: "var(--muted)"    },
 };
 

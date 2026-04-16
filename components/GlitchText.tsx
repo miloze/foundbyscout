@@ -35,7 +35,7 @@ export default function GlitchText({ children, style }: { children: React.ReactN
       <style>{`
         /* ── Chromatic aberration ── */
         .glitch-chroma {
-          text-shadow: -4px 0 #ff5841, 4px 0 #ff9070, 0 0 8px rgba(255,88,65,0.2);
+          text-shadow: -4px 0 var(--accent), 4px 0 #ff9070, 0 0 8px rgba(255,88,65,0.2);
         }
 
         /* ── Tracking error: sliced horizontal displacement ── */
@@ -58,7 +58,7 @@ export default function GlitchText({ children, style }: { children: React.ReactN
         .glitch-tracking { position: relative; }
         .glitch-tracking::before {
           animation: glitch-track 0.12s steps(3) both;
-          color: #ff5841;
+          color: var(--accent);
           opacity: 0.8;
         }
         .glitch-tracking::after {

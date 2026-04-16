@@ -3,7 +3,6 @@
 import { Suspense, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, OrbitControls } from "@react-three/drei";
-import { useTheme } from "./ThemeProvider";
 import * as THREE from "three";
 import type { Group } from "three";
 
@@ -80,15 +79,31 @@ export default function ParkModel({
   autoRotate?: boolean;
   fov?: number;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const { theme } = useTheme();
+  const [loaded,   setLoaded]   = useState(false);
+  const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
 
-  const filter = theme === "light"
-    ? "grayscale(1) contrast(1.15) brightness(0.85)"
-    : "grayscale(1) contrast(1.1)";
+  const filter = viewMode === "bw" ? "grayscale(1) contrast(1.1)" : "none";
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* B&W / CLR toggle */}
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 11, display: "flex", gap: 2 }}>
+        {(["bw", "colour"] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            style={{
+              padding: "5px 12px", border: "none", cursor: "pointer",
+              background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
+              color: "#fff", fontFamily: "monospace", fontSize: 10,
+              letterSpacing: "0.1em", borderRadius: 2,
+            }}
+          >
+            {mode === "bw" ? "B&W" : "CLR"}
+          </button>
+        ))}
+      </div>
+
       {!loaded && (
         <div style={{
           position: "absolute", inset: 0, display: "flex",
@@ -101,7 +116,7 @@ export default function ParkModel({
       )}
       <Canvas
         camera={{ position: pingPong ? pingPong[0] : cameraPos, fov }}
-        style={{ position: "absolute", inset: 0, filter }}
+        style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}
         gl={{ antialias: true, alpha: true }}
       >
         <ambientLight intensity={0.4} />

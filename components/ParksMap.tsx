@@ -175,9 +175,10 @@ export default function ParksMap() {
       const el = marker.getElement?.()?.querySelector("div");
       if (!el) return;
       const sel = selectedPark?.id === id;
-      el.style.background    = sel ? "#ff5841" : "#888";
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ff5841";
+      el.style.background    = sel ? accent : "#888";
       el.style.transform     = sel ? "scale(1.8)" : "scale(1)";
-      el.style.boxShadow     = sel ? "0 0 0 5px rgba(255,88,65,0.28)" : "none";
+      el.style.boxShadow     = sel ? `0 0 0 5px ${accent}44` : "none";
       el.style.opacity       = visible ? "1" : "0.15";
       el.style.pointerEvents = visible ? "auto" : "none";
     });
@@ -386,7 +387,7 @@ export default function ParksMap() {
                   style={{ position:"absolute",top:8,right:10,width:26,height:26,borderRadius:"50%",background:"rgba(0,0,0,0.45)",border:"none",color:"#fff",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}
                 >✕</button>
                 <div style={{ padding:"0 14px 10px" }}>
-                  <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"rgba(255,88,65,0.9)",marginBottom:2 }}>{selectedPark.location}</p>
+                  <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--accent)",marginBottom:2 }}>{selectedPark.location}</p>
                   <h3 style={{ fontSize:17,fontWeight:900,letterSpacing:"-0.02em",lineHeight:1.1,color:"#f0f0eb" }}>{selectedPark.name}</h3>
                 </div>
               </div>
@@ -458,7 +459,7 @@ export default function ParksMap() {
               {/* Gradient panel */}
               <div style={{ width:220,flexShrink:0,background:GRADIENTS[gradIdx(selectedPark)],position:"relative",display:"flex",alignItems:"flex-end" }}>
                 <div style={{ padding:"0 18px 16px" }}>
-                  <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"rgba(255,88,65,0.9)",marginBottom:3 }}>{selectedPark.location}</p>
+                  <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--accent)",marginBottom:3 }}>{selectedPark.location}</p>
                   <p style={{ fontSize:16,fontWeight:900,letterSpacing:"-0.02em",lineHeight:1.1,color:"#f0f0eb" }}>{selectedPark.name}</p>
                 </div>
               </div>

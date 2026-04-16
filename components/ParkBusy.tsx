@@ -5,7 +5,7 @@ type Level = "quiet" | "getting busy" | "peak" | "dark";
 const CONFIG: Record<Level, { label: string; dot: string }> = {
   "quiet":       { label: "Quiet",        dot: "#4caf6e" },
   "getting busy":{ label: "Getting busy", dot: "#f0a830" },
-  "peak":        { label: "Peak",         dot: "#ff5841" },
+  "peak":        { label: "Peak",         dot: "var(--accent)" },
   "dark":        { label: "Dark",         dot: "#555555" },
 };
 

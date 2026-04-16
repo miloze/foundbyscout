@@ -3,8 +3,8 @@ import HomeSpotlight from "@/components/HomeSpotlight";
 
 const featuredParks = [
   { name: "Crystal Palace", location: "South London", slug: "crystal-palace", tag: "Bowl" },
-  { name: "Meanwhile Gardens", location: "West London", slug: "meanwhile-gardens", tag: "Bowl" },
-  { name: "Rom Skatepark", location: "Essex", slug: "rom", tag: "Historic" },
+  { name: "Southbank", location: "Waterloo", slug: "southbank", tag: "Historic" },
+  { name: "Stockwell", location: "South London", slug: "stockwell", tag: "Bowl" },
   { name: "Livingston", location: "Scotland", slug: "livingston", tag: "Historic" },
 ];
 

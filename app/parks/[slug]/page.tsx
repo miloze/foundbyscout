@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ParkModelClient from "@/components/ParkModelClient";
+import ContourModelClient from "@/components/ContourModelClient";
 import ParkWeather from "@/components/ParkWeather";
 import ParkBusy from "@/components/ParkBusy";
 
@@ -27,6 +28,7 @@ type Park = {
   spots: Spot[];
   socials?: Social[];
   modelFile?: string;
+  useContourModel?: boolean;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
@@ -94,6 +96,7 @@ const PARKS: Record<string, Park> = {
     ],
     lat: 51.4156, lng: -0.0719,
     modelFile: "/crystal_palace_skate_park.glb",
+    useContourModel: true,
     socials: [
       { platform: "instagram", url: "https://instagram.com/crystalpalaceskatepark" },
       { platform: "facebook",  url: "https://facebook.com/crystalpalaceskatepark" },
@@ -299,10 +302,21 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
     <article>
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <div style={{ position: "relative", height: "58vh", minHeight: 340, overflow: "hidden", background: "var(--background)", marginLeft: bleed, marginRight: bleed }}>
-        {park.modelFile ? (
+      <div style={{
+        position: "relative",
+        height: park.useContourModel ? "78vh" : "58vh",
+        minHeight: 340, overflow: "hidden",
+        background: "var(--background)",
+        marginLeft: bleed, marginRight: bleed,
+      }}>
+        {park.useContourModel ? (
+          /* ContourModel hero — same as home spotlight */
+          <div style={{ position: "absolute", inset: 0 }}>
+            <ContourModelClient modelFile={park.modelFile!} />
+          </div>
+        ) : park.modelFile ? (
           <>
-            <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <div style={{ position: "absolute", inset: 0 }}>
               <ParkModelClient modelFile={park.modelFile!} cameraPos={park.cameraPos} cameraTarget={park.cameraTarget} modelRotation={park.modelRotation} orbitLimits={park.orbitLimits} pingPong={park.pingPong} />
             </div>
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />
@@ -313,14 +327,15 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 60%)" }} />
           </>
         )}
+
         {/* Postcode badge */}
-        <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(20px, 4vw, 36px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
+        <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(20px, 4vw, 36px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>
           <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{park.postcode.split(" ")[0]}</span>
         </div>
 
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(20px, 4vw, 36px)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(20px, 4vw, 36px)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, pointerEvents: "none", zIndex: 3 }}>
           <div>
-            <Link href="/parks" style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase", display: "inline-block", marginBottom: 12 }}>← All Parks</Link>
+            <Link href="/parks" style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase", display: "inline-block", marginBottom: 12, pointerEvents: "auto" }}>← All Parks</Link>
             <h1 style={{ fontSize: "clamp(40px, 8vw, 84px)", lineHeight: 0.92, color: "var(--foreground)", letterSpacing: "-0.02em", fontWeight: 300 }}>{park.name}</h1>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.08em", marginTop: 10 }}>{park.address.join(", ")} · {park.postcode}</p>
             <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -467,7 +482,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
                 <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginBottom: 20 }}>{spot.description}</p>
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--accent)", background: "rgba(255,88,65,0.1)", border: "1px solid rgba(255,88,65,0.3)", padding: "3px 7px", borderRadius: 2 }}>Unclaimed</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", padding: "3px 7px", borderRadius: 2 }}>Unclaimed</span>
                   </div>
                   <p style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: "var(--foreground)", marginBottom: 14 }}>{spot.bounty}</p>
                   <button style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "1px solid var(--border)", padding: "7px 14px", cursor: "pointer" }}>

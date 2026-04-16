@@ -55,7 +55,7 @@ export default function IdleSkate() {
   // Repeat the message enough times to fill double-width for a seamless loop
   const repeated = Array.from({ length: 10 }, (_, i) => (
     <span key={i} style={{ paddingRight: "0.55em" }}>
-      {msg}<span style={{ color: "#ff5841" }}> · </span>
+      {msg}<span style={{ color: "var(--accent)" }}> · </span>
     </span>
   ));
 
