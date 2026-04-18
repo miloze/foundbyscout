@@ -135,6 +135,16 @@ export default function ParksMap() {
     if (mapRef.current) setTimeout(() => mapRef.current?.invalidateSize(), 50);
   }, [isMobile]);
 
+  // On load: pick a random London park, zoom to it and select it
+  useEffect(() => {
+    if (mapStatus !== "ready" || !mapRef.current) return;
+    const londonParks = PARKS.filter(p => p.location.includes("London"));
+    const park = londonParks[Math.floor(Math.random() * londonParks.length)];
+    mapRef.current.setView([park.lat, park.lng], 13, { animate: false });
+    openPark(park);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapStatus]);
+
   useEffect(() => {
     if (!tileLayerRef.current) return;
     tileLayerRef.current.setUrl(theme === "light"
