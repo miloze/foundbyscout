@@ -301,7 +301,7 @@ export default function ParksMap() {
 
       {/* ══ MOBILE ══ */}
       {isMobile && (
-        <div style={{ position:"relative", height:"calc(100vh - 120px)" }}>
+        <div style={{ position:"relative", height:"calc(100dvh - 48px)" }}>
 
           {/* Full-height map */}
           <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
@@ -389,7 +389,7 @@ export default function ParksMap() {
 
       {/* ══ DESKTOP ══ */}
       {!isMobile && (
-        <div style={{ position:"relative", height:"calc(100vh - 120px)" }}>
+        <div style={{ position:"relative", height:"calc(100dvh - 48px)" }}>
           <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
 
           {mapStatus === "loading" && (
