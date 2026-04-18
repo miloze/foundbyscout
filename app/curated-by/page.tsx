@@ -80,7 +80,7 @@ export default function CuratedByPage() {
                   {issue.vol} — {issue.location}
                 </p>
                 <h2 className="font-black mb-2" style={{ fontSize: "1.75rem", lineHeight: 1, letterSpacing: "-0.02em" }}>
-                  Curated by {issue.curator}
+                  {issue.vol}
                 </h2>
                 <p className="text-sm" style={{ color: "var(--muted)", lineHeight: 1.6, maxWidth: "48ch" }}>
                   {issue.bio}

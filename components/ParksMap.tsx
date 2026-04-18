@@ -257,10 +257,12 @@ export default function ParksMap() {
       if (dx > dy * 1.8) touchDir.current = "h";
       else if (dy > dx * 1.8) touchDir.current = "v";
     }
-    // Swipe down: give physical feedback by translating the card
+    // Vertical swipe: give physical feedback by translating the card
     if (touchDir.current === "v" && cardRef.current) {
       const delta = e.touches[0].clientY - touchStart.current.y;
-      if (delta > 0) cardRef.current.style.transform = `translateY(${delta * 0.55}px)`;
+      // Allow drag in both directions — clamp upward drag to 20px so it hints but doesn't fly off
+      const clamped = delta < 0 ? Math.max(delta * 0.4, -20) : delta * 0.55;
+      cardRef.current.style.transform = `translateY(${clamped}px)`;
     }
   };
   const onCardTouchEnd = (e: React.TouchEvent) => {
@@ -272,8 +274,9 @@ export default function ParksMap() {
     if (finalDir === "h") {
       if (dx < -50) navigate(1);
       else if (dx > 50) navigate(-1);
-    } else if (finalDir === "v" && dy < -40) {
-      dismiss();
+    } else if (finalDir === "v") {
+      if (dy > 40)  setCardState("expanded"); // swipe up  → expand
+      if (dy < -40) dismiss();                // swipe down → dismiss
     }
   };
 
@@ -317,109 +320,88 @@ export default function ParksMap() {
 
       {/* ══ MOBILE ══ */}
       {isMobile && (
-        <div style={{ display:"flex", flexDirection:"column", height:"calc(100vh - 120px)" }}>
+        <div style={{ position:"relative", height:"calc(100vh - 120px)" }}>
 
-          {/* ── Map (top half) ── */}
-          <div style={{ flex:"0 0 52%", position:"relative", overflow:"hidden" }}>
-            <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
+          {/* Full-height map */}
+          <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
 
-            {mapStatus === "loading" && (
-              <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)" }}>
-                <div style={{ width:32,height:32,border:"3px solid var(--border)",borderTopColor:"var(--accent)",borderRadius:"50%",animation:"fbs-spin 0.8s linear infinite" }} />
-                <p style={{ marginTop:12,fontSize:12,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.12em" }}>Loading map…</p>
-              </div>
-            )}
-            {mapStatus === "error" && (
-              <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)",padding:32 }}>
-                <p style={{ fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10 }}>Map failed to load</p>
-                <p style={{ fontSize:12,color:"var(--muted)",maxWidth:300,textAlign:"center" }}>{mapError}</p>
-              </div>
-            )}
-
-            {/* Floating search */}
-            <div style={{ position:"absolute",top:12,left:12,right:12,zIndex:20 }}>
-              <div style={{ position:"relative" }}>
-                <span style={{ position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--muted)",pointerEvents:"none" }}>⌕</span>
-                <input
-                  type="text" placeholder="Search parks or areas…" value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{ width:"100%",padding:"11px 14px 11px 36px",fontSize:15,background: theme === "dark" ? "rgba(26,26,26,0.92)" : "rgba(244,242,238,0.96)",border:"1px solid var(--border)",color:"var(--foreground)",outline:"none",boxSizing:"border-box",backdropFilter:"blur(12px)",WebkitAppearance:"none" }}
-                />
-              </div>
+          {mapStatus === "loading" && (
+            <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)" }}>
+              <div style={{ width:32,height:32,border:"3px solid var(--border)",borderTopColor:"var(--accent)",borderRadius:"50%",animation:"fbs-spin 0.8s linear infinite" }} />
+              <p style={{ marginTop:12,fontSize:12,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.12em" }}>Loading map…</p>
             </div>
+          )}
+          {mapStatus === "error" && (
+            <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)",padding:32 }}>
+              <p style={{ fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10 }}>Map failed to load</p>
+              <p style={{ fontSize:12,color:"var(--muted)",maxWidth:300,textAlign:"center" }}>{mapError}</p>
+            </div>
+          )}
 
-            {/* Type filters + Near Me */}
-            <div style={{ position:"absolute",top:60,left:0,right:0,zIndex:20,display:"flex",gap:0,overflowX:"auto",padding:"0 12px",scrollbarWidth:"none" }}>
-              {TYPE_FILTERS.map(f => (
-                <button key={f} onClick={() => setTypeFilter(f)} style={S.pill(typeFilter === f)}>{f}</button>
-              ))}
-              <button onClick={nearMe} style={{ ...S.pill(false), marginLeft:8, display:"flex", alignItems:"center", gap:5 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
-                Near me
-              </button>
+          {/* Floating search */}
+          <div style={{ position:"absolute",top:12,left:12,right:12,zIndex:20 }}>
+            <div style={{ position:"relative" }}>
+              <span style={{ position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--muted)",pointerEvents:"none" }}>⌕</span>
+              <input
+                type="text" placeholder="Search parks or areas…" value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width:"100%",padding:"11px 14px 11px 36px",fontSize:15,background: theme === "dark" ? "rgba(26,26,26,0.92)" : "rgba(244,242,238,0.96)",border:"1px solid var(--border)",color:"var(--foreground)",outline:"none",boxSizing:"border-box",backdropFilter:"blur(12px)",WebkitAppearance:"none" }}
+              />
             </div>
           </div>
 
-          {/* ── Park panel (bottom half) ── */}
-          <div style={{ flex:1, borderTop:"1px solid var(--border)", overflow:"hidden", background:"var(--background)" }}>
-            {!selectedPark ? (
-              /* Empty state */
-              <div style={{ height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:8, padding:"0 24px" }}>
-                <p style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--muted)" }}>
-                  {filteredParks.length} park{filteredParks.length !== 1 ? "s" : ""}
-                </p>
-                <p style={{ fontSize:13, color:"var(--muted)", textAlign:"center" }}>Tap a marker to explore</p>
-              </div>
-            ) : (
-              /* Park card — tap to expand */
-              <div
-                onClick={() => setCardState("expanded")}
-                style={{ height:"100%", display:"flex", flexDirection:"column", cursor:"pointer", userSelect:"none" }}
-              >
-                {/* Gradient header */}
-                <div style={{
-                  flexShrink:0, flex:"0 0 42%",
-                  background:GRADIENTS[gradIdx(selectedPark)],
-                  display:"flex", alignItems:"flex-end", justifyContent:"space-between",
-                  padding:"0 16px 12px",
-                  animation: slideDir ? `fbs-slide-${slideDir === "left" ? "l" : "r"} 0.25s ease both` : undefined,
-                }}>
-                  <div>
-                    <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--accent)",marginBottom:3 }}>{selectedPark.location}</p>
-                    <h3 style={{ fontSize:18,fontWeight:900,letterSpacing:"-0.02em",lineHeight:1.1,color:"#f0f0eb" }}>{selectedPark.name}</h3>
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); dismiss(); }}
-                    style={{ background:"rgba(0,0,0,0.4)",border:"none",color:"#fff",width:28,height:28,borderRadius:"50%",fontSize:12,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center" }}
-                  >✕</button>
-                </div>
-
-                {/* Info row */}
-                <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 16px", gap:8, minHeight:0 }}>
-                  <div style={{ display:"flex", gap:5, alignItems:"center", flexWrap:"wrap" }}>
-                    <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>{selectedPark.type}</span>
-                    {selectedPark.is_free
-                      ? <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--accent)" }}>Free</span>
-                      : <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>Paid</span>
-                    }
-                    {selectedPark.is_covered && <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--accent)" }}>Covered</span>}
-                  </div>
-                  {/* Carousel nav */}
-                  <div style={{ display:"flex", gap:8, alignItems:"center", flexShrink:0 }}>
-                    <button onClick={e => { e.stopPropagation(); navigate(-1); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",fontSize:20,padding:"0 2px",lineHeight:1 }}>‹</button>
-                    <span style={{ fontSize:10,color:"var(--muted)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap" }}>{carouselIdx + 1}/{filteredParks.length}</span>
-                    <button onClick={e => { e.stopPropagation(); navigate(1); }}  style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",fontSize:20,padding:"0 2px",lineHeight:1 }}>›</button>
-                  </div>
-                </div>
-
-                {/* Tap hint */}
-                <div style={{ flexShrink:0, padding:"0 16px 10px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                  <p style={{ fontSize:11,color:"var(--muted)",fontStyle:"italic" }}>{selectedPark.brief.slice(0, 60)}…</p>
-                  <span style={{ fontSize:11,color:"var(--accent)",fontWeight:"bold",whiteSpace:"nowrap",marginLeft:8 }}>More →</span>
-                </div>
-              </div>
-            )}
+          {/* Type filters + Near Me */}
+          <div style={{ position:"absolute",top:60,left:0,right:0,zIndex:20,display:"flex",gap:0,overflowX:"auto",padding:"0 12px",scrollbarWidth:"none" }}>
+            {TYPE_FILTERS.map(f => (
+              <button key={f} onClick={() => setTypeFilter(f)} style={S.pill(typeFilter === f)}>{f}</button>
+            ))}
+            <button onClick={nearMe} style={{ ...S.pill(false), marginLeft:8, display:"flex", alignItems:"center", gap:5 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+              Near me
+            </button>
           </div>
+
+          {/* ── Floating park card ── */}
+          {selectedPark && (
+            <div
+              ref={cardRef}
+              className="fbs-card"
+              onClick={() => setCardState("expanded")}
+              onTouchStart={onCardTouchStart}
+              onTouchMove={onCardTouchMove}
+              onTouchEnd={onCardTouchEnd}
+              style={{
+                position:"absolute", bottom:20, left:16, right:16, zIndex:25,
+                background: theme === "dark" ? "rgba(22,22,22,0.97)" : "rgba(248,246,242,0.97)",
+                backdropFilter:"blur(16px)",
+                borderRadius:12,
+                padding:"16px 18px 18px",
+                boxShadow:"0 8px 32px rgba(0,0,0,0.28)",
+                cursor:"pointer", userSelect:"none",
+                animation: slideDir ? `fbs-slide-${slideDir === "left" ? "l" : "r"} 0.22s ease both` : "fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both",
+              }}
+            >
+              {/* Swipe handle */}
+              <div style={{ width:32,height:3,background:"var(--border)",borderRadius:2,margin:"0 auto 14px" }} />
+
+              {/* Badges row */}
+              <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+                <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--border)",color:"var(--muted)" }}>{selectedPark.type}</span>
+                {selectedPark.is_free
+                  ? <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--accent)",color:"var(--accent)" }}>Free</span>
+                  : <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--border)",color:"var(--muted)" }}>Paid</span>
+                }
+                {selectedPark.is_covered && <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--accent)",color:"var(--accent)" }}>Covered</span>}
+              </div>
+
+              {/* Location + Name */}
+              <p style={{ fontSize:10,textTransform:"uppercase",letterSpacing:"0.18em",color:"var(--muted)",marginBottom:4 }}>{selectedPark.location}</p>
+              <h3 style={{ fontSize:20,fontWeight:900,letterSpacing:"-0.02em",lineHeight:1.05,color:"var(--foreground)",marginBottom:10,textTransform:"uppercase" }}>{selectedPark.name}</h3>
+
+              {/* Description */}
+              <p style={{ fontSize:13,lineHeight:1.65,color:"var(--muted)" }}>{selectedPark.brief}</p>
+            </div>
+          )}
 
           {/* ── Expanded full-screen card ── */}
           {cardState === "expanded" && selectedPark && (

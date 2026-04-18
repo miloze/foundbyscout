@@ -26,7 +26,7 @@ const issues: Record<string, {
       { q: "What's the spot that defines the city for you?", a: "Lloyds, obviously. But there's a little marble ledge behind the waterfront that nobody really talks about. That's mine." },
       { q: "Five things — how'd you pick them?", a: "Stuff I'd grab if I had ten minutes to pack a bag. No overthinking." },
     ],
-    mixtape: { title: "Jess — Bristol Sessions", url: "#" },
+    mixtape: { title: "Temporal Cove w/ Pavement", url: "https://www.mixcloud.com/NTSRadio/temporal-cove-w-pavement-15th-january-2026/" },
   },
 };
 
@@ -80,7 +80,7 @@ export default async function CuratedBySlugPage({ params }: { params: Promise<{ 
             {issue.vol} — {issue.location}
           </p>
           <h1 className="font-black" style={{ fontSize: "clamp(2rem, 6vw, 4rem)", lineHeight: 0.95, letterSpacing: "-0.03em", marginBottom: "1rem" }}>
-            Curated by {issue.curator}
+            {issue.vol}
           </h1>
           <p style={{ color: "var(--muted)", fontSize: "0.9375rem", lineHeight: 1.6, maxWidth: "46ch" }}>
             {issue.bio}
@@ -123,15 +123,15 @@ export default async function CuratedBySlugPage({ params }: { params: Promise<{ 
       {issue.mixtape && (
         <section className="px-6 py-14 md:px-12">
           <p className="text-xs uppercase mb-6" style={{ color: "var(--accent)", letterSpacing: "0.2em" }}>Mixtape</p>
-          <div className="flex items-center gap-6 p-8" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#111", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ fontSize: "1.5rem" }}>♫</span>
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: "bold", marginBottom: 4 }}>{issue.mixtape.title}</p>
-              <p style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>Coming soon</p>
-            </div>
-          </div>
+          <p style={{ fontWeight: "bold", marginBottom: "1rem" }}>{issue.mixtape.title}</p>
+          <iframe
+            width="100%"
+            height="120"
+            src={`https://www.mixcloud.com/widget/iframe/?hide_cover=1&mini=1&feed=${encodeURIComponent(new URL(issue.mixtape.url).pathname)}`}
+            frameBorder="0"
+            allow="autoplay"
+            style={{ border: "1px solid var(--border)", display: "block" }}
+          />
         </section>
       )}
     </div>
