@@ -1,6 +1,5 @@
 import Link from "next/link";
-import ParkModelClient from "@/components/ParkModelClient";
-import ContourModelClient from "@/components/ContourModelClient";
+import ParkHeroViewer from "@/components/ParkHeroViewer";
 import ParkWeather from "@/components/ParkWeather";
 import ParkBusy from "@/components/ParkBusy";
 
@@ -27,6 +26,7 @@ type Park = {
   gallery: GalleryImg[];
   spots: Spot[];
   socials?: Social[];
+  heroImage?: string;
   modelFile?: string;
   useContourModel?: boolean;
   cameraPos?: [number, number, number];
@@ -95,6 +95,7 @@ const PARKS: Record<string, Park> = {
       { src: "/images/parks/crystal-palace/gallery-14.webp", span: "normal" },
     ],
     lat: 51.4156, lng: -0.0719,
+    heroImage: "/images/parks/crystal-palace/gallery-01.webp",
     modelFile: "/crystal-palace-skate_park.glb",
     useContourModel: true,
     cameraPos: [-18, 20, 20] as [number, number, number],
@@ -139,6 +140,7 @@ const PARKS: Record<string, Park> = {
     opened: "c. 1973", builder: "Community",
     managed_by: "Long Live Southbank / Southbank Centre",
     lat: 51.5064, lng: -0.1153,
+    heroImage: "/images/parks/southbank/gallery-01.webp",
     modelFile: "/southbank-undercroft.glb",
     modelRotation: [0, Math.PI, 0],
     cameraPos: [0, 7, 18],
@@ -211,6 +213,7 @@ const PARKS: Record<string, Park> = {
 
   "stockwell": {
     lat: 51.4671, lng: -0.1157,
+    heroImage: "/images/parks/stockwell/gallery-01.webp",
     modelFile: "/stockwell-skatepark.glb",
     useContourModel: true,
     modelRotation: [0, Math.PI / 2, 0] as [number, number, number],
@@ -315,18 +318,17 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
         background: "var(--background)",
         marginLeft: bleed, marginRight: bleed,
       }}>
-        {park.useContourModel ? (
-          /* ContourModel hero — same as home spotlight */
-          <div style={{ position: "absolute", inset: 0 }}>
-            <ContourModelClient modelFile={park.modelFile!} cameraPos={park.cameraPos} modelRotation={park.modelRotation} />
-          </div>
-        ) : park.modelFile ? (
-          <>
-            <div style={{ position: "absolute", inset: 0 }}>
-              <ParkModelClient modelFile={park.modelFile!} cameraPos={park.cameraPos} cameraTarget={park.cameraTarget} modelRotation={park.modelRotation} orbitLimits={park.orbitLimits} pingPong={park.pingPong} />
-            </div>
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />
-          </>
+        {park.modelFile ? (
+          <ParkHeroViewer
+            modelFile={park.modelFile}
+            heroImage={park.heroImage}
+            useContourModel={park.useContourModel}
+            cameraPos={park.cameraPos}
+            cameraTarget={park.cameraTarget}
+            modelRotation={park.modelRotation}
+            orbitLimits={park.orbitLimits}
+            pingPong={park.pingPong}
+          />
         ) : (
           <>
             <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px), repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px)" }} />
