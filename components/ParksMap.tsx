@@ -73,8 +73,9 @@ export default function ParksMap() {
   const tileLayerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRef      = useRef<HTMLDivElement>(null);
-  const touchStart   = useRef({ x:0, y:0 });
-  const touchDir     = useRef<"h"|"v"|null>(null);
+  const touchStart          = useRef({ x:0, y:0 });
+  const touchDir            = useRef<"h"|"v"|null>(null);
+  const userChangedFilter   = useRef(false);
   const [copied, setCopied] = useState(false);
 
   const { theme } = useTheme();
@@ -140,7 +141,7 @@ export default function ParksMap() {
     if (mapStatus !== "ready" || !mapRef.current) return;
     const londonParks = PARKS.filter(p => p.location.includes("London"));
     const park = londonParks[Math.floor(Math.random() * londonParks.length)];
-    mapRef.current.setView([park.lat, park.lng], 13, { animate: false });
+    mapRef.current.setView([park.lat, park.lng], 14, { animate: false });
     openPark(park);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapStatus]);
@@ -164,7 +165,7 @@ export default function ParksMap() {
   }, [isMobile]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !userChangedFilter.current) return;
     const bounds = REGION_BOUNDS[activeFilter];
     if (!bounds) return;
     const pad = cardState !== "hidden" ? PEEK_H + 16 : 24;
@@ -535,7 +536,7 @@ export default function ParksMap() {
                 style={{ width:"100%",padding:"9px 13px",fontSize:13,background:"var(--card)",border:"1px solid var(--border)",color:"var(--foreground)",outline:"none",boxSizing:"border-box" }} />
             </div>
             <div style={{ display:"flex",gap:4,padding:"8px 12px",borderBottom:"1px solid var(--border)",overflowX:"auto",flexWrap:"wrap" }}>
-              {REGIONS.map(f=><button key={f} onClick={()=>setActiveFilter(f)} style={S.desktopFilterBtn(activeFilter===f)}>{f}</button>)}
+              {REGIONS.map(f=><button key={f} onClick={()=>{ userChangedFilter.current=true; setActiveFilter(f); }} style={S.desktopFilterBtn(activeFilter===f)}>{f}</button>)}
             </div>
             <div style={{ display:"flex",gap:4,padding:"8px 12px",borderBottom:"1px solid var(--border)",overflowX:"auto",alignItems:"center" }}>
               {TYPE_FILTERS.map(f=><button key={f} onClick={()=>setTypeFilter(f)} style={S.desktopFilterBtn(typeFilter===f)}>{f}</button>)}
