@@ -58,7 +58,7 @@ const GRADIENTS = [
 ];
 
 type Park = typeof PARKS[0];
-type CardState = "hidden" | "peek" | "expanded";
+type CardState = "hidden" | "peek";
 
 const PEEK_H = 196;
 
@@ -275,8 +275,8 @@ export default function ParksMap() {
       if (dx < -50) navigate(1);
       else if (dx > 50) navigate(-1);
     } else if (finalDir === "v") {
-      if (dy > 40)  setCardState("expanded"); // swipe up  → expand
-      if (dy < -40) dismiss();                // swipe down → dismiss
+      if (dy > 40 && selectedPark) router.push(`/parks/${selectedPark.slug}`); // swipe up → park page
+      if (dy < -40) dismiss();                                                  // swipe down → dismiss
     }
   };
 
@@ -310,7 +310,6 @@ export default function ParksMap() {
         @keyframes fbs-card-in   { from { transform:translateY(${PEEK_H + 20}px); opacity:0; } to { transform:translateY(0); opacity:1; } }
         @keyframes fbs-slide-l   { from { opacity:0; transform:translateX(28px);  } to { opacity:1; transform:translateX(0); } }
         @keyframes fbs-slide-r   { from { opacity:0; transform:translateX(-28px); } to { opacity:1; transform:translateX(0); } }
-        @keyframes fbs-expand-up { from { transform:translateY(100%); } to { transform:translateY(0); } }
         .leaflet-container { background:var(--background) !important; }
         .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.4) !important; color:#888 !important; }
         .leaflet-control-attribution a { color:#aaa !important; }
@@ -366,7 +365,7 @@ export default function ParksMap() {
             <div
               ref={cardRef}
               className="fbs-card"
-              onClick={() => setCardState("expanded")}
+              onClick={() => selectedPark && router.push(`/parks/${selectedPark.slug}`)}
               onTouchStart={onCardTouchStart}
               onTouchMove={onCardTouchMove}
               onTouchEnd={onCardTouchEnd}
@@ -403,92 +402,6 @@ export default function ParksMap() {
             </div>
           )}
 
-          {/* ── Expanded full-screen card ── */}
-          {cardState === "expanded" && selectedPark && (
-            <div style={{
-              position:"fixed", inset:0, zIndex:200,
-              background:"var(--background)",
-              display:"flex", flexDirection:"column",
-              animation:"fbs-expand-up 0.35s cubic-bezier(0.32,0.72,0,1) both",
-              overflowY:"auto",
-            }}>
-              {/* Top bar */}
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 16px 0", flexShrink:0 }}>
-                <button
-                  onClick={() => setCardState("peek")}
-                  style={{ display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:"var(--foreground)",fontSize:13,padding:0 }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                  Map
-                </button>
-                <div style={{ display:"flex", gap:14, alignItems:"center" }}>
-                  <button onClick={() => toggleSave(selectedPark)} style={{ background:"none",border:"none",cursor:"pointer",color: savedIds.includes(selectedPark.id) ? "var(--accent)" : "var(--muted)",padding:0 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill={savedIds.includes(selectedPark.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                  <button onClick={() => sharePark(selectedPark)} style={{ background:"none",border:"none",cursor:"pointer",color: copied ? "var(--accent)" : "var(--muted)",padding:0 }}>
-                    {copied
-                      ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                    }
-                  </button>
-                </div>
-              </div>
-
-              {/* Gradient hero */}
-              <div style={{ flexShrink:0, height:160, background:GRADIENTS[gradIdx(selectedPark)], display:"flex", alignItems:"flex-end", padding:"0 20px 18px", margin:"16px 0 0" }}>
-                <div>
-                  <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.2em",color:"var(--accent)",marginBottom:4 }}>{selectedPark.location} · {selectedPark.borough}</p>
-                  <h2 style={{ fontSize:"clamp(1.6rem,6vw,2.4rem)",fontWeight:900,letterSpacing:"-0.03em",lineHeight:1,color:"#f0f0eb" }}>{selectedPark.name}</h2>
-                </div>
-              </div>
-
-              {/* Scrollable content */}
-              <div style={{ padding:"20px 20px 40px", display:"flex", flexDirection:"column", gap:20 }}>
-                {/* Badges */}
-                <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                  <span style={{ fontSize:10,padding:"3px 10px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>{selectedPark.type}</span>
-                  {selectedPark.is_free    && <span style={{ fontSize:10,padding:"3px 10px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--accent)" }}>Free</span>}
-                  {selectedPark.is_covered && <span style={{ fontSize:10,padding:"3px 10px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--accent)" }}>Covered</span>}
-                  {!selectedPark.is_free   && <span style={{ fontSize:10,padding:"3px 10px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>Paid</span>}
-                  {selectedPark.opened && <span style={{ fontSize:10,padding:"3px 10px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>Est. {selectedPark.opened}</span>}
-                </div>
-
-                {/* Brief */}
-                <p style={{ fontSize:14,lineHeight:1.7,color:"var(--foreground)" }}>{selectedPark.brief}</p>
-
-                {/* Scout note */}
-                {selectedPark.scout && (
-                  <div style={{ borderLeft:"2px solid var(--accent)",paddingLeft:14 }}>
-                    <p style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:"var(--accent)",marginBottom:6 }}>Scout says</p>
-                    <p style={{ fontSize:13,lineHeight:1.65,color:"var(--muted)",fontStyle:"italic" }}>{selectedPark.scout}</p>
-                  </div>
-                )}
-
-                {/* Key facts */}
-                {selectedPark.facts && selectedPark.facts.length > 0 && (
-                  <div>
-                    <p style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:"var(--accent)",marginBottom:10 }}>Key facts</p>
-                    <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-                      {selectedPark.facts.map((f,i) => (
-                        <div key={i} style={{ display:"flex",gap:8,alignItems:"flex-start" }}>
-                          <span style={{ color:"var(--accent)",fontSize:10,marginTop:2,flexShrink:0 }}>—</span>
-                          <span style={{ fontSize:13,color:"var(--muted)",lineHeight:1.5 }}>{f}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* CTA */}
-                <button
-                  onClick={() => router.push(`/parks/${selectedPark.slug}`)}
-                  style={{ padding:"14px",fontSize:13,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",background:"var(--accent)",color:"#fff",border:"none",cursor:"pointer",width:"100%" }}
-                >
-                  View Full Park Page →
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
