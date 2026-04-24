@@ -76,7 +76,7 @@ export default function HomeSpotlight() {
             style={{
               padding: "5px 12px", border: "none", cursor: "pointer",
               background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
-              color: "#fff", fontFamily: "monospace", fontSize: 10,
+              color: "#fff", fontFamily: "var(--font-mono)", fontSize: 10,
               letterSpacing: "0.1em", borderRadius: 2,
             }}
           >

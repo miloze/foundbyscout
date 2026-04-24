@@ -51,19 +51,16 @@ function Vinyl({ name }: { name: string }) {
 export default function CuratedByPage() {
   return (
     <div>
-      <div className="px-6 py-10 md:px-12" style={{ borderBottom: "1px solid var(--border)" }}>
-        <h1
-          className="font-black uppercase"
-          style={{ fontSize: "clamp(2rem, 6vw, 4rem)", lineHeight: 0.95, letterSpacing: "-0.03em" }}
-        >
+      <div style={{ paddingTop: "2.5rem", paddingBottom: "2.5rem", borderBottom: "1px solid var(--border)" }}>
+        <h1 style={{ fontSize: "clamp(2rem, 6vw, 4rem)", lineHeight: 0.95, letterSpacing: "-0.03em" }}>
           Curated By
         </h1>
-        <p className="mt-4 text-sm" style={{ color: "var(--muted)", maxWidth: "50ch", lineHeight: 1.6 }}>
+        <p style={{ marginTop: 16, fontSize: 13, color: "var(--muted)", maxWidth: "50ch", lineHeight: 1.6 }}>
           Five things they love. A short interview. A mixtape.
         </p>
       </div>
 
-      <div className="px-6 py-10 md:px-12 flex flex-col gap-8">
+      <div style={{ paddingTop: "2.5rem", paddingBottom: "2.5rem", display: "flex", flexDirection: "column", gap: 2 }}>
         {issues.map(issue => (
           <Link
             key={issue.slug}
@@ -71,22 +68,21 @@ export default function CuratedByPage() {
             style={{ display: "block", textDecoration: "none" }}
           >
             <div
-              className="flex items-center gap-8 p-8"
-              style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              style={{ display: "flex", alignItems: "center", gap: 32, padding: 32, background: "var(--card)", border: "1px solid var(--border)" }}
             >
               <Vinyl name={issue.curator} />
               <div style={{ flex: 1 }}>
-                <p className="text-xs uppercase mb-2" style={{ color: "var(--accent)", letterSpacing: "0.15em" }}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>
                   {issue.vol} — {issue.location}
                 </p>
-                <h2 className="font-black mb-2" style={{ fontSize: "1.75rem", lineHeight: 1, letterSpacing: "-0.02em" }}>
+                <h2 style={{ fontSize: "1.75rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>
                   {issue.vol}
                 </h2>
-                <p className="text-sm" style={{ color: "var(--muted)", lineHeight: 1.6, maxWidth: "48ch" }}>
+                <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, maxWidth: "48ch" }}>
                   {issue.bio}
                 </p>
               </div>
-              <span style={{ fontSize: 12, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--accent)", flexShrink: 0 }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 400, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--accent)", flexShrink: 0 }}>
                 Read →
               </span>
             </div>

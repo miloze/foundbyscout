@@ -1,0 +1,297 @@
+/* ============================================================
+   FOUND BY SCOUT — Design System CSS
+   Fonts: Space Grotesk (body), Rubik (headings), DM Mono (mono)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Rubik:wght@300&family=DM+Mono:wght@300;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+
+/* ── Base Color Tokens ─────────────────────────────── */
+:root {
+  /* Dark mode (default) */
+  --background:    #202020;
+  --foreground:    #f0f0eb;
+  --accent:        #ff5841;
+  --accent-hover:  #ff3d24;
+  --muted:         #888888;
+  --border:        #333333;
+  --card:          #2a2a2a;
+
+  /* Raw palette references */
+  --color-dark-bg:     #202020;
+  --color-dark-fg:     #f0f0eb;
+  --color-dark-card:   #2a2a2a;
+  --color-dark-border: #333333;
+  --color-dark-muted:  #888888;
+
+  --color-light-bg:     #f4f2ee;
+  --color-light-fg:     #1a1a1a;
+  --color-light-card:   #ebe8e3;
+  --color-light-border: #dddad4;
+  --color-light-muted:  #777777;
+
+  --color-accent:       #ff5841;
+  --color-accent-hover: #ff3d24;
+}
+
+[data-theme="light"] {
+  --background:   #f4f2ee;
+  --foreground:   #1a1a1a;
+  --accent:       #ff5841;
+  --accent-hover: #ff3d24;
+  --muted:        #777777;
+  --border:       #dddad4;
+  --card:         #ebe8e3;
+}
+
+/* ── Font Variables ─────────────────────────────────── */
+:root {
+  --font-body:    'Geist', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-heading: 'Rubik', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+}
+
+/* ── Typography Scale ───────────────────────────────── */
+
+/* Display — Park hero headlines */
+.fbs-display {
+  font-family: var(--font-heading);
+  font-size: clamp(3.5rem, 11vw, 9rem);
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+/* H1 — Page titles */
+h1, .fbs-h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+/* H2 — Section headers */
+h2, .fbs-h2 {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+/* H3 — Card/article titles */
+h3, .fbs-h3 {
+  font-family: var(--font-heading);
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  line-height: 1.0;
+  letter-spacing: -0.015em;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+/* Body — Long-form text */
+p, .fbs-body {
+  font-family: var(--font-body);
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.7;
+  font-weight: 400;
+  color: var(--foreground);
+}
+
+/* Body small */
+.fbs-body-sm {
+  font-family: var(--font-body);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Label — Mono metadata labels */
+.fbs-label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem; /* 10px */
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Label large */
+.fbs-label-lg {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem; /* 11px */
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+/* Mono body */
+.fbs-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+/* Accent label — category/section callout */
+.fbs-accent-label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ── Semantic Element Styles ─────────────────────────── */
+
+body {
+  font-family: var(--font-body);
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── Spacing Scale ───────────────────────────────────── */
+:root {
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-7:  48px;
+  --space-8:  64px;
+  --space-9:  80px;
+  --space-10: 128px;
+
+  /* Layout */
+  --max-width:       1440px;
+  --content-padding: clamp(16px, 4vw, 56px);
+  --section-gap:     clamp(40px, 8vw, 80px);
+
+  /* Grid gaps */
+  --gap-tight: 2px;
+  --gap-sm:    0.75rem;
+  --gap-md:    1.5rem;
+  --gap-lg:    clamp(2rem, 5vw, 5rem);
+}
+
+/* ── Border Radii ─────────────────────────────────────── */
+:root {
+  --radius-none:   0;        /* All cards, buttons, inputs — sharp */
+  --radius-circle: 50%;      /* Postcode badge only */
+  --radius-sm:     2px;      /* Micro badges only */
+}
+
+/* ── Elevation / Shadow ──────────────────────────────── */
+:root {
+  /* FBS uses no box-shadows. Depth via bg color difference only. */
+  --shadow-none: none;
+}
+
+/* ── Component Primitives ────────────────────────────── */
+
+/* Button — Primary */
+.fbs-btn {
+  display: inline-block;
+  padding: 11px 28px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.fbs-btn:hover { background: var(--accent-hover); }
+
+/* Button — Ghost */
+.fbs-btn-ghost {
+  display: inline-block;
+  padding: 8px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.fbs-btn-ghost:hover { color: var(--foreground); border-color: var(--foreground); }
+
+/* Tag / Badge */
+.fbs-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.5625rem; /* 9px */
+  padding: 3px 8px;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Accent pill badge */
+.fbs-badge-accent {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.5625rem;
+  padding: 3px 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Postcode circle */
+.fbs-postcode {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 300;
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Card */
+.fbs-card {
+  background: var(--card);
+  padding: 24px;
+}
+
+/* Divider */
+.fbs-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
+}

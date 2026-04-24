@@ -15,10 +15,7 @@ export default function Home() {
       <HomeSpotlight />
 
       {/* DIRECTORY CTA + FEATURED PARKS */}
-      <section
-        className="px-8 md:px-12"
-        style={{ paddingTop: "5rem", paddingBottom: "5rem" }}
-      >
+      <section style={{ paddingTop: "5rem", paddingBottom: "5rem" }}>
         <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: "clamp(2rem, 5vw, 5rem)", alignItems: "start" }}>
           {/* Left: Directory CTA */}
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: "1rem" }}>
@@ -28,7 +25,6 @@ export default function Home() {
                 fontSize: "clamp(2rem, 5vw, 3.5rem)",
                 lineHeight: 0.95,
                 letterSpacing: "-0.03em",
-                fontWeight: 800,
                 marginBottom: "1.25rem",
               }}
             >
@@ -79,8 +75,8 @@ export default function Home() {
                       {park.tag}
                     </span>
                   </div>
-                  <p style={{ fontSize: "0.875rem", fontWeight: "bold", letterSpacing: "0.02em" }}>{park.name}</p>
-                  <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: 2 }}>{park.location}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.02em", fontFamily: "var(--font-body)" }}>{park.name}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, fontFamily: "var(--font-body)" }}>{park.location}</p>
                 </Link>
               ))}
             </div>
@@ -89,37 +85,37 @@ export default function Home() {
       </section>
 
       {/* FIELD NOTES */}
-      <section className="px-8 pt-16 pb-16 md:px-12">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-black" style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}>Field Notes</h2>
-          <Link href="/field-notes" className="text-xs uppercase tracking-widest" style={{ color: "var(--muted)", letterSpacing: "0.15em" }}>All Features →</Link>
+      <section style={{ paddingBottom: "5rem" }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}>Field Notes</h2>
+          <Link href="/field-notes" className="text-xs uppercase" style={{ color: "var(--muted)", letterSpacing: "0.15em", fontFamily: "var(--font-mono)" }}>All Features →</Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-10 flex flex-col justify-end" style={{ background: "var(--card)", minHeight: "360px" }}>
-            <p className="text-xs uppercase mb-4" style={{ color: "var(--accent)", letterSpacing: "0.15em" }}>Interview</p>
-            <h3 className="font-black mb-3" style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", lineHeight: 1, letterSpacing: "-0.02em" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <div style={{ padding: "40px 32px", display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "var(--card)", minHeight: 320 }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 12 }}>Interview</p>
+            <h3 style={{ fontSize: "clamp(1.25rem, 3vw, 2rem)", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 12 }}>
               The Unsung Builder
             </h3>
-            <p style={{ color: "var(--muted)", fontSize: "0.9375rem", lineHeight: 1.6 }}>
+            <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>
               The man who built three DIY spots and never asked for credit.
             </p>
           </div>
-          <div className="flex flex-col gap-6">
-            <div className="p-8 flex flex-col justify-end flex-1" style={{ background: "var(--card)" }}>
-              <p className="text-xs uppercase mb-3" style={{ color: "var(--accent)", letterSpacing: "0.15em" }}>Regional</p>
-              <h3 className="font-black mb-2" style={{ fontSize: "1.5rem", lineHeight: 1, letterSpacing: "-0.02em" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end", flex: 1, background: "var(--card)" }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>Regional</p>
+              <h3 style={{ fontSize: "1.25rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>
                 The North West Right Now
               </h3>
-              <p className="text-sm" style={{ color: "var(--muted)", lineHeight: 1.6 }}>
+              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
                 Five parks worth the drive, one city that&apos;s quietly become essential.
               </p>
             </div>
-            <div className="p-8 flex flex-col justify-end flex-1" style={{ background: "var(--card)" }}>
-              <p className="text-xs uppercase mb-3" style={{ color: "var(--accent)", letterSpacing: "0.15em" }}>Spotlight</p>
-              <h3 className="font-black mb-2" style={{ fontSize: "1.5rem", lineHeight: 1, letterSpacing: "-0.02em" }}>
+            <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end", flex: 1, background: "var(--card)" }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>Spotlight</p>
+              <h3 style={{ fontSize: "1.25rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>
                 Rom Skatepark
               </h3>
-              <p className="text-sm" style={{ color: "var(--muted)", lineHeight: 1.6 }}>
+              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
                 Britain&apos;s oldest concrete skatepark turns 50.
               </p>
             </div>
@@ -128,20 +124,20 @@ export default function Home() {
       </section>
 
       {/* CURATED BY */}
-      <section className="px-8 md:px-12" style={{ paddingTop: "5rem", paddingBottom: "8rem" }}>
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-black" style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}>Curated By</h2>
-          <Link href="/curated-by" className="text-xs uppercase tracking-widest" style={{ color: "var(--muted)", letterSpacing: "0.15em" }}>All Issues →</Link>
+      <section style={{ paddingBottom: "6rem" }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}>Curated By</h2>
+          <Link href="/curated-by" style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--muted)" }}>All Issues →</Link>
         </div>
-        <div className="flex items-center justify-between p-10" style={{ background: "var(--card)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 40px", background: "var(--card)" }}>
           <div>
-            <p className="text-xs uppercase mb-2" style={{ color: "var(--accent)", letterSpacing: "0.15em" }}>Vol. 001 — Bristol</p>
-            <h3 className="font-black mb-2" style={{ fontSize: "1.75rem", lineHeight: 1, letterSpacing: "-0.02em" }}>Curated by Jess</h3>
-            <p className="text-sm" style={{ color: "var(--muted)", lineHeight: 1.6 }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>Vol. 001 — Bristol</p>
+            <h3 style={{ fontSize: "1.75rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>Curated by Jess</h3>
+            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
               Skating Lloyds before it gets busy, then whatever feels right after.
             </p>
           </div>
-          <Link href="/curated-by" className="flex-shrink-0 ml-8 px-6 py-3 text-sm font-bold" style={{ background: "var(--accent)", color: "#ffffff" }}>
+          <Link href="/curated-by/jess-bristol" style={{ flexShrink: 0, marginLeft: 32, padding: "12px 24px", fontSize: 14, fontWeight: 700, background: "var(--accent)", color: "#fff", fontFamily: "var(--font-body)" }}>
             Read
           </Link>
         </div>

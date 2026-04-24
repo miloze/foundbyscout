@@ -71,35 +71,34 @@ export default async function CuratedBySlugPage({ params }: { params: Promise<{ 
     <div>
       {/* Hero */}
       <div
-        className="px-6 py-16 md:px-12 flex items-center gap-12"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--card)" }}
+        style={{ paddingTop: 48, paddingBottom: 48, display: "flex", alignItems: "center", gap: 48, borderBottom: "1px solid var(--border)", background: "var(--card)" }}
       >
         <Vinyl name={issue.curator} />
         <div>
-          <p className="text-xs uppercase mb-3" style={{ color: "var(--accent)", letterSpacing: "0.2em" }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--accent)", marginBottom: 12 }}>
             {issue.vol} — {issue.location}
           </p>
-          <h1 className="font-black" style={{ fontSize: "clamp(2rem, 6vw, 4rem)", lineHeight: 0.95, letterSpacing: "-0.03em", marginBottom: "1rem" }}>
+          <h1 style={{ fontSize: "clamp(2rem, 6vw, 4rem)", lineHeight: 0.95, letterSpacing: "-0.03em", marginBottom: 16 }}>
             {issue.vol}
           </h1>
-          <p style={{ color: "var(--muted)", fontSize: "0.9375rem", lineHeight: 1.6, maxWidth: "46ch" }}>
+          <p style={{ color: "var(--muted)", fontSize: 15, lineHeight: 1.6, maxWidth: "46ch" }}>
             {issue.bio}
           </p>
         </div>
       </div>
 
       {/* 5 Things */}
-      <section className="px-6 py-14 md:px-12" style={{ borderBottom: "1px solid var(--border)" }}>
-        <p className="text-xs uppercase mb-8" style={{ color: "var(--accent)", letterSpacing: "0.2em" }}>Five Things</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1.5rem" }}>
+      <section style={{ paddingTop: "3.5rem", paddingBottom: "3.5rem", borderBottom: "1px solid var(--border)" }}>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--accent)", marginBottom: 32 }}>Five Things</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 2 }}>
           {issue.things.map((thing, i) => (
             <div key={i} style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <div style={{ aspectRatio: "1/1", background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "2rem", color: "var(--muted)", fontWeight: 800 }}>{i + 1}</span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: "2rem", fontWeight: 300, color: "var(--muted)" }}>{i + 1}</span>
               </div>
               <div style={{ padding: "1rem" }}>
-                <p style={{ fontWeight: "bold", fontSize: "0.9375rem", marginBottom: 4 }}>{thing.label}</p>
-                <p style={{ fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.5 }}>{thing.caption}</p>
+                <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>{thing.label}</p>
+                <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>{thing.caption}</p>
               </div>
             </div>
           ))}
@@ -107,13 +106,13 @@ export default async function CuratedBySlugPage({ params }: { params: Promise<{ 
       </section>
 
       {/* Interview */}
-      <section className="px-6 py-14 md:px-12" style={{ borderBottom: "1px solid var(--border)" }}>
-        <p className="text-xs uppercase mb-8" style={{ color: "var(--accent)", letterSpacing: "0.2em" }}>Interview</p>
+      <section style={{ paddingTop: "3.5rem", paddingBottom: "3.5rem", borderBottom: "1px solid var(--border)" }}>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--accent)", marginBottom: 32 }}>Interview</p>
         <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem", maxWidth: "60ch" }}>
           {issue.interview.map((item, i) => (
             <div key={i}>
-              <p style={{ fontWeight: "bold", marginBottom: "0.5rem", lineHeight: 1.4 }}>{item.q}</p>
-              <p style={{ color: "var(--muted)", lineHeight: 1.7, fontSize: "0.9375rem" }}>{item.a}</p>
+              <p style={{ fontSize: 15, fontWeight: 500, marginBottom: "0.5rem", lineHeight: 1.4 }}>{item.q}</p>
+              <p style={{ color: "var(--muted)", lineHeight: 1.7, fontSize: 15 }}>{item.a}</p>
             </div>
           ))}
         </div>
@@ -121,9 +120,9 @@ export default async function CuratedBySlugPage({ params }: { params: Promise<{ 
 
       {/* Mixtape */}
       {issue.mixtape && (
-        <section className="px-6 py-14 md:px-12">
-          <p className="text-xs uppercase mb-6" style={{ color: "var(--accent)", letterSpacing: "0.2em" }}>Mixtape</p>
-          <p style={{ fontWeight: "bold", marginBottom: "1rem" }}>{issue.mixtape.title}</p>
+        <section style={{ paddingTop: "3.5rem", paddingBottom: "3.5rem" }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--accent)", marginBottom: 24 }}>Mixtape</p>
+          <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 16 }}>{issue.mixtape.title}</p>
           <iframe
             width="100%"
             height="120"
