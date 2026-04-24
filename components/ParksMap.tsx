@@ -6,13 +6,13 @@ import "leaflet/dist/leaflet.css";
 import { useTheme } from "./ThemeProvider";
 
 const PARKS = [
-  { id:"1",  slug:"crystal-palace", name:"Crystal Palace Skatepark", location:"South London", borough:"Bromley",  lat:51.4156, lng:-0.0719, type:"Bowl",    is_covered:false, is_free:true, opened:"March 2018", builder:"Canvas Skateparks", brief:"A 100m curved concrete band with a world-class cloverleaf pool — the first tile-and-coping pool built in London in 40 years.", facts:["Cloverleaf pool — 8.5ft deep","L-shaped bowl — 5.5ft to 7ft","Mellow street section","1,100 sq m total area","Free / daylight hours only","Opened March 2018"], scout:"The pool is the headline feature — genuinely world-class and unlike anything else in London. The mellow entry section makes it accessible for beginners. Historic site that carries real weight for UK skateboarding." },
-  { id:"2",  slug:"stockwell",      name:"Stockwell Skatepark",      location:"South London", borough:"Lambeth",  lat:51.4671, lng:-0.1157, type:"Bowl",    is_covered:false, is_free:true, opened:"1978",       builder:"Lorne Edwards",    brief:"One of the oldest surviving skateparks in the UK. A flowing snake run and organic concrete landscape, recently restored to its iconic red surface.", facts:["Built 1978 — Lorne Edwards","Long snake run — the defining feature","Open 24/7 — unsupervised","Restored red surface 2023/24","Free entry","Behind Brixton Academy"], scout:"Pilgrimage-worthy. Not about tricks — it's about speed, flow and lines. You could spend an entire day here. Go on a Sunday afternoon for the full Stockwell experience." },
-  { id:"3",  slug:"southbank",      name:"Southbank Undercroft",     location:"South London", borough:"Southwark", lat:51.5064, lng:-0.1153, type:"Historic", is_covered:true, is_free:true, opened:"1973",       builder:"Community",        brief:"The most culturally significant skate spot on earth. Fifty-plus years under Waterloo Bridge — graffiti, grinds, and the heartbeat of UK skate culture.", facts:["Est. ~1973","Saved from redevelopment 2014","Covered — rideable in all weather","Free, 24/7","Waterloo / Embankment tube","Heart of UK skate culture"], scout:"Non-negotiable. Even if you don't skate a single thing, standing here and watching for an hour tells you everything about what skateboarding means." },
+  { id:"1",  slug:"crystal-palace", name:"Crystal Palace Skatepark", postcode:"SE19", location:"South London", borough:"Bromley",  lat:51.4156, lng:-0.0719, type:"Bowl",    is_covered:false, is_free:true, opened:"March 2018", builder:"Canvas Skateparks", heroImage:"/images/parks/crystal-palace/gallery-01.webp", brief:"A 100m curved concrete band with a world-class cloverleaf pool — the first tile-and-coping pool built in London in 40 years.", facts:["Cloverleaf pool — 8.5ft deep","L-shaped bowl — 5.5ft to 7ft","Mellow street section","1,100 sq m total area","Free / daylight hours only","Opened March 2018"], scout:"The pool is the headline feature — genuinely world-class and unlike anything else in London. The mellow entry section makes it accessible for beginners. Historic site that carries real weight for UK skateboarding." },
+  { id:"2",  slug:"stockwell",      name:"Stockwell Skatepark",      postcode:"SW9",  location:"South London", borough:"Lambeth",  lat:51.4671, lng:-0.1157, type:"Bowl",    is_covered:false, is_free:true, opened:"1978",       builder:"Lorne Edwards",    heroImage:"/images/parks/stockwell/gallery-01.webp",        brief:"One of the oldest surviving skateparks in the UK. A flowing snake run and organic concrete landscape, recently restored to its iconic red surface.", facts:["Built 1978 — Lorne Edwards","Long snake run — the defining feature","Open 24/7 — unsupervised","Restored red surface 2023/24","Free entry","Behind Brixton Academy"], scout:"Pilgrimage-worthy. Not about tricks — it's about speed, flow and lines. You could spend an entire day here. Go on a Sunday afternoon for the full Stockwell experience." },
+  { id:"3",  slug:"southbank",      name:"Southbank Undercroft",     postcode:"SE1",  location:"South London", borough:"Southwark", lat:51.5064, lng:-0.1153, type:"Historic", is_covered:true, is_free:true, opened:"1973",       builder:"Community",        heroImage:"/images/parks/southbank/gallery-01.webp",        brief:"The most culturally significant skate spot on earth. Fifty-plus years under Waterloo Bridge — graffiti, grinds, and the heartbeat of UK skate culture.", facts:["Est. ~1973","Saved from redevelopment 2014","Covered — rideable in all weather","Free, 24/7","Waterloo / Embankment tube","Heart of UK skate culture"], scout:"Non-negotiable. Even if you don't skate a single thing, standing here and watching for an hour tells you everything about what skateboarding means." },
 ];
 
 const REGIONS = ["All","London"];
-const TYPE_FILTERS = ["All","Bowl","Historic"];
+const TYPE_FILTERS = ["All","Bowl","Historic","Free","Covered"];
 
 const REGION_BOUNDS: Record<string,[[number,number],[number,number]]> = {
   "All":        [[49.5,-8.0],[61.0, 2.0]],
@@ -156,7 +156,10 @@ export default function ParksMap() {
 
   const filteredParks = PARKS.filter(p => {
     const mF = activeFilter === "All" || p.location.includes(activeFilter) || p.borough.includes(activeFilter);
-    const mT = typeFilter === "All" || p.type === typeFilter;
+    const mT = typeFilter === "All"
+      || p.type === typeFilter
+      || (typeFilter === "Free"    && p.is_free)
+      || (typeFilter === "Covered" && p.is_covered);
     const mS = p.name.toLowerCase().includes(search.toLowerCase()) || p.location.toLowerCase().includes(search.toLowerCase());
     return mF && mT && mS;
   });
@@ -407,76 +410,96 @@ export default function ParksMap() {
 
           <>
           {/* Sidebar */}
-          <div style={{ position:"absolute",top:0,left:0,bottom:0,width:280,background:"var(--background)",borderRight:"1px solid var(--border)",display:"flex",flexDirection:"column",zIndex:10 }}>
-            <div style={{ padding:12,borderBottom:"1px solid var(--border)" }}>
-              <input type="text" placeholder="Search parks…" value={search} onChange={e=>setSearch(e.target.value)}
-                style={{ width:"100%",padding:"9px 13px",fontSize:13,background:"var(--card)",border:"1px solid var(--border)",color:"var(--foreground)",outline:"none",boxSizing:"border-box" }} />
+          <div style={{ position:"absolute",top:0,left:0,bottom:0,width:320,background:"var(--background)",borderRight:"1px solid var(--border)",display:"flex",flexDirection:"column",zIndex:10 }}>
+            {/* Search */}
+            <div style={{ padding:16,borderBottom:"1px solid var(--border)",flexShrink:0 }}>
+              <p style={{ fontFamily:"var(--font-mono)",fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--muted)",marginBottom:10 }}>Skateparks</p>
+              <input type="text" placeholder="Search parks or areas…" value={search} onChange={e=>setSearch(e.target.value)}
+                style={{ width:"100%",background:"var(--card)",border:"1px solid var(--border)",color:"var(--foreground)",fontFamily:"var(--font-mono)",fontSize:12,padding:"9px 12px",outline:"none",boxSizing:"border-box",letterSpacing:"0.04em" }} />
             </div>
-            <div style={{ display:"flex",gap:4,padding:"8px 12px",borderBottom:"1px solid var(--border)",overflowX:"auto",flexWrap:"wrap" }}>
-              {REGIONS.map(f=><button key={f} onClick={()=>{ userChangedFilter.current=true; setActiveFilter(f); }} style={S.desktopFilterBtn(activeFilter===f)}>{f}</button>)}
-            </div>
-            <div style={{ display:"flex",gap:4,padding:"8px 12px",borderBottom:"1px solid var(--border)",overflowX:"auto",alignItems:"center" }}>
-              {TYPE_FILTERS.map(f=><button key={f} onClick={()=>setTypeFilter(f)} style={S.desktopFilterBtn(typeFilter===f)}>{f}</button>)}
-              <button onClick={nearMe} style={{ ...S.desktopFilterBtn(false), marginLeft:"auto", display:"flex", alignItems:"center", gap:4 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
-                Near me
-              </button>
-            </div>
-            <div style={{ overflowY:"auto",flex:1 }}>
-              {filteredParks.map(park=>(
-                <button key={park.id} onClick={()=>openPark(park)}
-                  style={{ width:"100%",textAlign:"left",padding:0,borderBottom:"1px solid var(--border)",cursor:"pointer",background:selectedPark?.id===park.id?"var(--card)":"transparent",display:"flex",alignItems:"stretch" }}>
-                  <div style={{ width:3,flexShrink:0,background:GRADIENTS[gradIdx(park)] }} />
-                  <div style={{ padding:"11px 13px",flex:1 }}>
-                    <p style={{ fontSize:13,fontWeight:"bold",color:selectedPark?.id===park.id?"var(--accent)":"var(--foreground)" }}>{park.name}</p>
-                    <p style={{ fontSize:11,marginTop:2,color:"var(--muted)" }}>{park.location}</p>
-                  </div>
-                  {selectedPark?.id===park.id && <div style={{ display:"flex",alignItems:"center",paddingRight:12,color:"var(--accent)",fontSize:12 }}>→</div>}
+            {/* Filters */}
+            <div style={{ padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0 }}>
+              {TYPE_FILTERS.filter(f=>f!=="All").map(f=>(
+                <button key={f} onClick={()=>setTypeFilter(typeFilter===f?"All":f)}
+                  style={{ fontFamily:"var(--font-mono)",fontSize:9,padding:"4px 10px",border:`1px solid ${typeFilter===f?"var(--accent)":"var(--border)"}`,color:typeFilter===f?"var(--accent)":"var(--muted)",background:typeFilter===f?"color-mix(in srgb,var(--accent) 8%,transparent)":"none",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase" as const }}>
+                  {f}
                 </button>
               ))}
+            </div>
+            {/* Park list */}
+            <div style={{ overflowY:"auto",flex:1 }}>
+              {filteredParks.map(park=>{
+                const sel = selectedPark?.id===park.id;
+                const tags = [park.type, park.is_free?"Free":null, park.is_covered?"Covered":null].filter(Boolean) as string[];
+                const postcodeLetters = park.postcode.replace(/[0-9]/g,"");
+                return (
+                  <button key={park.id} onClick={()=>openPark(park)}
+                    style={{ width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"14px 16px",borderBottom:"1px solid var(--border)",background:sel?"var(--card)":"none",cursor:"pointer",textAlign:"left",border:"none",borderBottom:"1px solid var(--border)" }}>
+                    <div style={{ flex:1,minWidth:0 }}>
+                      <p style={{ fontSize:13,fontWeight:600,color:sel?"var(--accent)":"var(--foreground)",letterSpacing:"0.01em",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{park.name}</p>
+                      <p style={{ fontFamily:"var(--font-mono)",fontSize:9,color:"var(--muted)",letterSpacing:"0.08em",textTransform:"uppercase",marginTop:3 }}>{park.postcode} · {park.location}</p>
+                      <div style={{ display:"flex",gap:4,marginTop:6 }}>
+                        {tags.map(t=><span key={t} style={{ fontFamily:"var(--font-mono)",fontSize:8,padding:"2px 6px",border:"1px solid var(--border)",color:"var(--muted)",letterSpacing:"0.08em",textTransform:"uppercase" as const }}>{t}</span>)}
+                      </div>
+                    </div>
+                    <div style={{ width:36,height:36,borderRadius:"50%",background:sel?"var(--accent)":"var(--card)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.2s" }}>
+                      <span style={{ fontFamily:"var(--font-heading)",fontSize:10,fontWeight:300,color:sel?"#fff":"var(--muted)",letterSpacing:"0.03em" }}>{postcodeLetters}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Desktop preview bar */}
           {selectedPark && (
-            <div style={{ position:"absolute",bottom:0,left:280,right:0,height:PEEK_H,background:"var(--background)",borderTop:"1px solid var(--border)",zIndex:11,display:"flex",alignItems:"stretch",animation:"fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both" }}>
-              {/* Gradient panel */}
-              <div style={{ width:220,flexShrink:0,background:GRADIENTS[gradIdx(selectedPark)],position:"relative",display:"flex",alignItems:"flex-end" }}>
-                <div style={{ padding:"0 18px 16px" }}>
-                  <p style={{ fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--accent)",marginBottom:3 }}>{selectedPark.location}</p>
-                  <p style={{ fontSize:16,fontWeight:900,letterSpacing:"-0.02em",lineHeight:1.1,color:"#f0f0eb" }}>{selectedPark.name}</p>
+            <div style={{ position:"absolute",bottom:0,left:320,right:0,height:PEEK_H,background:"var(--background)",borderTop:"1px solid var(--border)",zIndex:11,display:"flex",alignItems:"stretch",animation:"fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both" }}>
+              {/* Park photo */}
+              {selectedPark.heroImage && (
+                <div style={{ width:220,flexShrink:0,overflow:"hidden",position:"relative" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={selectedPark.heroImage} alt="" style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
                 </div>
-              </div>
+              )}
               {/* Info panel */}
-              <div style={{ flex:1,padding:"16px 22px",display:"flex",flexDirection:"column",justifyContent:"center",borderLeft:"1px solid var(--border)",overflow:"hidden" }}>
-                <div style={{ display:"flex",gap:7,marginBottom:9 }}>
-                  <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>{selectedPark.type}</span>
-                  {selectedPark.is_free    && <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--accent)" }}>Free</span>}
-                  {selectedPark.is_covered && <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--accent)" }}>Covered</span>}
-                  {!selectedPark.is_free   && <span style={{ fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)" }}>Paid</span>}
+              <div style={{ flex:1,padding:"20px 24px",display:"flex",flexDirection:"column",justifyContent:"space-between",borderLeft:"1px solid var(--border)",overflow:"hidden",minWidth:0 }}>
+                <div>
+                  {/* Postcode row */}
+                  <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:10 }}>
+                    <div style={{ width:32,height:32,borderRadius:"50%",background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                      <span style={{ fontFamily:"var(--font-heading)",fontSize:10,fontWeight:300,color:"#fff",letterSpacing:"0.03em" }}>{selectedPark.postcode.replace(/[0-9]/g,"")}</span>
+                    </div>
+                    <p style={{ fontFamily:"var(--font-mono)",fontSize:9,color:"var(--muted)",letterSpacing:"0.1em",textTransform:"uppercase" }}>{selectedPark.postcode} · {selectedPark.location}</p>
+                    <div style={{ display:"flex",gap:4,marginLeft:4 }}>
+                      {[selectedPark.type, selectedPark.is_free?"Free":null, selectedPark.is_covered?"Covered":null].filter(Boolean).map(t=>(
+                        <span key={t as string} style={{ fontFamily:"var(--font-mono)",fontSize:8,padding:"2px 7px",border:"1px solid var(--border)",color:"var(--muted)",letterSpacing:"0.08em",textTransform:"uppercase" as const }}>{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Name */}
+                  <h3 style={{ fontFamily:"var(--font-heading)",fontSize:"clamp(18px,2vw,26px)",fontWeight:300,letterSpacing:"-0.02em",textTransform:"uppercase",lineHeight:1,marginBottom:8 }}>{selectedPark.name}</h3>
+                  {/* Brief */}
+                  <p style={{ fontSize:13,lineHeight:1.6,color:"var(--muted)",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden" } as React.CSSProperties}>{selectedPark.brief}</p>
                 </div>
-                <p style={{ fontSize:13,lineHeight:1.65,color:"var(--muted)",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden" } as React.CSSProperties}>{selectedPark.brief}</p>
               </div>
               {/* Actions panel */}
-              <div style={{ flexShrink:0,padding:"16px 20px",display:"flex",flexDirection:"column",justifyContent:"center",gap:10,borderLeft:"1px solid var(--border)",alignItems:"center",minWidth:160 }}>
-                <button
-                  onClick={() => router.push(`/parks/${selectedPark.slug}`)}
-                  style={{ padding:"10px 20px",fontSize:12,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",background:"var(--accent)",color:"#fff",border:"none",cursor:"pointer",whiteSpace:"nowrap",width:"100%" }}
-                >
-                  View Park →
-                </button>
-                <div style={{ display:"flex",gap:16,alignItems:"center" }}>
-                  <button onClick={() => toggleSave(selectedPark)} style={{ background:"none",border:"none",cursor:"pointer",color: isSaved ? "var(--accent)" : "var(--muted)",padding:0,display:"flex",alignItems:"center" }} title={isSaved ? "Saved" : "Save"}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              <div style={{ flexShrink:0,padding:"16px 20px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:8,borderLeft:"1px solid var(--border)" }}>
+                <div style={{ display:"flex",gap:6 }}>
+                  <button onClick={() => toggleSave(selectedPark)} title={isSaved?"Saved":"Save"} style={{ width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer",color:isSaved?"var(--accent)":"var(--muted)" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill={isSaved?"currentColor":"none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                   </button>
-                  <button onClick={() => sharePark(selectedPark)} style={{ background:"none",border:"none",cursor:"pointer",color: copied ? "var(--accent)" : "var(--muted)",padding:0,display:"flex",alignItems:"center" }} title="Share">
+                  <button onClick={() => sharePark(selectedPark)} title="Share" style={{ width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer",color:copied?"var(--accent)":"var(--muted)" }}>
                     {copied
-                      ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                     }
                   </button>
-                  <button onClick={dismiss} style={{ fontSize:11,color:"var(--muted)",background:"none",border:"none",cursor:"pointer" }}>✕</button>
+                  <button onClick={dismiss} title="Close" style={{ width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer",color:"var(--muted)",fontSize:14 }}>✕</button>
                 </div>
+                <button onClick={() => router.push(`/parks/${selectedPark.slug}`)}
+                  style={{ padding:"11px 20px",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.12em",background:"var(--accent)",color:"#fff",border:"none",cursor:"pointer",fontFamily:"var(--font-body)",whiteSpace:"nowrap" }}>
+                  View Park →
+                </button>
               </div>
             </div>
           )}

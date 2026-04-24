@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Rubik, DM_Mono } from "next/font/google";
+import { Geist, Rubik, DM_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import ThemeProvider from "@/components/ThemeProvider";
 import Grain from "@/components/Grain";
 
-const bodyFont    = Space_Grotesk({ subsets: ["latin"], weight: ["300","400","500","600","700"], variable: "--font-body" });
+const bodyFont    = Geist({ subsets: ["latin"], weight: ["300","400","500","600","700"], variable: "--font-body" });
 const headingFont = Rubik({ subsets: ["latin"], weight: ["300"], variable: "--font-heading" });
 const monoFont    = DM_Mono({ subsets: ["latin"], weight: ["300","400"], variable: "--font-mono" });
 
