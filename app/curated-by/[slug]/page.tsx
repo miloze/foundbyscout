@@ -78,8 +78,8 @@ export default async function CuratedBySlugPage({ params }: { params: Promise<{ 
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--accent)", marginBottom: 12 }}>
             {issue.vol} — {issue.location}
           </p>
-          <h1 style={{ fontSize: "clamp(2rem, 6vw, 4rem)", lineHeight: 0.95, letterSpacing: "-0.03em", marginBottom: 16 }}>
-            {issue.vol}
+          <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(2rem, 6vw, 4rem)", fontWeight: 300, textTransform: "uppercase", lineHeight: 0.95, letterSpacing: "-0.03em", marginBottom: 16 }}>
+            Curated by {issue.curator}
           </h1>
           <p style={{ color: "var(--muted)", fontSize: 15, lineHeight: 1.6, maxWidth: "46ch" }}>
             {issue.bio}
