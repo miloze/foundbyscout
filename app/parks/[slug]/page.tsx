@@ -82,6 +82,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
             cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
             cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
             modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
+            pingPong={park.ping_pong ?? undefined}
           />
         ) : (
           <>

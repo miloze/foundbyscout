@@ -7,7 +7,7 @@
 
 -- ── PARKS ──────────────────────────────────────────────────────────────────
 
-INSERT INTO parks (slug, name, address, postcode, borough, location, type, surface, surface_note, is_free, is_covered, opened, builder, managed_by, description, brief, facts, lat, lng, hero_image, model_file, use_contour_model, camera_pos, model_rotation, glance, transport, hours, facilities, gallery, spots, socials, sort_order, published)
+INSERT INTO parks (slug, name, address, postcode, borough, location, type, surface, surface_note, is_free, is_covered, opened, builder, managed_by, description, brief, facts, lat, lng, hero_image, model_file, use_contour_model, camera_pos, camera_target, model_rotation, ping_pong, glance, transport, hours, facilities, gallery, spots, socials, sort_order, published)
 VALUES
 (
   'crystal-palace',
@@ -28,7 +28,9 @@ VALUES
   '/images/parks/crystal-palace/gallery-01.webp',
   '/crystal-palace-skate_park.glb', true,
   ARRAY[-18.0, 20.0, 20.0]::numeric[],
+  ARRAY[0.0, 0.0, 0.0]::numeric[],
   ARRAY[-1.5707963, 0.0, 0.0]::numeric[],
+  NULL,
   '[{"icon":"wb_sunny","value":"Outdoor","label":"Setting","available":true},{"icon":"bolt","value":"No floodlights","label":"Lighting","available":false},{"icon":"park","value":"Crystal Palace Park","label":"Green Space","available":true},{"icon":"local_parking","value":"Park car parks","label":"Car Park","available":true},{"icon":"wc","value":"Nearby","label":"Toilets","available":true},{"icon":"coffee","value":"In park","label":"Café","available":true},{"icon":"sports","value":"Bowl","label":"Style","available":true},{"icon":"confirmation_number","value":"Free","label":"Entry","available":true}]'::jsonb,
   '[{"type":"rail","name":"Crystal Palace","detail":"London Overground · 5 min walk"},{"type":"bus","name":"Routes 3, 157, 249","detail":"Crystal Palace stop · 2 min walk"},{"type":"bus","name":"Routes 122, 322, 358","detail":"Crystal Palace Park stop · 4 min walk"}]'::jsonb,
   '[{"days":"Mon – Sun","time":"08:00 – 20:00"}]'::jsonb,
@@ -57,7 +59,9 @@ VALUES
   '/images/parks/southbank/gallery-01.webp',
   '/southbank-undercroft.glb', false,
   ARRAY[0.0, 7.0, 18.0]::numeric[],
+  ARRAY[0.0, 7.0, 0.0]::numeric[],
   ARRAY[0.0, 3.14159265, 0.0]::numeric[],
+  '[[24.91, 8.44, -6.79], [-23.18, 9.11, -10.73]]'::jsonb,
   '[{"icon":"roofing","value":"Covered","label":"Setting","available":true},{"icon":"bolt","value":"Ambient only","label":"Lighting","available":true},{"icon":"schedule","value":"24 / 7","label":"Hours","available":true},{"icon":"local_parking","value":"None nearby","label":"Car Park","available":false},{"icon":"wc","value":"Southbank Centre","label":"Toilets","available":true},{"icon":"coffee","value":"Multiple nearby","label":"Café","available":true},{"icon":"sports","value":"Street / Banks","label":"Style","available":true},{"icon":"confirmation_number","value":"Free","label":"Entry","available":true}]'::jsonb,
   '[{"type":"tube","name":"Waterloo","detail":"Jubilee, Northern, Bakerloo, Waterloo & City · 5 min walk"},{"type":"tube","name":"Embankment","detail":"District & Circle lines · 8 min walk"},{"type":"rail","name":"Waterloo","detail":"National Rail · 5 min walk"}]'::jsonb,
   '[{"days":"Mon – Sun","time":"Open 24/7"}]'::jsonb,
@@ -85,7 +89,9 @@ VALUES
   '/images/parks/stockwell/gallery-01.webp',
   '/stockwell-skatepark.glb', true,
   ARRAY[0.0, 5.0, 31.0]::numeric[],
+  ARRAY[0.0, 0.0, 0.0]::numeric[],
   ARRAY[0.0, 1.5707963, 0.0]::numeric[],
+  NULL,
   '[{"icon":"wb_sunny","value":"Outdoor","label":"Setting","available":true},{"icon":"bolt","value":"No floodlights","label":"Lighting","available":false},{"icon":"park","value":"Adjacent","label":"Green Space","available":true},{"icon":"local_parking","value":"Street only","label":"Car Park","available":false},{"icon":"wc","value":"None","label":"Toilets","available":false},{"icon":"coffee","value":"None","label":"Café","available":false},{"icon":"sports","value":"Bowl / Snake Run","label":"Style","available":true},{"icon":"confirmation_number","value":"Free","label":"Entry","available":true}]'::jsonb,
   '[{"type":"tube","name":"Stockwell","detail":"Victoria & Northern lines · 8 min walk"},{"type":"tube","name":"Brixton","detail":"Victoria line · 12 min walk"},{"type":"bus","name":"Routes 2, 88, 155","detail":"Stockwell Road stop · 2 min walk"}]'::jsonb,
   '[{"days":"Mon – Sun","time":"Open 24/7"}]'::jsonb,
