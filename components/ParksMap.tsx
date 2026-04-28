@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "./ThemeProvider";
 
-const PARKS = [
-  { id:"1",  slug:"crystal-palace", name:"Crystal Palace Skatepark", postcode:"SE19", location:"South London", borough:"Bromley",  lat:51.4156, lng:-0.0719, type:"Bowl",    is_covered:false, is_free:true, opened:"March 2018", builder:"Canvas Skateparks", heroImage:"/images/parks/crystal-palace/gallery-01.webp", brief:"A 100m curved concrete band with a world-class cloverleaf pool — the first tile-and-coping pool built in London in 40 years.", facts:["Cloverleaf pool — 8.5ft deep","L-shaped bowl — 5.5ft to 7ft","Mellow street section","1,100 sq m total area","Free / daylight hours only","Opened March 2018"], scout:"The pool is the headline feature — genuinely world-class and unlike anything else in London. The mellow entry section makes it accessible for beginners. Historic site that carries real weight for UK skateboarding." },
-  { id:"2",  slug:"stockwell",      name:"Stockwell Skatepark",      postcode:"SW9",  location:"South London", borough:"Lambeth",  lat:51.4671, lng:-0.1157, type:"Bowl",    is_covered:false, is_free:true, opened:"1978",       builder:"Lorne Edwards",    heroImage:"/images/parks/stockwell/gallery-01.webp",        brief:"One of the oldest surviving skateparks in the UK. A flowing snake run and organic concrete landscape, recently restored to its iconic red surface.", facts:["Built 1978 — Lorne Edwards","Long snake run — the defining feature","Open 24/7 — unsupervised","Restored red surface 2023/24","Free entry","Behind Brixton Academy"], scout:"Pilgrimage-worthy. Not about tricks — it's about speed, flow and lines. You could spend an entire day here. Go on a Sunday afternoon for the full Stockwell experience." },
-  { id:"3",  slug:"southbank",      name:"Southbank Undercroft",     postcode:"SE1",  location:"South London", borough:"Southwark", lat:51.5064, lng:-0.1153, type:"Historic", is_covered:true, is_free:true, opened:"1973",       builder:"Community",        heroImage:"/images/parks/southbank/gallery-01.webp",        brief:"The most culturally significant skate spot on earth. Fifty-plus years under Waterloo Bridge — graffiti, grinds, and the heartbeat of UK skate culture.", facts:["Est. ~1973","Saved from redevelopment 2014","Covered — rideable in all weather","Free, 24/7","Waterloo / Embankment tube","Heart of UK skate culture"], scout:"Non-negotiable. Even if you don't skate a single thing, standing here and watching for an hour tells you everything about what skateboarding means." },
-];
+type Park = {
+  id: string; slug: string; name: string; postcode: string; location: string;
+  borough: string; lat: number; lng: number; type: string;
+  is_covered: boolean; is_free: boolean; opened: string; builder: string;
+  hero_image: string; brief: string; facts: string[]; scout: string;
+};
 
 const REGIONS = ["All","London"];
 const TYPE_FILTERS = ["All","Bowl","Historic","Free","Covered"];
@@ -39,13 +40,13 @@ const GRADIENTS = [
   "linear-gradient(160deg,#1a1a1a 0%,#2e1a10 60%,#3d2000 100%)",
 ];
 
-type Park = typeof PARKS[0];
 type CardState = "hidden" | "peek";
 
 const PEEK_H = 196;
 
 export default function ParksMap() {
   const router = useRouter();
+  const [parks, setParks] = useState<Park[]>([]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef       = useRef<any>(null);
@@ -81,12 +82,27 @@ export default function ParksMap() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  // Fetch parks from Supabase
+  useEffect(() => {
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const db = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      db.from("parks")
+        .select("id, slug, name, postcode, location, borough, lat, lng, type, is_covered, is_free, opened, builder, hero_image, brief, facts, scout")
+        .eq("published", true)
+        .order("sort_order", { ascending: true })
+        .then(({ data }) => { if (data) setParks(data as Park[]); });
+    });
+  }, []);
+
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("fbs-saved") || "[]");
     setSavedIds(saved);
   }, []);
 
-  // ── Leaflet ──
+  // ── Leaflet init (map only, no markers yet) ──
   useEffect(() => {
     if (mapRef.current) return;
     let cancelled = false;
@@ -103,10 +119,6 @@ export default function ParksMap() {
           { attribution:"© OpenStreetMap contributors © CARTO", subdomains:"abcd", maxZoom:19 }
         ).addTo(map);
         L.control.zoom({ position:"bottomright" }).addTo(map);
-        PARKS.forEach(park => {
-          const dot = L.divIcon({ className:"", html:`<div style="width:12px;height:12px;background:#888;border-radius:50%;border:2px solid rgba(136,136,136,0.3);transition:background .2s,transform .15s;"></div>`, iconSize:[12,12], iconAnchor:[6,6] });
-          markerRefs.current[park.id] = L.marker([park.lat,park.lng],{ icon:dot }).addTo(map).on("click",()=>openPark(park));
-        });
         mapRef.current = map;
         setMapStatus("ready");
       } catch(err) { setMapStatus("error"); setMapError(String(err)); }
@@ -114,19 +126,33 @@ export default function ParksMap() {
     return () => { cancelled = true; if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Add markers once parks are loaded ──
+  useEffect(() => {
+    if (!mapRef.current || parks.length === 0) return;
+    import("leaflet").then(({ default: L }) => {
+      parks.forEach(park => {
+        if (markerRefs.current[park.id]) return; // already added
+        const dot = L.divIcon({ className:"", html:`<div style="width:12px;height:12px;background:#888;border-radius:50%;border:2px solid rgba(136,136,136,0.3);transition:background .2s,transform .15s;"></div>`, iconSize:[12,12], iconAnchor:[6,6] });
+        markerRefs.current[park.id] = L.marker([park.lat,park.lng],{ icon:dot }).addTo(mapRef.current).on("click",()=>openPark(park));
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parks]);
+
   useEffect(() => {
     if (mapRef.current) setTimeout(() => mapRef.current?.invalidateSize(), 50);
   }, [isMobile]);
 
   // On load: pick a random London park, zoom to it and select it
   useEffect(() => {
-    if (mapStatus !== "ready" || !mapRef.current) return;
-    const londonParks = PARKS.filter(p => p.location.includes("London"));
+    if (mapStatus !== "ready" || !mapRef.current || parks.length === 0) return;
+    const londonParks = parks.filter(p => p.location?.includes("London"));
+    if (!londonParks.length) return;
     const park = londonParks[Math.floor(Math.random() * londonParks.length)];
     mapRef.current.setView([park.lat, park.lng], 14, { animate: false });
     openPark(park);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapStatus]);
+  }, [mapStatus, parks]);
 
   useEffect(() => {
     if (!tileLayerRef.current) return;
@@ -154,7 +180,7 @@ export default function ParksMap() {
     mapRef.current.fitBounds(bounds, { animate:true, duration:0.6, paddingTopLeft:[24,24], paddingBottomRight:[24, pad] });
   }, [activeFilter, cardState]);
 
-  const filteredParks = PARKS.filter(p => {
+  const filteredParks = parks.filter(p => {
     const mF = activeFilter === "All" || p.location.includes(activeFilter) || p.borough.includes(activeFilter);
     const mT = typeFilter === "All"
       || p.type === typeFilter
@@ -265,7 +291,7 @@ export default function ParksMap() {
     }
   };
 
-  const gradIdx = (park: Park) => PARKS.findIndex(p => p.id === park.id) % GRADIENTS.length;
+  const gradIdx = (park: Park) => parks.findIndex(p => p.id === park.id) % GRADIENTS.length;
   const isSaved = selectedPark ? savedIds.includes(selectedPark.id) : false;
 
   const S = {
@@ -455,10 +481,10 @@ export default function ParksMap() {
           {selectedPark && (
             <div style={{ position:"absolute",bottom:0,left:320,right:0,height:PEEK_H,background:"var(--background)",borderTop:"1px solid var(--border)",zIndex:11,display:"flex",alignItems:"stretch",animation:"fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both" }}>
               {/* Park photo */}
-              {selectedPark.heroImage && (
+              {selectedPark.hero_image && (
                 <div style={{ width:220,flexShrink:0,overflow:"hidden",position:"relative" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={selectedPark.heroImage} alt="" style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
+                  <img src={selectedPark.hero_image} alt="" style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
                 </div>
               )}
               {/* Info panel */}

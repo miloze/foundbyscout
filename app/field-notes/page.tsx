@@ -1,39 +1,18 @@
+import { createServerClient } from "@/lib/supabase-server";
+
 export const metadata = { title: "Field Notes — Found By Scout" };
 
-const FEATURES = [
-  {
-    cat: "Interview",
-    title: "The Unsung Builder",
-    blurb: "The man who built three DIY spots and never asked for credit.",
-    slug: "the-unsung-builder",
-  },
-  {
-    cat: "Regional",
-    title: "The North West Right Now",
-    blurb: "Five parks worth the drive, one city that's quietly become essential.",
-    slug: "north-west-right-now",
-  },
-  {
-    cat: "Spotlight",
-    title: "Rom Skatepark",
-    blurb: "Britain's oldest concrete skatepark turns 50.",
-    slug: "rom-skatepark",
-  },
-  {
-    cat: "Essay",
-    title: "Why Skateparks Look the Way They Do",
-    blurb: "Sixty years of concrete, community, and compromise.",
-    slug: "why-skateparks-look-the-way-they-do",
-  },
-  {
-    cat: "Regional",
-    title: "Scotland's Hidden Parks",
-    blurb: "From Livingston to the islands — the parks that don't make the lists.",
-    slug: "scotlands-hidden-parks",
-  },
-];
+export default async function FieldNotesPage() {
+  const db = createServerClient();
+  const { data: features } = await db
+    .from("field_notes")
+    .select("slug, title, category, blurb")
+    .eq("published", true)
+    .order("sort_order", { ascending: true });
 
-export default function FieldNotesPage() {
+  const items = features ?? [];
+  const [featured, ...rest] = items;
+
   return (
     <div style={{ paddingTop: "3rem", paddingBottom: "6rem" }}>
       {/* Header */}
@@ -51,60 +30,68 @@ export default function FieldNotesPage() {
 
       <hr style={{ border: "none", borderTop: "1px solid var(--border)", marginBottom: 40 }} />
 
+      {items.length === 0 && (
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.1em" }}>
+          No articles published yet.
+        </p>
+      )}
+
       {/* Featured article — 2-col */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, marginBottom: 2 }}>
-        <div style={{ background: "var(--card)", minHeight: 360, padding: "40px 36px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 16 }}>
-            {FEATURES[0].cat}
-          </p>
-          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(1.5rem, 3vw, 2.5rem)", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.02em", lineHeight: 1, marginBottom: 16 }}>
-            {FEATURES[0].title}
-          </h2>
-          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--muted)", marginBottom: 24, maxWidth: "42ch" }}>
-            {FEATURES[0].blurb}
-          </p>
-          <button style={{ padding: "10px 24px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", alignSelf: "flex-start", fontFamily: "var(--font-body)" }}>
-            Read →
-          </button>
+      {featured && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, marginBottom: 2 }}>
+          <div style={{ background: "var(--card)", minHeight: 360, padding: "40px 36px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 16 }}>
+              {featured.category}
+            </p>
+            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(1.5rem, 3vw, 2.5rem)", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.02em", lineHeight: 1, marginBottom: 16 }}>
+              {featured.title}
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--muted)", marginBottom: 24, maxWidth: "42ch" }}>
+              {featured.blurb}
+            </p>
+            <button style={{ padding: "10px 24px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", background: "var(--accent)", color: "#fff", border: "none", cursor: "pointer", alignSelf: "flex-start", fontFamily: "var(--font-body)" }}>
+              Read →
+            </button>
+          </div>
+          <div style={{ background: "var(--card)", minHeight: 360, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--border)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Photo</span>
+          </div>
         </div>
-        <div style={{ background: "var(--card)", minHeight: 360, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--border)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Photo</span>
-        </div>
-      </div>
+      )}
 
       {/* 3-col grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, marginBottom: 2 }}>
-        {FEATURES.slice(1, 4).map((f) => (
-          <div key={f.slug} style={{ background: "var(--card)", padding: "28px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 10 }}>
-              {f.cat}
-            </p>
-            <h3 style={{ fontFamily: "var(--font-heading)", fontSize: "1.2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.015em", lineHeight: 1, marginBottom: 10 }}>
-              {f.title}
-            </h3>
-            <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)" }}>
-              {f.blurb}
-            </p>
-          </div>
-        ))}
-      </div>
+      {rest.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, marginBottom: 2 }}>
+          {rest.slice(0, 3).map(f => (
+            <div key={f.slug} style={{ background: "var(--card)", padding: "28px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 10 }}>
+                {f.category}
+              </p>
+              <h3 style={{ fontFamily: "var(--font-heading)", fontSize: "1.2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.015em", lineHeight: 1, marginBottom: 10 }}>
+                {f.title}
+              </h3>
+              <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)" }}>{f.blurb}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 2-col grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-        {FEATURES.slice(3).map((f) => (
-          <div key={f.slug} style={{ background: "var(--card)", padding: "28px 24px" }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 10 }}>
-              {f.cat}
-            </p>
-            <h3 style={{ fontFamily: "var(--font-heading)", fontSize: "1.2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.015em", lineHeight: 1, marginBottom: 10 }}>
-              {f.title}
-            </h3>
-            <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)" }}>
-              {f.blurb}
-            </p>
-          </div>
-        ))}
-      </div>
+      {rest.length > 3 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+          {rest.slice(3).map(f => (
+            <div key={f.slug} style={{ background: "var(--card)", padding: "28px 24px" }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 10 }}>
+                {f.category}
+              </p>
+              <h3 style={{ fontFamily: "var(--font-heading)", fontSize: "1.2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.015em", lineHeight: 1, marginBottom: 10 }}>
+                {f.title}
+              </h3>
+              <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)" }}>{f.blurb}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

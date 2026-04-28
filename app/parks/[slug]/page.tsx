@@ -1,262 +1,18 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import ParkHeroViewer from "@/components/ParkHeroViewer";
 import ParkWeather from "@/components/ParkWeather";
 import ParkBusy from "@/components/ParkBusy";
+import { createServerClient } from "@/lib/supabase-server";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Transport   = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: string };
-type GlanceItem  = { icon: string; value: string; label: string; available: boolean };
-type Facility    = { icon: string; name: string; status: string; available: boolean };
-type HoursRow    = { days: string; time: string };
-type GalleryImg  = { src: string; caption?: string; credit?: string; span?: "full"|"wide"|"normal" };
-type Spot        = { name: string; description: string; position: string; bounty: string; difficulty: "easy"|"medium"|"hard"|"open" };
-
+type Transport  = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: string };
+type GlanceItem = { icon: string; value: string; label: string; available: boolean };
+type Facility   = { icon: string; name: string; status: string; available: boolean };
+type HoursRow   = { days: string; time: string };
+type Spot       = { name: string; description: string; position: string; bounty: string; difficulty: "easy"|"medium"|"hard"|"open" };
 type Social     = { platform: "instagram"|"facebook"|"youtube"|"tiktok"|"website"; url: string; label?: string };
 
-type Park = {
-  name: string; address: string[]; postcode: string; borough: string;
-  type: string; surface: string; surfaceNote: string;
-  is_free: boolean; is_covered: boolean;
-  opened: string; builder: string; managed_by: string;
-  description: string[];
-  glance: GlanceItem[];
-  transport: Transport[];
-  hours: HoursRow[];
-  facilities: Facility[];
-  gallery: GalleryImg[];
-  spots: Spot[];
-  socials?: Social[];
-  heroImage?: string;
-  modelFile?: string;
-  useContourModel?: boolean;
-  cameraPos?: [number, number, number];
-  cameraTarget?: [number, number, number];
-  modelRotation?: [number, number, number];
-  orbitLimits?: { minPolar: number; maxPolar: number; minAzimuth: number; maxAzimuth: number };
-  pingPong?: [[number,number,number],[number,number,number]];
-  lat: number; lng: number;
-};
-
-// ── Data ───────────────────────────────────────────────────────────────────
-const PARKS: Record<string, Park> = {
-  "crystal-palace": {
-    name: "Crystal Palace Skatepark",
-    address: ["Crystal Palace Park", "Ledrington Road", "London"],
-    postcode: "SE19 2BA", borough: "Bromley",
-    type: "Bowl", surface: "Smooth concrete",
-    surfaceNote: "New poured slab — opened March 2018",
-    is_free: true, is_covered: false,
-    opened: "March 2018", builder: "Canvas Skateparks",
-    managed_by: "GLL / London Borough of Bromley",
-    description: [
-      "Crystal Palace is a landmark south London skatepark on the site of the UK's first national skateboarding competition in 1977. Designed by Canvas Skateparks in collaboration with Kinnear Landscape Architects and local riders, it opened in March 2018 after years of community campaigning.",
-      "The park is arranged in three distinct zones. The cloverleaf pool is genuinely world-class — 8.5ft deep with tile and coping, unlike anything else in London. The L-shaped bowl transitions from 5.5ft to 7ft, and a mellow street section makes the park accessible for beginners.",
-      "Set within Crystal Palace Park, the surrounding green space and proximity to the NSC makes it one of the most complete skate destinations in the south of England.",
-    ],
-    glance: [
-      { icon: "wb_sunny",            value: "Outdoor",           label: "Setting",    available: true  },
-      { icon: "bolt",                value: "No floodlights",    label: "Lighting",   available: false },
-      { icon: "park",                value: "Crystal Palace Park", label: "Green Space", available: true },
-      { icon: "local_parking",       value: "Park car parks",    label: "Car Park",   available: true  },
-      { icon: "wc",                  value: "Nearby",            label: "Toilets",    available: true  },
-      { icon: "coffee",              value: "In park",           label: "Café",       available: true  },
-      { icon: "sports",              value: "Bowl",              label: "Style",      available: true  },
-      { icon: "confirmation_number", value: "Free",              label: "Entry",      available: true  },
-    ],
-    transport: [
-      { type: "rail", name: "Crystal Palace",       detail: "London Overground · 5 min walk" },
-      { type: "bus",  name: "Routes 3, 157, 249",   detail: "Crystal Palace stop · 2 min walk" },
-      { type: "bus",  name: "Routes 122, 322, 358", detail: "Crystal Palace Park stop · 4 min walk" },
-    ],
-    hours: [{ days: "Mon – Sun", time: "08:00 – 20:00" }],
-    facilities: [
-      { icon: "wc",            name: "Toilets",     status: "Nearby",   available: true  },
-      { icon: "coffee",        name: "Café",        status: "In park",  available: true  },
-      { icon: "local_parking", name: "Car Park",    status: "Adjacent", available: true  },
-      { icon: "park",          name: "Green Space", status: "Yes",      available: true  },
-      { icon: "bolt",          name: "Floodlights", status: "None",     available: false },
-    ],
-    // Layout: wide = 2/3, full = 100%, normal = 1/3
-    // Aspect ratios are controlled per-slot in the gallery component below
-    gallery: [
-      { src: "/images/parks/crystal-palace/gallery-01.webp", span: "wide"   },
-      { src: "/images/parks/crystal-palace/gallery-02.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-03.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-04.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-05.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-06.webp", span: "full"   },
-      { src: "/images/parks/crystal-palace/gallery-07.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-08.webp", span: "wide"   },
-      { src: "/images/parks/crystal-palace/gallery-09.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-10.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-11.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-12.webp", span: "normal" },
-      { src: "/images/parks/crystal-palace/gallery-13.webp", span: "wide"   },
-      { src: "/images/parks/crystal-palace/gallery-14.webp", span: "normal" },
-    ],
-    lat: 51.4156, lng: -0.0719,
-    heroImage: "/images/parks/crystal-palace/gallery-01.webp",
-    modelFile: "/crystal-palace-skate_park.glb",
-    useContourModel: true,
-    cameraPos: [-18, 20, 20] as [number, number, number],
-    modelRotation: [-Math.PI / 2, 0, 0] as [number, number, number],
-    socials: [
-      { platform: "instagram", url: "https://instagram.com/crystalpalaceskatepark" },
-      { platform: "facebook",  url: "https://facebook.com/crystalpalaceskatepark" },
-      { platform: "website",   url: "https://gll.org", label: "GLL" },
-    ],
-    spots: [
-      {
-        name: "Cloverleaf Pool",
-        description: "8.5ft deep, tile and coping. Three connected kidney shapes — the deepest and most technical section of the park.",
-        position: "North end",
-        bounty: "First proper frontside grind on the pool coping",
-        difficulty: "hard",
-      },
-      {
-        name: "L-Shaped Bowl",
-        description: "Transitions from 5.5ft to 7ft across its length. Flows naturally into the pool section.",
-        position: "Centre",
-        bounty: "Best line linking all three bowl sections without stopping",
-        difficulty: "medium",
-      },
-      {
-        name: "Street Section",
-        description: "Mellow banks, a ledge, and flat ground. The most accessible part of the park — a good warm-up before the bowls.",
-        position: "South end",
-        bounty: "Best nosegrind on the main ledge",
-        difficulty: "easy",
-      },
-    ],
-  },
-
-  "southbank": {
-    name: "Southbank Undercroft",
-    address: ["Belvedere Road", "South Bank", "London"],
-    postcode: "SE1 8XX", borough: "Southwark",
-    type: "Historic", surface: "Original rough concrete",
-    surfaceNote: "Original early-1970s poured slab — never resurfaced",
-    is_free: true, is_covered: true,
-    opened: "c. 1973", builder: "Community",
-    managed_by: "Long Live Southbank / Southbank Centre",
-    lat: 51.5064, lng: -0.1153,
-    heroImage: "/images/parks/southbank/gallery-01.webp",
-    modelFile: "/southbank-undercroft.glb",
-    modelRotation: [0, Math.PI, 0],
-    cameraPos: [0, 7, 18],
-    cameraTarget: [0, 7, 0],
-    pingPong: [[24.91, 8.44, -6.79], [-23.18, 9.11, -10.73]],
-    description: [
-      "The Southbank Undercroft has been a skate spot since the early 1970s — the most culturally significant piece of concrete in the world. Tucked beneath the Hayward Gallery and Queen Elizabeth Hall, skaters have claimed this low-ceilinged, column-filled space for over fifty years.",
-      "In 2013 the Southbank Centre announced plans to redevelop the undercroft into retail units. The campaign to save it — led by Long Live Southbank — became one of the most successful grassroots preservation efforts in skateboarding history. By 2014 the space was secured in perpetuity for skateboarding.",
-      "Covered and rideable in all weather, open 24 hours. The rough original concrete, low ceiling and constant hum of the city above make it unlike any other skate spot on earth.",
-    ],
-    glance: [
-      { icon: "roofing",             value: "Covered",           label: "Setting",     available: true  },
-      { icon: "bolt",                value: "Ambient only",      label: "Lighting",    available: true  },
-      { icon: "schedule",            value: "24 / 7",            label: "Hours",       available: true  },
-      { icon: "local_parking",       value: "None nearby",       label: "Car Park",    available: false },
-      { icon: "wc",                  value: "Southbank Centre",  label: "Toilets",     available: true  },
-      { icon: "coffee",              value: "Multiple nearby",   label: "Café",        available: true  },
-      { icon: "sports",              value: "Street / Banks",    label: "Style",       available: true  },
-      { icon: "confirmation_number", value: "Free",              label: "Entry",       available: true  },
-    ],
-    transport: [
-      { type: "tube", name: "Waterloo",   detail: "Jubilee, Northern, Bakerloo, Waterloo & City · 5 min walk" },
-      { type: "tube", name: "Embankment", detail: "District & Circle lines · 8 min walk" },
-      { type: "rail", name: "Waterloo",   detail: "National Rail · 5 min walk" },
-    ],
-    hours: [{ days: "Mon – Sun", time: "Open 24/7" }],
-    facilities: [
-      { icon: "roofing",       name: "Covered",     status: "Yes — fully",           available: true  },
-      { icon: "bolt",          name: "Floodlights", status: "Ambient / city light",  available: true  },
-      { icon: "wc",            name: "Toilets",     status: "Southbank Centre",      available: true  },
-      { icon: "coffee",        name: "Café",        status: "Multiple nearby",       available: true  },
-      { icon: "local_parking", name: "Car Park",    status: "None — city centre",    available: false },
-    ],
-    gallery: [],
-    socials: [
-      { platform: "instagram", url: "https://www.instagram.com/longlivesouthbank", label: "Long Live Southbank" },
-      { platform: "website",   url: "https://www.llsb.com", label: "LLSB" },
-    ],
-    spots: [
-      {
-        name: "The Bump",
-        description: "The centrepiece. A low concrete wedge that's been the launch pad for fifty years of clips. Deceptively technical — the low ceiling changes everything.",
-        position: "Centre",
-        bounty: "Best trick over the bump — anything that clears the pillar",
-        difficulty: "medium",
-      },
-      {
-        name: "The Banks",
-        description: "Smooth angled concrete running the length of the undercroft. Every style of skating works here — the columns create natural lines.",
-        position: "Both sides",
-        bounty: "Longest line using both banks without touching flat",
-        difficulty: "easy",
-      },
-      {
-        name: "The Ledges",
-        description: "Original concrete ledges ground down by decades of wax and grinding. Each one slightly different — nothing is perfectly square.",
-        position: "Throughout",
-        bounty: "Switch nosegrind the main ledge",
-        difficulty: "hard",
-      },
-      {
-        name: "Manual Pad",
-        description: "Flat-top concrete block at the south end. Low enough to be approachable, worn enough to be honest.",
-        position: "South end",
-        bounty: "Nose manual the full length",
-        difficulty: "medium",
-      },
-    ],
-  },
-
-  "stockwell": {
-    lat: 51.4671, lng: -0.1157,
-    heroImage: "/images/parks/stockwell/gallery-01.webp",
-    modelFile: "/stockwell-skatepark.glb",
-    useContourModel: true,
-    modelRotation: [0, Math.PI / 2, 0] as [number, number, number],
-    cameraPos: [0, 5, 31] as [number, number, number],
-    name: "Stockwell Skatepark",
-    address: ["Stockwell Road", "Brixton", "London"],
-    postcode: "SW9 9SL", borough: "Lambeth",
-    type: "Bowl", surface: "Smooth concrete",
-    surfaceNote: "Original 1978 slab — restored 2023/24",
-    is_free: true, is_covered: false,
-    opened: "1978", builder: "Lorne Edwards",
-    managed_by: "London Borough of Lambeth",
-    description: [
-      "Stockwell is one of London's oldest surviving skateparks and arguably its most culturally significant. Built in 1978 by Lorne Edwards — who also built the UK's first skatepark in Portland, Dorset — it sits behind Brixton Academy on Stockwell Road.",
-      "The park is an organic, free-flowing concrete landscape unlike any standardised modern park. Renovated by Betongpark in 2023/24, restoring its iconic red surface.",
-    ],
-    glance: [
-      { icon: "wb_sunny",            value: "Outdoor",          label: "Setting",    available: true  },
-      { icon: "bolt",                value: "No floodlights",   label: "Lighting",   available: false },
-      { icon: "park",                value: "Adjacent",         label: "Green Space", available: true },
-      { icon: "local_parking",       value: "Street only",      label: "Car Park",   available: false },
-      { icon: "wc",                  value: "None",             label: "Toilets",    available: false },
-      { icon: "coffee",              value: "None",             label: "Café",       available: false },
-      { icon: "sports",              value: "Bowl / Snake Run", label: "Style",      available: true  },
-      { icon: "confirmation_number", value: "Free",             label: "Entry",      available: true  },
-    ],
-    transport: [
-      { type: "tube", name: "Stockwell",         detail: "Victoria & Northern lines · 8 min walk" },
-      { type: "tube", name: "Brixton",           detail: "Victoria line · 12 min walk" },
-      { type: "bus",  name: "Routes 2, 88, 155", detail: "Stockwell Road stop · 2 min walk" },
-    ],
-    hours: [{ days: "Mon – Sun", time: "Open 24/7" }],
-    facilities: [
-      { icon: "wc",            name: "Toilets",     status: "None",     available: false },
-      { icon: "coffee",        name: "Café",        status: "None",     available: false },
-      { icon: "local_parking", name: "Car Park",    status: "None",     available: false },
-      { icon: "park",          name: "Green Space", status: "Adjacent", available: true  },
-      { icon: "bolt",          name: "Floodlights", status: "None",     available: false },
-    ],
-    gallery: [],
-    spots: [],
-  },
-};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -294,16 +50,16 @@ function SocialIcon({ platform }: { platform: Social["platform"] }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 export default async function ParkPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const park = PARKS[slug];
 
-  if (!park) {
-    return (
-      <div style={{ padding: "80px 24px", textAlign: "center" }}>
-        <p style={{ fontSize: 13, color: "var(--muted)" }}>Park not found.</p>
-        <Link href="/parks" style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", textTransform: "uppercase", display: "inline-block", marginTop: 16 }}>← Back to map</Link>
-      </div>
-    );
-  }
+  const db = createServerClient();
+  const { data: park } = await db
+    .from("parks")
+    .select("*")
+    .eq("slug", slug)
+    .eq("published", true)
+    .single();
+
+  if (!park) notFound();
 
   const bleed = "calc(-1 * clamp(16px, 4vw, 56px))";
 
@@ -313,21 +69,19 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <div style={{
         position: "relative",
-        height: park.useContourModel ? "78vh" : "58vh",
+        height: park.use_contour_model ? "78vh" : "58vh",
         minHeight: 340, overflow: "hidden",
         background: "var(--background)",
         marginLeft: bleed, marginRight: bleed,
       }}>
-        {park.modelFile ? (
+        {park.model_file ? (
           <ParkHeroViewer
-            modelFile={park.modelFile}
-            heroImage={park.heroImage}
-            useContourModel={park.useContourModel}
-            cameraPos={park.cameraPos}
-            cameraTarget={park.cameraTarget}
-            modelRotation={park.modelRotation}
-            orbitLimits={park.orbitLimits}
-            pingPong={park.pingPong}
+            modelFile={park.model_file}
+            heroImage={park.hero_image}
+            useContourModel={park.use_contour_model}
+            cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
+            cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
+            modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
           />
         ) : (
           <>
@@ -338,7 +92,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
 
         {/* Postcode badge */}
         <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(20px, 4vw, 36px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{park.postcode.split(" ")[0]}</span>
+          <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{(park.postcode ?? "").split(" ")[0]}</span>
         </div>
 
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(20px, 4vw, 36px)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, pointerEvents: "none", zIndex: 3 }}>
@@ -348,7 +102,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.08em", marginTop: 10 }}>{park.address.join(", ")} · {park.postcode}</p>
             <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "flex-start" }}>
               <ParkWeather lat={park.lat} lng={park.lng} />
-              <ParkBusy lit={park.is_covered ?? false} />
+              <ParkBusy lit={park.is_covered} />
             </div>
           </div>
         </div>
@@ -382,7 +136,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
             <div style={{ width: 48, height: 48, borderRadius: 4, flexShrink: 0, background: "repeating-linear-gradient(45deg, #c0bdb7 0px, #c0bdb7 1px, #b0ada6 1px, #b0ada6 4px)" }} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 300, letterSpacing: "0.02em", textTransform: "uppercase" }}>{park.surface}</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", marginTop: 4 }}>{park.surfaceNote}</div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", marginTop: 4 }}>{park.surface_note}</div>
             </div>
           </div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", lineHeight: 1.8, marginTop: 24, paddingBottom: 40 }}>
