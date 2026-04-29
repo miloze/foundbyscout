@@ -33,16 +33,14 @@ function PingPongCamera({ posA, posB, target }: {
   const { camera } = useThree();
   const t   = useRef(0);
   const dir = useRef(1);
-  const look = new THREE.Vector3(...n(target));
-  const vA   = new THREE.Vector3(...n(posA));
-  const vB   = new THREE.Vector3(...n(posB));
+  const look  = new THREE.Vector3(...n(target));
+  const vA    = new THREE.Vector3(...n(posA));
+  const vB    = new THREE.Vector3(...n(posB));
   const point = new THREE.Vector3();
 
   useFrame((_, delta) => {
-    t.current += delta * 0.025 * dir.current;
-    if (t.current >= 1) { t.current = 1; dir.current = -1; }
-    if (t.current <= 0) { t.current = 0; dir.current =  1; }
-    const s = t.current * t.current * (3 - 2 * t.current);
+    t.current += delta * 0.22; // radians/sec — full cycle ≈ 28s
+    const s = (Math.sin(t.current) + 1) / 2; // smooth 0→1 oscillation
     point.lerpVectors(vA, vB, s);
     camera.position.copy(point);
     camera.lookAt(look);
