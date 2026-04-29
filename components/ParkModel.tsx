@@ -31,18 +31,22 @@ function PingPongCamera({ posA, posB, target }: {
   target: [number, number, number];
 }) {
   const { camera } = useThree();
-  const t   = useRef(0);
-  const dir = useRef(1);
-  const look  = new THREE.Vector3(...n(target));
-  const vA    = new THREE.Vector3(...n(posA));
-  const vB    = new THREE.Vector3(...n(posB));
-  const point = new THREE.Vector3();
+  const t = useRef(0);
+  const look = new THREE.Vector3(...n(target));
+
+  // Derive orbit radius + height from the two positions
+  const [ax, ay, az] = n(posA);
+  const [bx, by, bz] = n(posB);
+  const radius  = (Math.sqrt(ax * ax + az * az) + Math.sqrt(bx * bx + bz * bz)) / 2;
+  const height  = (ay + by) / 2;
+  const startAngle = Math.atan2(az, ax);
+  const endAngle   = Math.atan2(bz, bx);
 
   useFrame((_, delta) => {
-    t.current += delta * 0.22; // radians/sec — full cycle ≈ 28s
-    const s = (Math.sin(t.current) + 1) / 2; // smooth 0→1 oscillation
-    point.lerpVectors(vA, vB, s);
-    camera.position.copy(point);
+    t.current += delta * 0.18; // radians/sec — full sweep ≈ 35s
+    const s     = (Math.sin(t.current) + 1) / 2;
+    const angle = startAngle + (endAngle - startAngle) * s;
+    camera.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
     camera.lookAt(look);
   });
 
