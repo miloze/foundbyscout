@@ -39,11 +39,10 @@ function PingPongCamera({ posA, posB, target }: {
   const radius = (Math.sqrt(ax * ax + az * az) + Math.sqrt(bx * bx + bz * bz)) / 2;
   const height = (ay + by) / 2;
 
-  // Compute angles and force arc to stay on the same side as posA/posB (positive Z)
   let startAngle = Math.atan2(az, ax);
   let endAngle   = Math.atan2(bz, bx);
-  // If going the wrong way (arc crosses negative Z), flip end angle
-  if (endAngle < startAngle) endAngle += 2 * Math.PI;
+  // Force clockwise arc (through negative Z = front of model)
+  if (endAngle > startAngle) endAngle -= 2 * Math.PI;
 
   useFrame((_, delta) => {
     t.current += delta * 0.2;
