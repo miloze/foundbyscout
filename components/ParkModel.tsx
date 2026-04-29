@@ -31,20 +31,23 @@ function PingPongCamera({ posA, posB, target }: {
   target: [number, number, number];
 }) {
   const { camera } = useThree();
-  const t = useRef(0);
+  const t = useRef(-Math.PI / 2); // start at posA
   const look = new THREE.Vector3(...n(target));
 
-  // Derive orbit radius + height from the two positions
   const [ax, ay, az] = n(posA);
   const [bx, by, bz] = n(posB);
-  const radius  = (Math.sqrt(ax * ax + az * az) + Math.sqrt(bx * bx + bz * bz)) / 2;
-  const height  = (ay + by) / 2;
-  const startAngle = Math.atan2(az, ax);
-  const endAngle   = Math.atan2(bz, bx);
+  const radius = (Math.sqrt(ax * ax + az * az) + Math.sqrt(bx * bx + bz * bz)) / 2;
+  const height = (ay + by) / 2;
+
+  // Compute angles and force arc to stay on the same side as posA/posB (positive Z)
+  let startAngle = Math.atan2(az, ax);
+  let endAngle   = Math.atan2(bz, bx);
+  // If going the wrong way (arc crosses negative Z), flip end angle
+  if (endAngle < startAngle) endAngle += 2 * Math.PI;
 
   useFrame((_, delta) => {
-    t.current += delta * 0.18; // radians/sec — full sweep ≈ 35s
-    const s     = (Math.sin(t.current) + 1) / 2;
+    t.current += delta * 0.2;
+    const s     = (Math.sin(t.current) + 1) / 2; // 0→1 oscillation
     const angle = startAngle + (endAngle - startAngle) * s;
     camera.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
     camera.lookAt(look);
