@@ -34,22 +34,16 @@ function PingPongCamera({ posA, posB, target }: {
   const t   = useRef(0);
   const dir = useRef(1);
   const look = new THREE.Vector3(...n(target));
-
   const vA   = new THREE.Vector3(...n(posA));
   const vB   = new THREE.Vector3(...n(posB));
-  const vT   = new THREE.Vector3(...n(target));
-  const mid     = new THREE.Vector3().addVectors(vA, vB).multiplyScalar(0.5);
-  const awayXZ  = new THREE.Vector3().subVectors(mid, vT).setY(0).normalize().multiplyScalar(32);
-  const ctrl    = new THREE.Vector3().addVectors(mid, awayXZ).setY(mid.y);
-  const curve   = new THREE.QuadraticBezierCurve3(vA, ctrl, vB);
-  const point   = new THREE.Vector3();
+  const point = new THREE.Vector3();
 
   useFrame((_, delta) => {
     t.current += delta * 0.025 * dir.current;
     if (t.current >= 1) { t.current = 1; dir.current = -1; }
     if (t.current <= 0) { t.current = 0; dir.current =  1; }
     const s = t.current * t.current * (3 - 2 * t.current);
-    curve.getPoint(s, point);
+    point.lerpVectors(vA, vB, s);
     camera.position.copy(point);
     camera.lookAt(look);
   });
