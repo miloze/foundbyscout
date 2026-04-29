@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF, OrbitControls } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { Group } from "three";
 
@@ -58,14 +58,11 @@ function PingPongCamera({ posA, posB, target }: {
   return null;
 }
 
-type OrbitLimits = { minPolar: number; maxPolar: number; minAzimuth: number; maxAzimuth: number };
-
 export default function ParkModel({
   modelFile,
   cameraPos     = [0, 18, 25],
   cameraTarget  = [0, 0, 0],
   modelRotation = [-Math.PI / 2, 0, 0] as [number, number, number],
-  orbitLimits   = { minPolar: Math.PI / 6, maxPolar: Math.PI / 2.8, minAzimuth: -Infinity, maxAzimuth: Infinity },
   pingPong,
   autoRotate,
   fov           = 50,
@@ -74,7 +71,6 @@ export default function ParkModel({
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  orbitLimits?: OrbitLimits;
   pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
   fov?: number;
@@ -128,18 +124,9 @@ export default function ParkModel({
         <Suspense fallback={null}>
           <Model onLoad={() => setLoaded(true)} modelFile={modelFile} modelRotation={modelRotation} rotate={autoRotate ?? !pingPong} />
         </Suspense>
-        {pingPong
-          ? <PingPongCamera posA={pingPong[0]} posB={pingPong[1]} target={cameraTarget} />
-          : <OrbitControls
-              enableZoom={false}
-              enablePan={false}
-              target={cameraTarget}
-              minPolarAngle={orbitLimits.minPolar}
-              maxPolarAngle={orbitLimits.maxPolar}
-              minAzimuthAngle={orbitLimits.minAzimuth}
-              maxAzimuthAngle={orbitLimits.maxAzimuth}
-            />
-        }
+        {pingPong && (
+          <PingPongCamera posA={pingPong[0]} posB={pingPong[1]} target={cameraTarget} />
+        )}
       </Canvas>
     </div>
   );

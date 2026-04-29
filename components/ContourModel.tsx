@@ -115,21 +115,11 @@ export default function ContourModel({
           <CameraController normalPos={cameraPos} />
           <OrbitControls
             target={[0, 2, 0]}
-            enablePan
-            enableZoom
-            enableRotate
+            enablePan={false}
+            enableZoom={false}
+            enableRotate={false}
             autoRotate
             autoRotateSpeed={0.6}
-            minPolarAngle={Math.PI * 0.05}
-            maxPolarAngle={Math.PI * 0.38}
-            minDistance={12}
-            maxDistance={70}
-            mouseButtons={{
-              LEFT:   THREE.MOUSE.ROTATE,
-              MIDDLE: THREE.MOUSE.PAN,
-              RIGHT:  THREE.MOUSE.DOLLY,
-            }}
-            keyPanSpeed={20}
           />
           <Suspense fallback={null}>
             <SceneMesh

@@ -1,14 +1,16 @@
 import Link from "next/link";
 import HomeSpotlight from "@/components/HomeSpotlight";
+import { createServerClient } from "@/lib/supabase-server";
 
-const featuredParks = [
-  { name: "Crystal Palace", location: "South London", slug: "crystal-palace", tag: "Bowl" },
-  { name: "Southbank", location: "Waterloo", slug: "southbank", tag: "Historic" },
-  { name: "Stockwell", location: "South London", slug: "stockwell", tag: "Bowl" },
-  { name: "Livingston", location: "Scotland", slug: "livingston", tag: "Historic" },
-];
+export default async function Home() {
+  const db = createServerClient();
+  const { data: featuredParks } = await db
+    .from("parks")
+    .select("slug, name, location, type, hero_image")
+    .eq("published", true)
+    .order("sort_order", { ascending: true })
+    .limit(4);
 
-export default function Home() {
   return (
     <div>
       {/* HERO */}
@@ -54,7 +56,7 @@ export default function Home() {
               <Link href="/parks" className="text-xs uppercase tracking-widest" style={{ color: "var(--muted)", letterSpacing: "0.15em" }}>View All →</Link>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              {featuredParks.map((park) => (
+              {(featuredParks ?? []).map((park) => (
                 <Link key={park.slug} href={`/parks/${park.slug}`} style={{ display: "block" }}>
                   <div
                     style={{
@@ -64,15 +66,29 @@ export default function Home() {
                       marginBottom: "0.5rem",
                     }}
                   >
+                    {park.hero_image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={park.hero_image}
+                        alt={park.name}
+                        style={{
+                          position: "absolute", inset: 0,
+                          width: "100%", height: "100%",
+                          objectFit: "cover",
+                          filter: "grayscale(1) contrast(1.05) brightness(0.88)",
+                          transition: "transform 0.4s ease",
+                        }}
+                      />
+                    )}
                     <span
                       style={{
-                        position: "absolute", top: 8, left: 8,
+                        position: "absolute", top: 8, left: 8, zIndex: 1,
                         fontSize: 9, padding: "3px 8px",
                         background: "var(--accent)", color: "#fff",
                         fontWeight: "bold", letterSpacing: "0.1em", textTransform: "uppercase",
                       }}
                     >
-                      {park.tag}
+                      {park.type}
                     </span>
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.02em", fontFamily: "var(--font-body)" }}>{park.name}</p>

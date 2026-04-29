@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import ContourModelClient from "./ContourModelClient";
 import ParkModelClient from "./ParkModelClient";
 
-type OrbitLimits = { minPolar: number; maxPolar: number; minAzimuth: number; maxAzimuth: number };
-
 type Props = {
   modelFile: string;
   heroImage?: string;
@@ -13,13 +11,12 @@ type Props = {
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  orbitLimits?: OrbitLimits;
   pingPong?: [[number, number, number], [number, number, number]];
 };
 
 export default function ParkHeroViewer({
   modelFile, heroImage, useContourModel,
-  cameraPos, cameraTarget, modelRotation, orbitLimits, pingPong,
+  cameraPos, cameraTarget, modelRotation, pingPong,
 }: Props) {
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
@@ -90,7 +87,6 @@ export default function ParkHeroViewer({
           cameraPos={cameraPos}
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}
-          orbitLimits={orbitLimits}
           pingPong={pingPong}
         />
       </div>
