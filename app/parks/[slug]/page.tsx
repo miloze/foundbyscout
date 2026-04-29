@@ -50,8 +50,10 @@ function SocialIcon({ platform }: { platform: Social["platform"] }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 export const dynamic = "force-dynamic";
 
-export default async function ParkPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ParkPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ debug?: string }> }) {
   const { slug } = await params;
+  const { debug } = await searchParams;
+  const isDebug = debug === "1";
 
   const db = createServerClient();
   const { data: park } = await db
@@ -85,6 +87,7 @@ export default async function ParkPage({ params }: { params: Promise<{ slug: str
             cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
             modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
             pingPong={park.ping_pong ?? undefined}
+            debug={isDebug}
           />
         ) : (
           <>

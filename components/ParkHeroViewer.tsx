@@ -12,11 +12,12 @@ type Props = {
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
   pingPong?: [[number, number, number], [number, number, number]];
+  debug?: boolean;
 };
 
 export default function ParkHeroViewer({
   modelFile, heroImage, useContourModel,
-  cameraPos, cameraTarget, modelRotation, pingPong,
+  cameraPos, cameraTarget, modelRotation, pingPong, debug,
 }: Props) {
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
@@ -88,6 +89,7 @@ export default function ParkHeroViewer({
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}
           pingPong={pingPong}
+          debug={debug}
         />
       </div>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />

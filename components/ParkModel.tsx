@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { Group } from "three";
 
@@ -22,6 +22,9 @@ function Model({ onLoad, modelFile, modelRotation, rotate }: { onLoad: () => voi
   );
 }
 
+// Coerce to numbers — Supabase numeric[] returns strings
+const n = (v: unknown[]): [number, number, number] => [+v[0]!, +v[1]!, +v[2]!];
+
 function PingPongCamera({ posA, posB, target }: {
   posA: [number, number, number];
   posB: [number, number, number];
@@ -30,8 +33,6 @@ function PingPongCamera({ posA, posB, target }: {
   const { camera } = useThree();
   const t   = useRef(0);
   const dir = useRef(1);
-  // Coerce to numbers — Supabase numeric[] returns strings
-  const n = (v: [number,number,number]): [number,number,number] => [+v[0], +v[1], +v[2]];
   const look = new THREE.Vector3(...n(target));
 
   const vA   = new THREE.Vector3(...n(posA));
@@ -40,16 +41,13 @@ function PingPongCamera({ posA, posB, target }: {
   const mid     = new THREE.Vector3().addVectors(vA, vB).multiplyScalar(0.5);
   const awayXZ  = new THREE.Vector3().subVectors(mid, vT).setY(0).normalize().multiplyScalar(32);
   const ctrl    = new THREE.Vector3().addVectors(mid, awayXZ).setY(mid.y);
-
-  const curve = new THREE.QuadraticBezierCurve3(vA, ctrl, vB);
-  const point = new THREE.Vector3();
+  const curve   = new THREE.QuadraticBezierCurve3(vA, ctrl, vB);
+  const point   = new THREE.Vector3();
 
   useFrame((_, delta) => {
     t.current += delta * 0.025 * dir.current;
     if (t.current >= 1) { t.current = 1; dir.current = -1; }
     if (t.current <= 0) { t.current = 0; dir.current =  1; }
-
-    // Smoothstep easing
     const s = t.current * t.current * (3 - 2 * t.current);
     curve.getPoint(s, point);
     camera.position.copy(point);
@@ -59,6 +57,39 @@ function PingPongCamera({ posA, posB, target }: {
   return null;
 }
 
+// Shows live camera XYZ in debug mode so you can find good ping-pong positions
+function DebugCamera() {
+  const { camera } = useThree();
+  const [pos, setPos] = useState("…");
+
+  useFrame(() => {
+    const { x, y, z } = camera.position;
+    setPos(`${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`);
+  });
+
+  return (
+    <mesh visible={false}>
+      <boxGeometry />
+      <meshBasicMaterial />
+      {/* rendered via portal below */}
+      <group userData={{ debugPos: pos }} />
+    </mesh>
+  );
+}
+
+function DebugOverlay() {
+  const { camera } = useThree();
+  const [pos, setPos] = useState({ x: 0, y: 0, z: 0 });
+
+  useFrame(() => {
+    setPos({ x: camera.position.x, y: camera.position.y, z: camera.position.z });
+  });
+
+  return (
+    <mesh visible={false} userData={{ x: pos.x, y: pos.y, z: pos.z }} />
+  );
+}
+
 export default function ParkModel({
   modelFile,
   cameraPos     = [0, 18, 25],
@@ -66,6 +97,7 @@ export default function ParkModel({
   modelRotation = [-Math.PI / 2, 0, 0] as [number, number, number],
   pingPong,
   autoRotate,
+  debug         = false,
   fov           = 50,
 }: {
   modelFile: string;
@@ -74,12 +106,26 @@ export default function ParkModel({
   modelRotation?: [number, number, number];
   pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
+  debug?: boolean;
   fov?: number;
 }) {
   const [loaded,   setLoaded]   = useState(false);
   const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
+  const [camPos,   setCamPos]   = useState("loading…");
 
   const filter = viewMode === "bw" ? "grayscale(1) contrast(1.1)" : "none";
+  const startPos = pingPong
+    ? [+pingPong[0][0], +pingPong[0][1], +pingPong[0][2]] as [number,number,number]
+    : [+cameraPos[0], +cameraPos[1], +cameraPos[2]] as [number,number,number];
+
+  function LivePos() {
+    const { camera } = useThree();
+    useFrame(() => {
+      const { x, y, z } = camera.position;
+      setCamPos(`[${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}]`);
+    });
+    return null;
+  }
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -101,6 +147,22 @@ export default function ParkModel({
         ))}
       </div>
 
+      {/* Debug overlay */}
+      {debug && (
+        <div style={{
+          position: "absolute", bottom: 80, left: 12, zIndex: 20,
+          background: "rgba(0,0,0,0.75)", color: "#0f0", padding: "10px 14px",
+          fontFamily: "monospace", fontSize: 12, lineHeight: 1.8,
+          borderRadius: 4, pointerEvents: "none",
+        }}>
+          <div style={{ color: "#aaa", fontSize: 10, marginBottom: 4 }}>CAMERA POSITION</div>
+          <div>{camPos}</div>
+          <div style={{ color: "#aaa", fontSize: 10, marginTop: 8 }}>Orbit to position A → note coords</div>
+          <div style={{ color: "#aaa", fontSize: 10 }}>Orbit to position B → note coords</div>
+          <div style={{ color: "#aaa", fontSize: 10 }}>Then update ping_pong in Supabase</div>
+        </div>
+      )}
+
       {!loaded && (
         <div style={{
           position: "absolute", inset: 0, display: "flex",
@@ -112,7 +174,7 @@ export default function ParkModel({
         </div>
       )}
       <Canvas
-        camera={{ position: pingPong ? [+pingPong[0][0], +pingPong[0][1], +pingPong[0][2]] : [+cameraPos[0], +cameraPos[1], +cameraPos[2]], fov }}
+        camera={{ position: startPos, fov }}
         style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}
         gl={{ antialias: true, alpha: true }}
       >
@@ -123,9 +185,15 @@ export default function ParkModel({
         <pointLight position={[0, 15, 0]} intensity={3.0} color="#ffffff" />
         <pointLight position={[0, -8, 0]} intensity={2.5} color="#ff7040" />
         <Suspense fallback={null}>
-          <Model onLoad={() => setLoaded(true)} modelFile={modelFile} modelRotation={modelRotation} rotate={autoRotate ?? !pingPong} />
+          <Model onLoad={() => setLoaded(true)} modelFile={modelFile} modelRotation={modelRotation} rotate={!debug && (autoRotate ?? !pingPong)} />
         </Suspense>
-        {pingPong && (
+        {debug && (
+          <>
+            <OrbitControls enableZoom enablePan enableRotate target={n(cameraTarget)} />
+            <LivePos />
+          </>
+        )}
+        {!debug && pingPong && (
           <PingPongCamera posA={pingPong[0]} posB={pingPong[1]} target={cameraTarget} />
         )}
       </Canvas>
