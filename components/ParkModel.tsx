@@ -45,7 +45,7 @@ function PingPongCamera({ posA, posB, target }: {
   if (endAngle > startAngle) endAngle -= 2 * Math.PI;
 
   useFrame((_, delta) => {
-    t.current += delta * 0.2;
+    t.current += delta * 0.1;
     const s     = (Math.sin(t.current) + 1) / 2; // 0→1 oscillation
     const angle = startAngle + (endAngle - startAngle) * s;
     camera.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
