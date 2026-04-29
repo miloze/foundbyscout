@@ -30,12 +30,13 @@ function PingPongCamera({ posA, posB, target }: {
   const { camera } = useThree();
   const t   = useRef(0);
   const dir = useRef(1);
-  const look = new THREE.Vector3(...target);
+  // Coerce to numbers — Supabase numeric[] returns strings
+  const n = (v: [number,number,number]): [number,number,number] => [+v[0], +v[1], +v[2]];
+  const look = new THREE.Vector3(...n(target));
 
-  // Quadratic Bezier: control point = midpoint pushed away from the target
-  const vA   = new THREE.Vector3(...posA);
-  const vB   = new THREE.Vector3(...posB);
-  const vT   = new THREE.Vector3(...target);
+  const vA   = new THREE.Vector3(...n(posA));
+  const vB   = new THREE.Vector3(...n(posB));
+  const vT   = new THREE.Vector3(...n(target));
   const mid     = new THREE.Vector3().addVectors(vA, vB).multiplyScalar(0.5);
   const awayXZ  = new THREE.Vector3().subVectors(mid, vT).setY(0).normalize().multiplyScalar(32);
   const ctrl    = new THREE.Vector3().addVectors(mid, awayXZ).setY(mid.y);
@@ -111,7 +112,7 @@ export default function ParkModel({
         </div>
       )}
       <Canvas
-        camera={{ position: pingPong ? pingPong[0] : cameraPos, fov }}
+        camera={{ position: pingPong ? [+pingPong[0][0], +pingPong[0][1], +pingPong[0][2]] : [+cameraPos[0], +cameraPos[1], +cameraPos[2]], fov }}
         style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}
         gl={{ antialias: true, alpha: true }}
       >
