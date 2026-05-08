@@ -10,7 +10,6 @@ type Transport  = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: stri
 type GlanceItem = { icon: string; value: string; label: string; available: boolean };
 type Facility   = { icon: string; name: string; status: string; available: boolean };
 type HoursRow   = { days: string; time: string };
-type Spot       = { name: string; description: string; position: string; bounty: string; difficulty: "easy"|"medium"|"hard"|"open" };
 type Social     = { platform: "instagram"|"facebook"|"youtube"|"tiktok"|"website"; url: string; label?: string };
 
 
@@ -30,7 +29,6 @@ function TransportBadge({ type }: { type: Transport["type"] }) {
   );
 }
 
-const DIFF_COLOUR: Record<string, string> = { easy: "#2a7a3a", medium: "#b87a00", hard: "var(--accent)", open: "var(--muted)" };
 
 function SocialIcon({ platform }: { platform: Social["platform"] }) {
   const paths: Record<string, string> = {
@@ -87,6 +85,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
             cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
             modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
             pingPong={park.ping_pong ?? undefined}
+            autoRotate={park.auto_rotate ?? false}
             debug={isDebug}
           />
         ) : (
@@ -97,7 +96,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
         )}
 
         {/* Postcode badge */}
-        <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(20px, 4vw, 36px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(16px, 4vw, 56px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>
           <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{(park.postcode ?? "").split(" ")[0]}</span>
         </div>
 
@@ -115,13 +114,13 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
       </div>
 
       {/* ── TWO-COLUMN: ABOUT + SIDEBAR ──────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", maxWidth: 1100, margin: "0 auto" }}>
+      <div data-park-cols style={{ display: "grid", gridTemplateColumns: "1fr 300px" }}>
 
         {/* Left */}
         <div style={{ paddingRight: 48, borderRight: "1px solid var(--border)" }}>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", paddingTop: 32, marginBottom: 16 }}>At a glance</p>
           <div data-glance-grid style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, marginBottom: 40 }}>
-            {park.glance.map((item) => (
+            {park.glance.map((item: GlanceItem) => (
               <div key={item.label} style={{ background: "var(--card)", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 10, opacity: item.available ? 1 : 0.38 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: item.available ? "var(--accent)" : "var(--muted)" }}>{item.icon}</span>
                 <div>
@@ -134,7 +133,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
 
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>About</p>
           <div style={{ fontSize: 15, lineHeight: 1.75, color: "var(--foreground)", marginBottom: 32, paddingBottom: 32, borderBottom: "1px solid var(--border)" }}>
-            {park.description.map((p, i) => <p key={i} style={{ marginTop: i > 0 ? 14 : 0 }}>{p}</p>)}
+            {park.description.map((p: string, i: number) => <p key={i} style={{ marginTop: i > 0 ? 14 : 0 }}>{p}</p>)}
           </div>
 
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Surface</p>
@@ -155,11 +154,11 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Getting there</p>
           <div style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid var(--border)" }}>
             <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--foreground)", marginBottom: 16 }}>
-              {park.address.map((l, i) => <span key={i}>{l}<br /></span>)}
+              {park.address.map((l: string, i: number) => <span key={i}>{l}<br /></span>)}
               <span style={{ color: "var(--muted)" }}>{park.postcode}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {park.transport.map((t, i) => (
+              {park.transport.map((t: Transport, i: number) => (
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <TransportBadge type={t.type} />
                   <div>
@@ -173,7 +172,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
 
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Opening times</p>
           <div style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid var(--border)" }}>
-            {park.hours.map((row, i) => (
+            {park.hours.map((row: HoursRow, i: number) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: i < park.hours.length - 1 ? "1px solid var(--border)" : "none" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted)" }}>{row.days}</span>
                 <span style={{ fontSize: 12.5, fontWeight: 500 }}>{row.time}</span>
@@ -188,7 +187,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
           </p>
           {park.socials && park.socials.length > 0 && (
             <div style={{ display: "flex", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
-              {park.socials.map((s, i) => (
+              {park.socials.map((s: Social, i: number) => (
                 <a
                   key={i}
                   href={s.url}
@@ -217,81 +216,85 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
         </div>
       </div>
 
-      {/* ── EDITORIAL GALLERY ─────────────────────────────────────────── */}
-      <div style={{ marginLeft: bleed, marginRight: bleed, borderTop: "1px solid var(--border)" }}>
-        <div style={{ padding: "32px clamp(16px, 4vw, 56px) 0", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)" }}>Photos</p>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em" }}>Coming soon</p>
-        </div>
-        <div data-gallery-grid style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, marginTop: 16, paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)", paddingBottom: 2 }}>
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} style={{ aspectRatio: "4/3", background: "var(--card)", border: "1px solid var(--border)" }} />
-          ))}
-        </div>
-      </div>
-
-      {/* ── SPOTS & BOUNTIES ──────────────────────────────────────────── */}
-      {park.spots.length > 0 && (
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 48, paddingBottom: 48, maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)" }}>Spots & Open Bounties</p>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em" }}>{park.spots.length} spots</p>
+      {/* ── PHOTO STRIP ──────────────────────────────────────────────── */}
+      {park.gallery_images && park.gallery_images.length > 0 && (
+        <section style={{ marginTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Photos</p>
+          <div data-photo-strip style={{ display: "grid", gridTemplateColumns: park.gallery_images.length === 1 ? "1fr" : "2fr 1fr 1fr 1fr", gap: 2, background: "var(--border)" }}>
+            {(park.gallery_images as string[]).map((url: string, i: number) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={url}
+                alt=""
+                style={{
+                  display: "block", width: "100%",
+                  aspectRatio: i === 0 ? "16/10" : "4/5",
+                  objectFit: "cover",
+                  filter: "grayscale(1) contrast(1.05) brightness(0.9)",
+                }}
+              />
+            ))}
           </div>
-          <div data-spots-grid style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
-            {park.spots.map((spot) => (
-              <div key={spot.name} style={{ background: "var(--card)", padding: "24px 22px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-                  <div>
-                    <h3 style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.01em" }}>{spot.name}</h3>
-                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 3 }}>{spot.position}</p>
-                  </div>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: DIFF_COLOUR[spot.difficulty], flexShrink: 0, marginLeft: 8, paddingTop: 2 }}>{spot.difficulty}</span>
-                </div>
-                <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginBottom: 20 }}>{spot.description}</p>
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", padding: "3px 7px", borderRadius: 2 }}>Unclaimed</span>
-                  </div>
-                  <p style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: "var(--foreground)", marginBottom: 14 }}>{spot.bounty}</p>
-                  <button style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "1px solid var(--border)", padding: "7px 14px", cursor: "pointer" }}>
-                    Submit your clip →
-                  </button>
-                </div>
+        </section>
+      )}
+
+      {/* ── SCOUT NOTES ──────────────────────────────────────────────── */}
+      <section style={{ paddingTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
+        <div data-scout-notes style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(3rem, 6vw, 6rem)" }}>
+          <div>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 20 }}>Scout Notes</p>
+            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, letterSpacing: "-0.03em", textTransform: "uppercase", lineHeight: 0.95, marginBottom: "1.5rem", color: "var(--foreground)" }}>
+              What to expect
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--muted)", marginBottom: 16 }}>
+              Field notes and first-hand observations from the Scout team coming soon. Expect honest coverage of sessions, conditions, locals, and the wider scene.
+            </p>
+            <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--muted)" }}>
+              Know this park well? Get in touch — we want real accounts from the people who skate it.
+            </p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, background: "var(--border)" }}>
+            {[
+              { label: "Best for",    value: "Intermediate – Advanced" },
+              { label: "Busy times",  value: "Weekends, after school" },
+              { label: "Vibe",        value: "Community – relaxed" },
+              { label: "Nearest shop",value: "Coming soon" },
+            ].map(row => (
+              <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "var(--background)" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)" }}>{row.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--foreground)" }}>{row.value}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
+      </section>
 
-      {/* ── COMMUNITY CLIPS ───────────────────────────────────────────── */}
-      <div style={{ borderTop: "1px solid var(--border)", marginLeft: bleed, marginRight: bleed }}>
-        <div style={{ padding: "48px clamp(16px, 4vw, 56px)", maxWidth: `calc(1100px + clamp(16px, 4vw, 56px) * 2)`, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)" }}>Community Clips</p>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em" }}>0 submissions</p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "var(--card)", padding: "56px 24px", flexDirection: "column", gap: 12 }}>
-            <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center" }}>No clips submitted yet. Be the first.</p>
-            <button style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--accent)", background: "none", border: "1px solid var(--accent)", padding: "8px 18px", cursor: "pointer", marginTop: 8 }}>
-              Submit a clip
-            </button>
-          </div>
+      {/* ── CLIPS PLACEHOLDER ────────────────────────────────────────── */}
+      <section style={{ paddingTop: 64, paddingBottom: 64 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)" }}>Clips</p>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--border)" }}>Coming soon</span>
         </div>
-      </div>
+        <div data-clips-grid style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, background: "var(--border)" }}>
+          {[null, null, null].map((_, i) => (
+            <div key={i} style={{ background: "var(--card)", aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <style>{`
         .fbs-social-link:hover { color: var(--foreground) !important; border-color: var(--foreground) !important; }
         @media (max-width: 760px) {
-          /* Two-column info section → single column */
-          article > div[style*="300px"] { grid-template-columns: 1fr !important; }
-          article > div[style*="300px"] > div:first-child { padding-right: 0 !important; border-right: none !important; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
-          article > div[style*="300px"] > div:last-child { padding-left: 0 !important; }
-          /* At-a-glance → 2 columns */
+          [data-park-cols] { grid-template-columns: 1fr !important; }
+          [data-park-cols] > div:first-child { padding-right: 0 !important; border-right: none !important; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
+          [data-park-cols] > div:last-child { padding-left: 0 !important; }
           [data-glance-grid] { grid-template-columns: repeat(2, 1fr) !important; }
-          /* Spots grid → single column */
-          [data-spots-grid] { grid-template-columns: 1fr !important; }
-          /* Gallery placeholder → 2 columns */
-          [data-gallery-grid] { grid-template-columns: repeat(2, 1fr) !important; }
+          [data-scout-notes] { grid-template-columns: 1fr !important; }
+          [data-photo-strip] { grid-template-columns: 1fr 1fr !important; }
+          [data-clips-grid]  { grid-template-columns: 1fr 1fr !important; }
         }
       `}</style>
 

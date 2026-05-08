@@ -9,10 +9,9 @@ type Park = {
   id: string; slug: string; name: string; postcode: string; location: string;
   borough: string; lat: number; lng: number; type: string;
   is_covered: boolean; is_free: boolean; opened: string; builder: string;
-  hero_image: string; brief: string; facts: string[]; scout: string;
+  hero_image: string; brief: string;
 };
 
-const REGIONS = ["All","London"];
 const TYPE_FILTERS = ["All","Bowl","Historic","Free","Covered"];
 
 const REGION_BOUNDS: Record<string,[[number,number],[number,number]]> = {
@@ -27,18 +26,6 @@ const REGION_BOUNDS: Record<string,[[number,number],[number,number]]> = {
   "Wales":      [[51.3,-5.3],[53.5,-2.6]],
 };
 
-const GRADIENTS = [
-  "linear-gradient(160deg,#1a1a1a 0%,#2d1f1a 60%,#3d2415 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#1a1a2e 60%,#0f2040 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#1f2d1a 60%,#243d15 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#2a1a1a 60%,#3d1010 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#1a2a2a 60%,#103535 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#2a1a2a 60%,#3a0a3a 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#2a2010 60%,#4a3010 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#101a2a 60%,#051525 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#1a2a1a 60%,#153015 100%)",
-  "linear-gradient(160deg,#1a1a1a 0%,#2e1a10 60%,#3d2000 100%)",
-];
 
 type CardState = "hidden" | "peek";
 
@@ -63,9 +50,10 @@ export default function ParksMap() {
 
   const { theme } = useTheme();
 
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeFilter] = useState("All");
   const [typeFilter,   setTypeFilter]   = useState("All");
   const [search,       setSearch]       = useState("");
+  const [satellite,    setSatellite]    = useState(false);
   const [isMobile,     setIsMobile]     = useState(true);
   const [mapStatus,    setMapStatus]    = useState<"loading"|"ready"|"error">("loading");
   const [mapError,     setMapError]     = useState("");
@@ -90,7 +78,7 @@ export default function ParksMap() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
       db.from("parks")
-        .select("id, slug, name, postcode, location, borough, lat, lng, type, is_covered, is_free, opened, builder, hero_image, brief, facts, scout")
+        .select("id, slug, name, postcode, location, borough, lat, lng, type, is_covered, is_free, opened, builder, hero_image, brief")
         .eq("published", true)
         .order("sort_order", { ascending: true })
         .then(({ data }) => { if (data) setParks(data as Park[]); });
@@ -126,18 +114,19 @@ export default function ParksMap() {
     return () => { cancelled = true; if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Add markers once parks are loaded ──
+  // ── Add markers once both the map and parks are ready ──
   useEffect(() => {
-    if (!mapRef.current || parks.length === 0) return;
+    if (mapStatus !== "ready" || !mapRef.current || parks.length === 0) return;
     import("leaflet").then(({ default: L }) => {
       parks.forEach(park => {
         if (markerRefs.current[park.id]) return; // already added
+        if (!park.lat || !park.lng) return;
         const dot = L.divIcon({ className:"", html:`<div style="width:12px;height:12px;background:#888;border-radius:50%;border:2px solid rgba(136,136,136,0.3);transition:background .2s,transform .15s;"></div>`, iconSize:[12,12], iconAnchor:[6,6] });
         markerRefs.current[park.id] = L.marker([park.lat,park.lng],{ icon:dot }).addTo(mapRef.current).on("click",()=>openPark(park));
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parks]);
+  }, [parks, mapStatus]);
 
   useEffect(() => {
     if (mapRef.current) setTimeout(() => mapRef.current?.invalidateSize(), 50);
@@ -154,12 +143,27 @@ export default function ParksMap() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapStatus, parks]);
 
+  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
   useEffect(() => {
-    if (!tileLayerRef.current) return;
-    tileLayerRef.current.setUrl(theme === "light"
-      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png");
-  }, [theme]);
+    if (!mapRef.current) return;
+    import("leaflet").then(({ default: L }) => {
+      if (tileLayerRef.current) { tileLayerRef.current.remove(); tileLayerRef.current = null; }
+      if (satellite) {
+        tileLayerRef.current = L.tileLayer(
+          `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+          { attribution: "© Mapbox © OpenStreetMap", maxZoom: 19 }
+        ).addTo(mapRef.current);
+      } else {
+        tileLayerRef.current = L.tileLayer(
+          theme === "light"
+            ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          { attribution: "© OpenStreetMap contributors © CARTO", subdomains: "abcd", maxZoom: 19 }
+        ).addTo(mapRef.current);
+      }
+    });
+  }, [satellite, theme, MAPBOX_TOKEN]);
 
   const panTo = useCallback((park: Park) => {
     if (!mapRef.current) return;
@@ -291,7 +295,6 @@ export default function ParksMap() {
     }
   };
 
-  const gradIdx = (park: Park) => parks.findIndex(p => p.id === park.id) % GRADIENTS.length;
   const isSaved = selectedPark ? savedIds.includes(selectedPark.id) : false;
 
   const S = {
@@ -368,6 +371,9 @@ export default function ParksMap() {
             <button onClick={nearMe} style={{ ...S.pill(false), marginLeft:8, display:"flex", alignItems:"center", gap:5 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
               Near me
+            </button>
+            <button onClick={() => setSatellite(v => !v)} style={{ ...S.pill(satellite), marginLeft:8 }}>
+              Satellite
             </button>
           </div>
 
@@ -451,6 +457,10 @@ export default function ParksMap() {
                   {f}
                 </button>
               ))}
+              <button onClick={()=>setSatellite(v=>!v)}
+                style={{ fontFamily:"var(--font-mono)",fontSize:9,padding:"4px 10px",border:`1px solid ${satellite?"var(--accent)":"var(--border)"}`,color:satellite?"var(--accent)":"var(--muted)",background:satellite?"color-mix(in srgb,var(--accent) 8%,transparent)":"none",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase" as const,marginLeft:"auto" }}>
+                Satellite
+              </button>
             </div>
             {/* Park list */}
             <div style={{ overflowY:"auto",flex:1 }}>
@@ -460,7 +470,7 @@ export default function ParksMap() {
                 const postcodeLetters = park.postcode.replace(/[0-9]/g,"");
                 return (
                   <button key={park.id} onClick={()=>openPark(park)}
-                    style={{ width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"14px 16px",borderBottom:"1px solid var(--border)",background:sel?"var(--card)":"none",cursor:"pointer",textAlign:"left",border:"none",borderBottom:"1px solid var(--border)" }}>
+                    style={{ width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"14px 16px",background:sel?"var(--card)":"none",cursor:"pointer",textAlign:"left",border:"none",borderBottom:"1px solid var(--border)" }}>
                     <div style={{ flex:1,minWidth:0 }}>
                       <p style={{ fontSize:13,fontWeight:600,color:sel?"var(--accent)":"var(--foreground)",letterSpacing:"0.01em",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{park.name}</p>
                       <p style={{ fontFamily:"var(--font-mono)",fontSize:9,color:"var(--muted)",letterSpacing:"0.08em",textTransform:"uppercase",marginTop:3 }}>{park.postcode} · {park.location}</p>

@@ -17,147 +17,97 @@ export default async function Home() {
       <HomeSpotlight />
 
       {/* DIRECTORY CTA + FEATURED PARKS */}
-      <section style={{ paddingTop: "5rem", paddingBottom: "5rem" }}>
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: "clamp(2rem, 5vw, 5rem)", alignItems: "start" }}>
-          {/* Left: Directory CTA */}
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: "1rem" }}>
-            <p className="text-xs uppercase tracking-widest mb-4" style={{ color: "var(--muted)", letterSpacing: "0.2em" }}>The Directory</p>
-            <h2
-              style={{
-                fontSize: "clamp(2rem, 5vw, 3.5rem)",
-                lineHeight: 0.95,
-                letterSpacing: "-0.03em",
-                marginBottom: "1.25rem",
-              }}
-            >
-              Find a park
-            </h2>
-            <p style={{ color: "var(--muted)", maxWidth: "38ch", lineHeight: 1.6, fontSize: "0.9375rem", marginBottom: "1.75rem" }}>
-              Every skatepark in the UK, mapped and documented. Filter by obstacles, amenities, or find what&apos;s near you right now.
+      <section style={{ paddingTop: "5rem", paddingBottom: "6rem", borderBottom: "1px solid var(--border)" }}>
+
+        {/* Header row — label + View All link */}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)" }}>
+            The Directory
+          </p>
+          <Link href="/parks" style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--muted)", textDecoration: "none" }}>
+            View All →
+          </Link>
+        </div>
+
+        {/* Full-width heading + description */}
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "clamp(2rem, 6vw, 6rem)", marginBottom: "3rem", flexWrap: "wrap" }}>
+          <h2 style={{
+            fontFamily: "var(--font-heading)",
+            fontSize: "clamp(3rem, 7vw, 6rem)",
+            lineHeight: 0.9,
+            letterSpacing: "-0.03em",
+            fontWeight: 300,
+            textTransform: "uppercase",
+            flexShrink: 0,
+          }}>
+            Find a park
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1.25rem", maxWidth: "44ch" }}>
+            <p style={{ color: "var(--muted)", lineHeight: 1.65, fontSize: 15 }}>
+              Every skatepark in the UK, documented and mapped. Filter by type, amenities, or find what&apos;s near you.
             </p>
             <Link
               href="/parks"
-              className="inline-block"
               style={{
-                padding: "11px 28px", fontWeight: "bold", fontSize: 12,
-                textTransform: "uppercase", letterSpacing: "0.12em",
+                display: "inline-block",
+                padding: "12px 28px", fontWeight: "bold", fontSize: 11,
+                textTransform: "uppercase", letterSpacing: "0.14em",
                 background: "var(--accent)", color: "#fff",
-                alignSelf: "flex-start",
+                fontFamily: "var(--font-mono)",
               }}
             >
-              Open the Map →
+              Browse Parks →
             </Link>
           </div>
+        </div>
 
-          {/* Right: 2×2 featured parks grid */}
-          <div>
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-xs uppercase tracking-widest" style={{ color: "var(--muted)", letterSpacing: "0.2em" }}>Featured Parks</p>
-              <Link href="/parks" className="text-xs uppercase tracking-widest" style={{ color: "var(--muted)", letterSpacing: "0.15em" }}>View All →</Link>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              {(featuredParks ?? []).map((park) => (
-                <Link key={park.slug} href={`/parks/${park.slug}`} style={{ display: "block" }}>
-                  <div
+        {/* Thumbnails — 4 across */}
+        <div data-park-thumbs style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, background: "var(--border)" }}>
+          {(featuredParks ?? []).map((park) => (
+            <Link key={park.slug} href={`/parks/${park.slug}`} style={{ display: "block", background: "var(--background)", textDecoration: "none", color: "inherit" }}>
+              <div style={{ position: "relative", overflow: "hidden", background: "var(--card)", aspectRatio: "3/4" }}>
+                {park.hero_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={park.hero_image}
+                    alt={park.name}
                     style={{
-                      position: "relative", overflow: "hidden",
-                      background: "var(--card)",
-                      aspectRatio: "4/3",
-                      marginBottom: "0.5rem",
+                      position: "absolute", inset: 0,
+                      width: "100%", height: "100%",
+                      objectFit: "cover",
+                      filter: "grayscale(1) contrast(1.05) brightness(0.88)",
                     }}
-                  >
-                    {park.hero_image && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={park.hero_image}
-                        alt={park.name}
-                        style={{
-                          position: "absolute", inset: 0,
-                          width: "100%", height: "100%",
-                          objectFit: "cover",
-                          filter: "grayscale(1) contrast(1.05) brightness(0.88)",
-                          transition: "transform 0.4s ease",
-                        }}
-                      />
-                    )}
-                    <span
-                      style={{
-                        position: "absolute", top: 8, left: 8, zIndex: 1,
-                        fontSize: 9, padding: "3px 8px",
-                        background: "var(--accent)", color: "#fff",
-                        fontWeight: "bold", letterSpacing: "0.1em", textTransform: "uppercase",
-                      }}
-                    >
-                      {park.type}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.02em", fontFamily: "var(--font-body)" }}>{park.name}</p>
-                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, fontFamily: "var(--font-body)" }}>{park.location}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
+                    className="fbs-thumb-img"
+                  />
+                )}
+                <div className="fbs-thumb-overlay" />
+                <span style={{
+                  position: "absolute", top: 10, left: 10,
+                  fontSize: 9, padding: "3px 8px",
+                  background: "var(--accent)", color: "#fff",
+                  fontWeight: "bold", letterSpacing: "0.1em",
+                  textTransform: "uppercase", fontFamily: "var(--font-mono)",
+                }}>
+                  {park.type}
+                </span>
+              </div>
+              <div style={{ padding: "10px 12px 14px" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em" }}>{park.name}</p>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>{park.location}</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
-      {/* FIELD NOTES */}
-      <section style={{ paddingBottom: "5rem" }}>
-        <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}>Field Notes</h2>
-          <Link href="/field-notes" className="text-xs uppercase" style={{ color: "var(--muted)", letterSpacing: "0.15em", fontFamily: "var(--font-mono)" }}>All Features →</Link>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          <div style={{ padding: "40px 32px", display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "var(--card)", minHeight: 320 }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 12 }}>Interview</p>
-            <h3 style={{ fontSize: "clamp(1.25rem, 3vw, 2rem)", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 12 }}>
-              The Unsung Builder
-            </h3>
-            <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>
-              The man who built three DIY spots and never asked for credit.
-            </p>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end", flex: 1, background: "var(--card)" }}>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>Regional</p>
-              <h3 style={{ fontSize: "1.25rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>
-                The North West Right Now
-              </h3>
-              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
-                Five parks worth the drive, one city that&apos;s quietly become essential.
-              </p>
-            </div>
-            <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end", flex: 1, background: "var(--card)" }}>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>Spotlight</p>
-              <h3 style={{ fontSize: "1.25rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>
-                Rom Skatepark
-              </h3>
-              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
-                Britain&apos;s oldest concrete skatepark turns 50.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CURATED BY */}
-      <section style={{ paddingBottom: "6rem" }}>
-        <div className="flex items-center justify-between" style={{ marginBottom: 24 }}>
-          <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}>Curated By</h2>
-          <Link href="/curated-by" style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--muted)" }}>All Issues →</Link>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 40px", background: "var(--card)" }}>
-          <div>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 8 }}>Vol. 001 — Bristol</p>
-            <h3 style={{ fontSize: "1.75rem", lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 8 }}>Curated by Jess</h3>
-            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
-              Skating Lloyds before it gets busy, then whatever feels right after.
-            </p>
-          </div>
-          <Link href="/curated-by/jess-bristol" style={{ flexShrink: 0, marginLeft: 32, padding: "12px 24px", fontSize: 14, fontWeight: 700, background: "var(--accent)", color: "#fff", fontFamily: "var(--font-body)" }}>
-            Read
-          </Link>
-        </div>
-      </section>
+      <style>{`
+        .fbs-thumb-overlay { position:absolute; inset:0; background:var(--accent); opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
+        a:hover .fbs-thumb-overlay { opacity:0.28; }
+        a:active .fbs-thumb-overlay { opacity:0.28; }
+        @media (max-width: 700px) {
+          [data-park-thumbs] { grid-template-columns: 1fr 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

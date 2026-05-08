@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase-server";
 import Link from "next/link";
+import PublishToggle from "./PublishToggle";
 
 export default async function AdminParksPage() {
   const db = createServerClient();
@@ -29,9 +30,7 @@ export default async function AdminParksPage() {
                 {park.postcode} · {park.borough} · {park.type}
               </p>
             </div>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, padding: "3px 8px", border: `1px solid ${park.published ? "var(--accent)" : "var(--border)"}`, color: park.published ? "var(--accent)" : "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              {park.published ? "Live" : "Draft"}
-            </span>
+            <PublishToggle slug={park.slug} published={park.published} />
             <Link href={`/admin/parks/${park.slug}`} style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--foreground)", textDecoration: "none" }}>
               Edit →
             </Link>

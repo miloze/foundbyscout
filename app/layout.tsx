@@ -33,6 +33,23 @@ export default function RootLayout({
             <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
               <Nav />
               <main style={{ flex: 1 }}>{children}</main>
+              <footer style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: 32, paddingBottom: 40,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 24, flexWrap: "wrap",
+              }}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em" }}>
+                  © {new Date().getFullYear()} Found by Scout
+                </p>
+                <div style={{ display: "flex", gap: 24 }}>
+                  {[["Parks", "/parks"]].map(([label, href]) => (
+                    <a key={href} href={href} style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              </footer>
             </div>
           </div>
         </ThemeProvider>

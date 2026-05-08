@@ -7,9 +7,6 @@ import { useTheme } from "./ThemeProvider";
 
 const links = [
   { href: "/parks", label: "Parks" },
-  { href: "/field-notes", label: "Field Notes" },
-  { href: "/curated-by", label: "Curated By" },
-  { href: "/submit", label: "Submit a Park" },
 ];
 
 export default function Nav() {

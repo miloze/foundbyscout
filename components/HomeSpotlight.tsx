@@ -20,7 +20,7 @@ const PARKS = [
     name: "Southbank",
     subtitle: "Undercroft",
     location: "Waterloo",
-    tags: ["Historic", "Free", "Covered"],
+    tags: ["Street", "Free", "Covered"],
     brief: "Fifty years under Waterloo Bridge. The most culturally significant skate spot on earth.",
     postcode: "SE1",
     heroImage: "/images/parks/southbank/gallery-01.webp",
@@ -49,6 +49,8 @@ export default function HomeSpotlight() {
         position: "relative", minHeight: "78vh",
         display: "flex", flexDirection: "column", justifyContent: "flex-end",
         padding: "8rem clamp(16px,4vw,56px) 3rem",
+        marginLeft: "calc(-1 * clamp(16px, 4vw, 56px))",
+        marginRight: "calc(-1 * clamp(16px, 4vw, 56px))",
         overflow: "hidden",
         userSelect: "none",
       }}
@@ -94,11 +96,11 @@ export default function HomeSpotlight() {
       {/* Postcode badge */}
       <div style={{
         position: "absolute", top: "clamp(20px,4vw,36px)", left: "clamp(16px,4vw,56px)",
-        width: 72, height: 72, borderRadius: "50%", background: "var(--accent)",
+        width: 80, height: 80, borderRadius: "50%", background: "var(--accent)",
         display: "flex", alignItems: "center", justifyContent: "center",
         zIndex: 2, pointerEvents: "none",
       }}>
-        <span style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{park.postcode}</span>
+        <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{park.postcode}</span>
       </div>
 
       {/* Content overlay */}
