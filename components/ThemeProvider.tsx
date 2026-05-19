@@ -5,8 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Theme = "dark" | "light";
 
 const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({
-  theme: "dark",
-  toggle: () => {},
+  theme: "dark", toggle: () => {},
 });
 
 export function useTheme() {
@@ -16,12 +15,11 @@ export function useTheme() {
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
-  // Read saved preference on mount
   useEffect(() => {
-    const saved = localStorage.getItem("fbs-theme") as Theme | null;
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.setAttribute("data-theme", saved);
+    const savedTheme = localStorage.getItem("fbs-theme") as Theme | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute("data-theme", savedTheme);
     }
   }, []);
 

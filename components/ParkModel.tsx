@@ -26,7 +26,7 @@ function Model({ onLoad, modelFile, modelRotation }: {
     scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         const mesh = obj as THREE.Mesh;
-        mesh.frustumCulled = false;
+
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach(m => {
           const mat = m as THREE.Material;

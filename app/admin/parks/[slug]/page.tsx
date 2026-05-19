@@ -116,6 +116,7 @@ type FormState = {
   name: string; postcode: string; borough: string; location: string;
   type: string; surface: string; surface_note: string;
   is_free: boolean; is_covered: boolean; published: boolean; use_contour_model: boolean;
+  sort_order: number;
   opened: string; builder: string; managed_by: string;
   lat: string; lng: string;
   address: string[];
@@ -132,7 +133,7 @@ type FormState = {
 const EMPTY: FormState = {
   name: "", postcode: "", borough: "", location: "",
   type: "Bowl", surface: "", surface_note: "",
-  is_free: true, is_covered: false, published: false, use_contour_model: false,
+  is_free: true, is_covered: false, published: false, use_contour_model: false, sort_order: 0,
   opened: "", builder: "", managed_by: "",
   lat: "", lng: "",
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
@@ -161,9 +162,11 @@ export default function EditParkPage() {
   const [saving,      setSaving]      = useState(false);
   const [deleting,    setDeleting]    = useState(false);
   const [error,       setError]       = useState("");
-  const [uploading,   setUploading]   = useState(false);
-  const [newImgUrl,   setNewImgUrl]   = useState("");
-  const imgInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const [slotUrls,      setSlotUrls]      = useState<string[]>(Array(8).fill(""));
+  const [hoveredSlot,   setHoveredSlot]   = useState<number | null>(null);
+  const slotFileInputRef   = useRef<HTMLInputElement>(null);
+  const slotUploadIndexRef = useRef<number>(-1);
 
   useEffect(() => {
     fetch(`/api/admin/parks/${slug}`)
@@ -181,6 +184,7 @@ export default function EditParkPage() {
           is_free:           park.is_free ?? true,
           is_covered:        park.is_covered ?? false,
           published:         park.published ?? false,
+          sort_order:        park.sort_order ?? 0,
           use_contour_model: park.use_contour_model ?? false,
           opened:            park.opened ?? "",
           builder:           park.builder ?? "",
@@ -212,29 +216,37 @@ export default function EditParkPage() {
   const upd = <K extends keyof FormState>(key: K, v: FormState[K]) =>
     setForm(f => ({ ...f, [key]: v }));
 
-  // ── Gallery upload ────────────────────────────────────────────────────────
-  async function handleImgUpload(files: FileList | null) {
-    if (!files?.length) return;
-    setUploading(true);
-    setError("");
-    const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      const path = `${slug}/${Date.now()}-${file.name}`;
-      const { error: err } = await supabase.storage
-        .from("park-images").upload(path, file, { upsert: true });
-      if (err) { setError(`Upload failed: ${err.message}`); setUploading(false); return; }
-      const { data } = supabase.storage.from("park-images").getPublicUrl(path);
-      urls.push(data.publicUrl);
-    }
-    setForm(f => ({ ...f, gallery_images: [...f.gallery_images, ...urls] }));
-    setUploading(false);
+  // ── Gallery slot helpers ──────────────────────────────────────────────────
+  function setSlotImage(index: number, url: string) {
+    setForm(f => {
+      const imgs = [...f.gallery_images];
+      while (imgs.length <= index) imgs.push("");
+      imgs[index] = url;
+      return { ...f, gallery_images: imgs };
+    });
   }
 
-  function addImageUrl() {
-    const url = newImgUrl.trim();
-    if (!url) return;
-    setForm(f => ({ ...f, gallery_images: [...f.gallery_images, url] }));
-    setNewImgUrl("");
+  function removeSlotImage(index: number) {
+    setForm(f => {
+      const imgs = [...f.gallery_images];
+      imgs[index] = "";
+      while (imgs.length > 0 && !imgs[imgs.length - 1]) imgs.pop();
+      return { ...f, gallery_images: imgs };
+    });
+  }
+
+  async function handleSlotUpload(slotIndex: number, files: FileList | null) {
+    if (!files?.length) return;
+    setUploadingSlot(slotIndex);
+    setError("");
+    const file = files[0];
+    const path = `${slug}/${Date.now()}-${file.name}`;
+    const { error: err } = await supabase.storage
+      .from("park-images").upload(path, file, { upsert: true });
+    if (err) { setError(`Upload failed: ${err.message}`); setUploadingSlot(null); return; }
+    const { data } = supabase.storage.from("park-images").getPublicUrl(path);
+    setSlotImage(slotIndex, data.publicUrl);
+    setUploadingSlot(null);
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -348,7 +360,7 @@ export default function EditParkPage() {
                 <Input value={form.lng} onChange={v => upd("lng", v)} placeholder="-0.0719" />
               </div>
             </div>
-            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "center" }}>
               {([
                 ["is_free",           "Free entry"],
                 ["is_covered",        "Covered / indoor"],
@@ -362,6 +374,12 @@ export default function EditParkPage() {
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)" }}>{label}</span>
                 </label>
               ))}
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)" }}>Homepage order</span>
+                <input type="number" min={0} value={form.sort_order}
+                  onChange={e => setForm(f => ({ ...f, sort_order: +e.target.value }))}
+                  style={{ width: 56, background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px", outline: "none", textAlign: "center" }} />
+              </label>
             </div>
           </div>
         </section>
@@ -528,59 +546,135 @@ export default function EditParkPage() {
 
         {/* ── 8. GALLERY ─────────────────────────────────────────────────── */}
         <section>
-          <SectionHead>Gallery images</SectionHead>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 16, lineHeight: 1.8 }}>
-            These appear in the Photos strip on the park page. Hover a thumbnail to set it as the hero image or remove it.
+          <SectionHead>Gallery — editorial layout</SectionHead>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 20, lineHeight: 1.8 }}>
+            Each slot maps directly to a position in the editorial grid on the park page. Click a slot to upload, or paste a URL below it. Uploads go to Supabase Storage → park-images/{slug}/
           </p>
 
-          {form.gallery_images.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4, marginBottom: 16 }}>
-              {form.gallery_images.map((url, i) => (
-                <div key={i} style={{ position: "relative", aspectRatio: "4/3", background: "var(--card)", overflow: "hidden" }}
-                  onMouseEnter={e => { (e.currentTarget.querySelector(".gal-overlay") as HTMLElement).style.opacity = "1"; }}
-                  onMouseLeave={e => { (e.currentTarget.querySelector(".gal-overlay") as HTMLElement).style.opacity = "0"; }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: "grayscale(1)" }} />
-                  <div className="gal-overlay" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", opacity: 0, transition: "opacity 0.2s", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+          <input
+            ref={slotFileInputRef} type="file" accept="image/*" style={{ display: "none" }}
+            onChange={e => { handleSlotUpload(slotUploadIndexRef.current, e.target.files); e.target.value = ""; }}
+          />
+
+          {(() => {
+            const slotMeta = [
+              { label: "Full width · top",      aspect: "16/7"  },
+              { label: "Left · row 2",          aspect: "3/2"   },
+              { label: "Right · row 2",         aspect: "3/2"   },
+              { label: "Left · row 3 (model)",  aspect: "1/1"   },
+              { label: "Right · row 3",         aspect: "1/1"   },
+              { label: "Full width · mid",      aspect: "21/9"  },
+              { label: "Full width · lower",    aspect: "21/9"  },
+              { label: "Full width · bottom",   aspect: "21/9"  },
+            ];
+
+            const renderSlot = (i: number) => {
+              const { label, aspect } = slotMeta[i];
+              const url = form.gallery_images[i] ?? "";
+              const isHovered  = hoveredSlot === i;
+              const isUploading = uploadingSlot === i;
+
+              return (
+                <div key={i}>
+                  <div
+                    style={{ position: "relative", aspectRatio: aspect, background: "var(--card)", overflow: "hidden", cursor: "pointer" }}
+                    onMouseEnter={() => setHoveredSlot(i)}
+                    onMouseLeave={() => setHoveredSlot(null)}
+                    onClick={() => { slotUploadIndexRef.current = i; slotFileInputRef.current?.click(); }}
+                  >
+                    {url
+                      ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> // eslint-disable-line @next/next/no-img-element
+                      : (
+                        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{label}</span>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--border)" }}>click to upload</span>
+                        </div>
+                      )
+                    }
+
+                    {/* Hover / uploading overlay */}
+                    {(isHovered || isUploading) && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        {isUploading
+                          ? <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#fff" }}>Uploading…</span>
+                          : <>
+                              <button type="button"
+                                onClick={e => { e.stopPropagation(); slotUploadIndexRef.current = i; slotFileInputRef.current?.click(); }}
+                                style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "var(--accent)", border: "none", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
+                                {url ? "Replace" : "Upload"}
+                              </button>
+                              {url && (
+                                <>
+                                  <button type="button"
+                                    onClick={e => { e.stopPropagation(); setForm(f => ({ ...f, hero_image: url })); }}
+                                    style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "#333", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
+                                    Set hero
+                                  </button>
+                                  <button type="button"
+                                    onClick={e => { e.stopPropagation(); removeSlotImage(i); }}
+                                    style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
+                                    Remove
+                                  </button>
+                                </>
+                              )}
+                            </>
+                        }
+                      </div>
+                    )}
+
+                    {/* Slot label badge */}
+                    <div style={{ position: "absolute", bottom: 0, left: 0, padding: "3px 7px", background: "rgba(0,0,0,0.45)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.55)", pointerEvents: "none" }}>
+                      {label}
+                    </div>
+
+                    {/* Hero badge */}
+                    {form.hero_image === url && url && (
+                      <div style={{ position: "absolute", top: 6, left: 6, background: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.06em", color: "#fff", padding: "3px 6px" }}>Hero</div>
+                    )}
+                  </div>
+
+                  {/* URL paste row */}
+                  <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
+                    <input
+                      type="text"
+                      value={slotUrls[i] ?? ""}
+                      onChange={e => setSlotUrls(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
+                      onKeyDown={e => {
+                        if (e.key !== "Enter") return;
+                        const u = slotUrls[i]?.trim();
+                        if (u) { setSlotImage(i, u); setSlotUrls(prev => { const n = [...prev]; n[i] = ""; return n; }); }
+                      }}
+                      placeholder={`Slot ${i} — paste URL and press → or Enter`}
+                      style={{ flex: 1, background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 9, padding: "6px 8px", outline: "none" }}
+                    />
                     <button type="button"
-                      onClick={() => setForm(f => ({ ...f, hero_image: url }))}
-                      style={{ fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--accent)", border: "none", color: "#fff", padding: "4px 8px", cursor: "pointer" }}>
-                      Set hero
-                    </button>
-                    <button type="button"
-                      onClick={() => upd("gallery_images", form.gallery_images.filter((_, j) => j !== i))}
-                      style={{ fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.06em", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "4px 8px", cursor: "pointer" }}>
-                      Remove
+                      onClick={() => {
+                        const u = slotUrls[i]?.trim();
+                        if (u) { setSlotImage(i, u); setSlotUrls(prev => { const n = [...prev]; n[i] = ""; return n; }); }
+                      }}
+                      style={{ flexShrink: 0, padding: "6px 12px", background: "var(--card)", border: "1px solid var(--border)", color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 12, cursor: "pointer" }}>
+                      →
                     </button>
                   </div>
-                  {form.hero_image === url && (
-                    <div style={{ position: "absolute", top: 4, left: 4, background: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.06em", color: "#fff", padding: "3px 6px" }}>Hero</div>
-                  )}
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            };
 
-          {/* Upload + paste URL */}
-          <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
-            <input ref={imgInputRef} type="file" multiple accept="image/*"
-              style={{ display: "none" }}
-              onChange={e => { handleImgUpload(e.target.files); e.target.value = ""; }} />
-            <button type="button" onClick={() => imgInputRef.current?.click()} disabled={uploading}
-              style={{ flexShrink: 0, padding: "10px 18px", background: "var(--card)", border: "1px solid var(--border)", fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", cursor: uploading ? "not-allowed" : "pointer", color: "var(--foreground)", opacity: uploading ? 0.6 : 1, whiteSpace: "nowrap" }}>
-              {uploading ? "Uploading…" : "↑ Upload"}
-            </button>
-            <div style={{ flex: 1, display: "flex", gap: 4 }}>
-              <Input value={newImgUrl} onChange={setNewImgUrl}
-                placeholder="Or paste an image URL and press +"
-              />
-              <button type="button" onClick={addImageUrl}
-                style={{ flexShrink: 0, width: 40, background: "var(--card)", border: "1px solid var(--border)", color: "var(--accent)", fontSize: 20, cursor: "pointer" }}>+</button>
-            </div>
-          </div>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", marginTop: 6, letterSpacing: "0.04em" }}>
-            Uploads go to Supabase Storage → park-images/{slug}/
-          </p>
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--background)" }}>
+                {renderSlot(0)}
+                <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 10 }}>
+                  {renderSlot(1)}{renderSlot(2)}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {renderSlot(3)}{renderSlot(4)}
+                </div>
+                {renderSlot(5)}
+                {renderSlot(6)}
+                {renderSlot(7)}
+              </div>
+            );
+          })()}
         </section>
 
         {/* ── 9. HERO & 3D MODEL ──────────────────────────────────────────── */}
@@ -598,6 +692,19 @@ export default function EditParkPage() {
                 <img src={form.hero_image} alt="" style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
               ) : (
                 <div style={{ width: "100%", aspectRatio: "16/9", background: "var(--card)", border: "1px dashed var(--border)" }} />
+              )}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, alignItems: "end" }}>
+              <div>
+                <FieldLabel hint="directory / find-a-park grid (3:4 portrait, 720×960)">Thumbnail image URL</FieldLabel>
+                <Input value={form.thumbnail} onChange={v => upd("thumbnail", v)}
+                  placeholder="/images/parks/bloblands/thumb-01.webp" />
+              </div>
+              {form.thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.thumbnail} alt="" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
+              ) : (
+                <div style={{ width: "100%", aspectRatio: "3/4", background: "var(--card)", border: "1px dashed var(--border)" }} />
               )}
             </div>
             <div>

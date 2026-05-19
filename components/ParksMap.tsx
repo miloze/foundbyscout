@@ -491,12 +491,12 @@ export default function ParksMap() {
           {selectedPark && (
             <div style={{ position:"absolute",bottom:0,left:320,right:0,height:PEEK_H,background:"var(--background)",borderTop:"1px solid var(--border)",zIndex:11,display:"flex",alignItems:"stretch",animation:"fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both" }}>
               {/* Park photo */}
-              {selectedPark.hero_image && (
-                <div style={{ width:220,flexShrink:0,overflow:"hidden",position:"relative" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={selectedPark.hero_image} alt="" style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
-                </div>
-              )}
+              <div style={{ width:220,flexShrink:0,overflow:"hidden",position:"relative",background:"#111" }}>
+                {selectedPark.hero_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selectedPark.hero_image} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
+                )}
+              </div>
               {/* Info panel */}
               <div style={{ flex:1,padding:"20px 24px",display:"flex",flexDirection:"column",justifyContent:"space-between",borderLeft:"1px solid var(--border)",overflow:"hidden",minWidth:0 }}>
                 <div>

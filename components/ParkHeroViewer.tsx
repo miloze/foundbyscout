@@ -21,7 +21,6 @@ export default function ParkHeroViewer({
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug,
 }: Props) {
   const [isMobile, setIsMobile] = useState(false);
-  const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900);
@@ -34,36 +33,15 @@ export default function ParkHeroViewer({
   if (isMobile) {
     return (
       <div style={{ position: "absolute", inset: 0 }}>
-        {/* B&W / CLR toggle */}
-        <div style={{ position: "absolute", top: 12, right: 12, zIndex: 11, display: "flex", gap: 2 }}>
-          {(["bw", "colour"] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                padding: "5px 12px", border: "none", cursor: "pointer",
-                background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
-                color: "#fff", fontFamily: "monospace", fontSize: 10,
-                letterSpacing: "0.1em", borderRadius: 2,
-              }}
-            >
-              {mode === "bw" ? "B&W" : "CLR"}
-            </button>
-          ))}
-        </div>
-
         {heroImage ? (
           <img
             src={heroImage}
             alt=""
-            style={{
-              width: "100%", height: "100%", objectFit: "cover",
-              filter: viewMode === "bw" ? "grayscale(1) contrast(1.05) brightness(0.9)" : "none",
-              transition: "filter 0.4s ease",
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          <div style={{ position: "absolute", inset: 0, background: "var(--card)" }} />
+          <div style={{ position: "absolute", inset: 0, background: "#111" }} />
         )}
 
         {/* Bottom gradient for text legibility */}

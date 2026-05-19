@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import ParkHeroViewer from "@/components/ParkHeroViewer";
 import ParkWeather from "@/components/ParkWeather";
 import ParkBusy from "@/components/ParkBusy";
+import EditorialGallery from "@/components/EditorialGallery";
+import GalleryModelSlotClient from "@/components/GalleryModelSlotClient";
 import { createServerClient } from "@/lib/supabase-server";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -63,6 +65,24 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
 
   if (!park) notFound();
 
+  // Dev fallback: use local static images when the DB has no gallery yet.
+  // Slot order matches EditorialGallery: full, wide-left, narrow-right, sq-left(model), sq-right, full, full
+  const bloblandsDevImages = slug === "bloblands" ? [
+    { src: "/images/parks/bloblands/hero-01.webp",    alt: "Bloblands skatepark overview" },
+    { src: "/images/parks/bloblands/gallery-01.webp", alt: "Bloblands graffiti wall" },
+    { src: "/images/parks/bloblands/gallery-02.webp", alt: "Skater at Bloblands" },
+    { src: "",                                         alt: "" }, // slot 3 — replaced by 3D model
+    { src: "/images/parks/bloblands/gallery-04.webp", alt: "Bloblands concrete obstacle" },
+    { src: "/images/parks/bloblands/gallery-03.webp", alt: "Bloblands panoramic" },
+  ] : null;
+
+  const galleryImages = park.gallery_images?.length
+    ? (park.gallery_images as string[]).map((src) => ({ src, alt: "" }))
+    : bloblandsDevImages ?? [];
+
+  // Model file: use DB value or fall back to the known local path for bloblands
+  const modelFile = slug === "bloblands" ? "/images/parks/bloblands/volcano.glb" : (park.model_file || null);
+
   const bleed = "calc(-1 * clamp(16px, 4vw, 56px))";
 
   return (
@@ -71,7 +91,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <div style={{
         position: "relative",
-        height: park.use_contour_model ? "78vh" : "58vh",
+        height: "78vh",
         minHeight: 340, overflow: "hidden",
         background: "var(--background)",
         marginLeft: bleed, marginRight: bleed,
@@ -89,11 +109,11 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
             debug={isDebug}
           />
         ) : (
-          <>
-            <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px), repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px)" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 60%)" }} />
-          </>
+          <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px), repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px)" }} />
         )}
+
+        {/* Always-on gradient so the title reads over any hero content */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 60%)", pointerEvents: "none", zIndex: 1 }} />
 
         {/* Postcode badge */}
         <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(16px, 4vw, 56px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>
@@ -136,15 +156,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
             {park.description.map((p: string, i: number) => <p key={i} style={{ marginTop: i > 0 ? 14 : 0 }}>{p}</p>)}
           </div>
 
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Surface</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--border)" }}>
-            <div style={{ width: 48, height: 48, borderRadius: 4, flexShrink: 0, background: "repeating-linear-gradient(45deg, #c0bdb7 0px, #c0bdb7 1px, #b0ada6 1px, #b0ada6 4px)" }} />
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 300, letterSpacing: "0.02em", textTransform: "uppercase" }}>{park.surface}</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", marginTop: 4 }}>{park.surface_note}</div>
-            </div>
-          </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", lineHeight: 1.8, marginTop: 24, paddingBottom: 40 }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", lineHeight: 1.8, paddingBottom: 40 }}>
             Opened {park.opened}
           </div>
         </div>
@@ -216,26 +228,16 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
         </div>
       </div>
 
-      {/* ── PHOTO STRIP ──────────────────────────────────────────────── */}
-      {park.gallery_images && park.gallery_images.length > 0 && (
-        <section style={{ marginTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Photos</p>
-          <div data-photo-strip style={{ display: "grid", gridTemplateColumns: park.gallery_images.length === 1 ? "1fr" : "2fr 1fr 1fr 1fr", gap: 2, background: "var(--border)" }}>
-            {(park.gallery_images as string[]).map((url: string, i: number) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={url}
-                alt=""
-                style={{
-                  display: "block", width: "100%",
-                  aspectRatio: i === 0 ? "16/10" : "4/5",
-                  objectFit: "cover",
-                  filter: "grayscale(1) contrast(1.05) brightness(0.9)",
-                }}
-              />
-            ))}
-          </div>
+      {/* ── PHOTO GALLERY ────────────────────────────────────────────── */}
+      {galleryImages.length > 0 && (
+        <section style={{ paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16, paddingTop: 64 }}>Photos</p>
+          <EditorialGallery
+            images={galleryImages}
+            slotOverrides={modelFile ? {
+              3: <GalleryModelSlotClient modelFile={modelFile} debug={isDebug} />,
+            } : undefined}
+          />
         </section>
       )}
 

@@ -25,7 +25,7 @@ export default function Nav() {
           Found by Scout
         </Link>
 
-        {/* Desktop links + toggle */}
+        {/* Desktop links + toggles */}
         <ul className="hidden md:flex items-center gap-8">
           {links.map((link) => (
             <li key={link.href}>

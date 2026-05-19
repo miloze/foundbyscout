@@ -23,6 +23,7 @@ html, body {
   color: var(--foreground);
 }
 
+
 body {
   font-family: var(--font-body), 'Helvetica Neue', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

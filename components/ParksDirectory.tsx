@@ -288,13 +288,14 @@ export default function ParksDirectory() {
         }}
       >
         {/* Image */}
-        <div style={{ position: "relative", paddingBottom: aspect, overflow: "hidden", background: "var(--card)" }}>
+        <div style={{ position: "relative", paddingBottom: aspect, overflow: "hidden", background: "#111" }}>
           {park.hero_image && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={park.hero_image}
-              alt={park.name}
+              alt=""
               className="fbs-park-img"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               style={{
                 position: "absolute", inset: 0,
                 width: "100%", height: "100%",
@@ -351,10 +352,11 @@ export default function ParksDirectory() {
           animationDelay: `${idx * 50}ms`,
         }}
       >
-        <div style={{ position: "relative", paddingBottom: "75%", overflow: "hidden", background: "var(--card)" }}>
+        <div style={{ position: "relative", paddingBottom: "75%", overflow: "hidden", background: "#111" }}>
           {park.hero_image && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={park.hero_image} alt={park.name}
+            <img src={park.hero_image} alt=""
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: imgFilter }}
             />
           )}
@@ -526,12 +528,12 @@ export default function ParksDirectory() {
           {/* Preview bar */}
           {selectedPark && (
             <div style={{ position: "fixed", bottom: 0, left: "calc(clamp(16px, 4vw, 56px) + 300px)", right: "clamp(16px, 4vw, 56px)", height: PEEK_H, background: "var(--background)", borderTop: "1px solid var(--border)", zIndex: 11, display: "flex", alignItems: "stretch", animation: "fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both" }}>
-              {selectedPark.hero_image && (
-                <div style={{ width: 200, flexShrink: 0, overflow: "hidden" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div style={{ width: 200, flexShrink: 0, overflow: "hidden", background: "#111" }}>
+                {selectedPark.hero_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={selectedPark.hero_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: imgFilter }} />
-                </div>
-              )}
+                )}
+              </div>
               <div style={{ flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", justifyContent: "center", borderLeft: "1px solid var(--border)", minWidth: 0, gap: 4 }}>
                 <h3 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(20px,2.2vw,30px)", fontWeight: 300, letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 1, color: "var(--foreground)" }}>{selectedPark.name}</h3>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 4 }}>{selectedPark.location}</p>

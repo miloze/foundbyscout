@@ -6,8 +6,9 @@ export default async function Home() {
   const db = createServerClient();
   const { data: featuredParks } = await db
     .from("parks")
-    .select("slug, name, location, type, hero_image")
+    .select("slug, name, location, type, hero_image, thumbnail")
     .eq("published", true)
+    .gt("sort_order", 0)
     .order("sort_order", { ascending: true })
     .limit(4);
 
@@ -65,12 +66,12 @@ export default async function Home() {
         <div data-park-thumbs style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, background: "var(--border)" }}>
           {(featuredParks ?? []).map((park) => (
             <Link key={park.slug} href={`/parks/${park.slug}`} style={{ display: "block", background: "var(--background)", textDecoration: "none", color: "inherit" }}>
-              <div style={{ position: "relative", overflow: "hidden", background: "var(--card)", aspectRatio: "3/4" }}>
-                {park.hero_image && (
+              <div style={{ position: "relative", overflow: "hidden", background: "#111", aspectRatio: "3/4" }}>
+                {(park.thumbnail || park.hero_image) && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={park.hero_image}
-                    alt={park.name}
+                    src={park.thumbnail || park.hero_image}
+                    alt=""
                     style={{
                       position: "absolute", inset: 0,
                       width: "100%", height: "100%",
@@ -101,6 +102,8 @@ export default async function Home() {
       </section>
 
       <style>{`
+        .fbs-thumb-img { color: transparent; transition: filter 0.4s ease; }
+        .fbs-colour .fbs-thumb-img { filter: none !important; }
         .fbs-thumb-overlay { position:absolute; inset:0; background:var(--accent); opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
         a:hover .fbs-thumb-overlay { opacity:0.28; }
         a:active .fbs-thumb-overlay { opacity:0.28; }
