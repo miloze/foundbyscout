@@ -57,7 +57,7 @@ export default function ParkWeather({ lat, lng }: { lat: number; lng: number }) 
         <span style={{
           fontFamily: "var(--font-mono)", fontSize: 10,
           letterSpacing: "0.1em", textTransform: "uppercase",
-          color: "var(--foreground)",
+          color: "#fff",
         }}>
           {c.label}
         </span>
@@ -66,7 +66,7 @@ export default function ParkWeather({ lat, lng }: { lat: number; lng: number }) 
       {checkedAt && (
         <span style={{
           fontFamily: "var(--font-mono)", fontSize: 9,
-          letterSpacing: "0.08em", color: "var(--muted)",
+          letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)",
           paddingLeft: 10,
         }}>
           {checkedAt}

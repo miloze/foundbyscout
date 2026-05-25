@@ -71,7 +71,7 @@ export default function ParkBusy({ lit = false }: { lit?: boolean }) {
       <span style={{
         fontFamily: "var(--font-mono)", fontSize: 10,
         letterSpacing: "0.1em", textTransform: "uppercase",
-        color: "var(--foreground)",
+        color: "#fff",
       }}>
         {c.label}
       </span>

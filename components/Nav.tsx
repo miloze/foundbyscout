@@ -18,7 +18,7 @@ export default function Nav() {
     <header style={{ borderBottom: "none" }} className="sticky top-0 z-50">
       <nav
         className="flex items-center justify-between"
-        style={{ background: "var(--background)", paddingTop: "12px", paddingBottom: "12px", borderBottom: "1px solid var(--border)" }}
+        style={{ background: "var(--background)", paddingTop: "12px", paddingBottom: "12px", paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)", borderBottom: "1px solid var(--border)" }}
       >
         {/* Logo */}
         <Link href="/" className="text-sm font-black" style={{ color: "var(--accent)", letterSpacing: "0.04em" }}>

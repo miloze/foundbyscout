@@ -28,10 +28,10 @@ export default function RootLayout({
       </head>
       <body className={`${bodyFont.variable} ${headingFont.variable} ${monoFont.variable}`} style={{ fontFamily: "var(--font-body), sans-serif", margin: 0, background: "var(--background)", color: "var(--foreground)" }}>
         <ThemeProvider>
-          <Grain />
+          {/* <Grain /> */}
+          <Nav />
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", padding: "0 clamp(16px, 4vw, 56px)" }}>
             <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
-              <Nav />
               <main style={{ flex: 1 }}>{children}</main>
               <footer style={{
                 borderTop: "1px solid var(--border)",

@@ -9,7 +9,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// ── Base UI components ─────────────────────────────────────────────────────
+type GalleryRowItem = { slot: number; ratio: string; type: "image" | "video" | "gif" | "glb"; glbFile?: string };
+type GalleryColumn = { slots: GalleryRowItem[] };
+
+const btnStyle: React.CSSProperties = {
+  fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.06em",
+  padding: "3px 8px", border: "1px solid var(--border)",
+  background: "var(--card)", color: "var(--muted)",
+  cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap",
+};
+
 function SectionHead({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
@@ -106,7 +115,6 @@ function RemoveBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type TransportItem = { type: string; name: string; detail: string };
 type HoursItem     = { days: string; time: string };
 type GlanceItem    = { icon: string; value: string; label: string; available: boolean };
@@ -152,19 +160,33 @@ function strToNumArr(s: string): number[] | null {
   return parts.length === 3 ? parts : null;
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────
+const RATIO_OPTIONS = [
+  { label: "16:9", aspect: "16/9" },
+  { label: "9:16", aspect: "9/16" },
+  { label: "1:1",  aspect: "1/1"  },
+  { label: "21:9", aspect: "21/9" },
+  { label: "3:2",  aspect: "3/2"  },
+  { label: "16:7", aspect: "16/7" },
+];
+
 export default function EditParkPage() {
   const router = useRouter();
   const { slug } = useParams<{ slug: string }>();
 
-  const [form,        setForm]        = useState<FormState>(EMPTY);
-  const [loading,     setLoading]     = useState(true);
-  const [saving,      setSaving]      = useState(false);
-  const [deleting,    setDeleting]    = useState(false);
-  const [error,       setError]       = useState("");
+  const [form,          setForm]          = useState<FormState>(EMPTY);
+  const [loading,       setLoading]       = useState(true);
+  const [saving,        setSaving]        = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
+  const [error,         setError]         = useState("");
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
   const [slotUrls,      setSlotUrls]      = useState<string[]>(Array(8).fill(""));
   const [hoveredSlot,   setHoveredSlot]   = useState<number | null>(null);
+  const [slotRatios,    setSlotRatios]    = useState<string[]>(Array(8).fill("16/9"));
+  const [slotOrder,     setSlotOrder]     = useState<number[]>([0,1,2,3,4,5,6,7]);
+  const [dragSlot,      setDragSlot]      = useState<number | null>(null);
+
+  const [galleryRows, setGalleryRows] = useState<GalleryColumn[][]>([])
+
   const slotFileInputRef   = useRef<HTMLInputElement>(null);
   const slotUploadIndexRef = useRef<number>(-1);
 
@@ -208,6 +230,16 @@ export default function EditParkPage() {
           camera_target:  numArrToStr(park.camera_target),
           model_rotation: numArrToStr(park.model_rotation),
         });
+        if (Array.isArray(park.slot_ratios)) setSlotRatios(park.slot_ratios);
+        if (Array.isArray(park.slot_order))  setSlotOrder(park.slot_order);
+        if (Array.isArray(park.gallery_rows)) {
+          const normalize = (row: unknown[]) =>
+            row.map((item: unknown) => {
+              const i = item as Record<string, unknown>;
+              return Array.isArray(i.slots) ? (i as GalleryColumn) : { slots: [i as GalleryRowItem] };
+            });
+          setGalleryRows((park.gallery_rows as unknown[][]).map(normalize));
+        }
         setLoading(false);
       })
       .catch(() => { setError("Failed to load park"); setLoading(false); });
@@ -216,7 +248,6 @@ export default function EditParkPage() {
   const upd = <K extends keyof FormState>(key: K, v: FormState[K]) =>
     setForm(f => ({ ...f, [key]: v }));
 
-  // ── Gallery slot helpers ──────────────────────────────────────────────────
   function setSlotImage(index: number, url: string) {
     setForm(f => {
       const imgs = [...f.gallery_images];
@@ -249,7 +280,6 @@ export default function EditParkPage() {
     setUploadingSlot(null);
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -263,6 +293,9 @@ export default function EditParkPage() {
       camera_pos:     strToNumArr(form.camera_pos),
       camera_target:  strToNumArr(form.camera_target),
       model_rotation: strToNumArr(form.model_rotation),
+      slot_ratios: slotRatios,
+      slot_order:  slotOrder,
+      gallery_rows: galleryRows,
     };
 
     const res = await fetch(`/api/admin/parks/${slug}`, {
@@ -288,15 +321,183 @@ export default function EditParkPage() {
     else { const d = await res.json(); setError(d.error ?? "Delete failed"); setDeleting(false); }
   }
 
+  function moveSlot(fromIdx: number, toIdx: number) {
+    setSlotOrder(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }
+
   if (loading) return <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)" }}>Loading…</p>;
 
-  const G2 = { display: "grid" as const, gridTemplateColumns: "1fr 1fr",    gap: 16 };
+  const G2 = { display: "grid" as const, gridTemplateColumns: "1fr 1fr",     gap: 16 };
   const G3 = { display: "grid" as const, gridTemplateColumns: "1fr 1fr 1fr", gap: 16 };
 
+  const slotLabels = ["Slot 0","Slot 1","Slot 2","Slot 3","Slot 4","Slot 5","Slot 6","Slot 7"];
+
+  const renderSlot = (orderIdx: number) => {
+    const i           = slotOrder[orderIdx];
+    const aspect      = slotRatios[i] ?? "16/9";
+    const url         = form.gallery_images[i] ?? "";
+    const isHovered   = hoveredSlot === i;
+    const isUploading = uploadingSlot === i;
+    const isDragging  = dragSlot === orderIdx;
+
+    return (
+      <div
+        key={i}
+        style={{ opacity: isDragging ? 0.4 : 1, transition: "opacity 0.15s", userSelect: "none" }}
+      >
+        {/* Drag handle + ratio selector row */}
+        <div style={{ display: "flex", gap: 2, marginBottom: 4, alignItems: "center" }}
+          onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+          onDrop={e => { e.preventDefault(); if (dragSlot !== null && dragSlot !== orderIdx) moveSlot(dragSlot, orderIdx); setDragSlot(null); }}
+        >
+          {/* Grip handle — this is the drag target */}
+          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+  <button
+    type="button"
+    onClick={() => { if (orderIdx > 0) moveSlot(orderIdx, orderIdx - 1); }}
+    disabled={orderIdx === 0}
+    style={{ padding: "3px 7px", border: "1px solid var(--border)", background: "var(--card)", color: orderIdx === 0 ? "var(--border)" : "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11, cursor: orderIdx === 0 ? "default" : "pointer" }}
+  >↑</button>
+  <button
+    type="button"
+    onClick={() => { if (orderIdx < slotOrder.length - 1) moveSlot(orderIdx, orderIdx + 1); }}
+    disabled={orderIdx === slotOrder.length - 1}
+    style={{ padding: "3px 7px", border: "1px solid var(--border)", background: "var(--card)", color: orderIdx === slotOrder.length - 1 ? "var(--border)" : "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11, cursor: orderIdx === slotOrder.length - 1 ? "default" : "pointer" }}
+  >↓</button>
+  <button
+  type="button"
+  onClick={() => {
+    setSlotOrder(prev => prev.filter((_, idx) => idx !== orderIdx));
+    setSlotRatios(prev => prev.filter((_, idx) => idx !== i));
+    setForm(f => ({
+      ...f,
+      gallery_images: f.gallery_images.filter((_, idx) => idx !== i),
+    }));
+  }}
+  style={{ padding: "3px 7px", border: "1px solid var(--border)", background: "var(--card)", color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11, cursor: "pointer" }}
+>×</button>
+</div>
+
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginLeft: 4, marginRight: 6 }}>
+            {orderIdx + 1}
+          </span>
+
+          {RATIO_OPTIONS.map(r => (
+            <button
+              key={r.label}
+              type="button"
+              onClick={() => setSlotRatios(prev => { const n = [...prev]; n[i] = r.aspect; return n; })}
+              style={{
+                fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.06em",
+                padding: "3px 8px", border: "1px solid var(--border)",
+                background: aspect === r.aspect ? "var(--foreground)" : "var(--card)",
+                color: aspect === r.aspect ? "var(--background)" : "var(--muted)",
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Drop zone above */}
+        <div
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); if (dragSlot !== null && dragSlot !== orderIdx) moveSlot(dragSlot, orderIdx); setDragSlot(null); }}
+          style={{ height: dragSlot !== null && dragSlot !== orderIdx ? 6 : 0, background: "var(--accent)", transition: "height 0.15s", marginBottom: dragSlot !== null && dragSlot !== orderIdx ? 4 : 0 }}
+        />
+
+        {/* Slot image */}
+        <div
+          style={{ position: "relative", aspectRatio: aspect, background: "var(--card)", overflow: "hidden", cursor: "pointer" }}
+          onMouseEnter={() => setHoveredSlot(i)}
+          onMouseLeave={() => setHoveredSlot(null)}
+          onClick={() => { slotUploadIndexRef.current = i; slotFileInputRef.current?.click(); }}
+        >
+          {url
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : (
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{slotLabels[i]}</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--border)" }}>click to upload</span>
+              </div>
+            )
+          }
+
+          {(isHovered || isUploading) && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {isUploading
+                ? <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#fff" }}>Uploading…</span>
+                : <>
+                    <button type="button"
+                      onClick={e => { e.stopPropagation(); slotUploadIndexRef.current = i; slotFileInputRef.current?.click(); }}
+                      style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "var(--accent)", border: "none", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
+                      {url ? "Replace" : "Upload"}
+                    </button>
+                    {url && (
+                      <>
+                        <button type="button"
+                          onClick={e => { e.stopPropagation(); setForm(f => ({ ...f, hero_image: url })); }}
+                          style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "#333", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
+                          Set hero
+                        </button>
+                        <button type="button"
+                          onClick={e => { e.stopPropagation(); removeSlotImage(i); }}
+                          style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </>
+              }
+            </div>
+          )}
+
+          <div style={{ position: "absolute", bottom: 0, left: 0, padding: "3px 7px", background: "rgba(0,0,0,0.45)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.55)", pointerEvents: "none" }}>
+            {slotLabels[i]} · {RATIO_OPTIONS.find(r => r.aspect === aspect)?.label}
+          </div>
+
+          {form.hero_image === url && url && (
+            <div style={{ position: "absolute", top: 6, left: 6, background: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.06em", color: "#fff", padding: "3px 6px" }}>Hero</div>
+          )}
+        </div>
+
+        {/* URL paste row */}
+        <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
+          <input
+            type="text"
+            value={slotUrls[i] ?? ""}
+            onChange={e => setSlotUrls(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
+            onKeyDown={e => {
+              if (e.key !== "Enter") return;
+              const u = slotUrls[i]?.trim();
+              if (u) { setSlotImage(i, u); setSlotUrls(prev => { const n = [...prev]; n[i] = ""; return n; }); }
+            }}
+            placeholder={`Slot ${i} — paste URL and press → or Enter`}
+            style={{ flex: 1, background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 9, padding: "6px 8px", outline: "none" }}
+          />
+          <button type="button"
+            onClick={() => {
+              const u = slotUrls[i]?.trim();
+              if (u) { setSlotImage(i, u); setSlotUrls(prev => { const n = [...prev]; n[i] = ""; return n; }); }
+            }}
+            style={{ flexShrink: 0, padding: "6px 12px", background: "var(--card)", border: "1px solid var(--border)", color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 12, cursor: "pointer" }}>
+            →
+          </button>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div style={{ maxWidth: 820 }}>
 
-      {/* Header */}
       <div style={{ marginBottom: 40 }}>
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)", marginBottom: 8 }}>Parks</p>
         <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.02em" }}>
@@ -305,9 +506,9 @@ export default function EditParkPage() {
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", marginTop: 4 }}>/{slug}</p>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 48 }}>
+      <form onSubmit={handleSubmit} onKeyDown={e => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }} style={{ display: "flex", flexDirection: "column", gap: 48 }}>
 
-        {/* ── 1. BASIC INFO ──────────────────────────────────────────────── */}
+        {/* 1. BASIC INFO */}
         <section>
           <SectionHead>Basic info</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -384,7 +585,7 @@ export default function EditParkPage() {
           </div>
         </section>
 
-        {/* ── 2. CONTENT ─────────────────────────────────────────────────── */}
+        {/* 2. CONTENT */}
         <section>
           <SectionHead>Content</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -396,17 +597,15 @@ export default function EditParkPage() {
             <div>
               <FieldLabel hint="separate paragraphs with a blank line">Description</FieldLabel>
               <Textarea value={form.description} onChange={v => upd("description", v)} rows={8}
-                placeholder={"First paragraph — the park's character and what makes it special.\n\nSecond paragraph — history, builders, the community.\n\nThird paragraph — tips, tricks, what to expect on your first visit."} />
+                placeholder={"First paragraph.\n\nSecond paragraph.\n\nThird paragraph."} />
             </div>
           </div>
         </section>
 
-        {/* ── 3. ADDRESS & TRANSPORT ──────────────────────────────────────── */}
+        {/* 3. ADDRESS & TRANSPORT */}
         <section>
           <SectionHead>Address & getting there</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
-            {/* Address lines */}
             <div>
               <FieldLabel hint="one row per line — street, area, city">Address</FieldLabel>
               {form.address.map((line, i) => (
@@ -419,15 +618,12 @@ export default function EditParkPage() {
               ))}
               <AddRowBtn onClick={() => upd("address", [...form.address, ""])} label="+ Add address line" />
             </div>
-
-            {/* Transport */}
             <div>
               <FieldLabel>Transport links</FieldLabel>
               <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr auto", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>Type</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>Station / stop</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>Walking time / detail</span>
-                <span />
+                {["Type","Station / stop","Walking time / detail",""].map((h, i) => (
+                  <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{h}</span>
+                ))}
               </div>
               {form.transport.map((t, i) => (
                 <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 1fr 1fr auto", gap: 8, marginBottom: 6, alignItems: "center" }}>
@@ -446,13 +642,13 @@ export default function EditParkPage() {
           </div>
         </section>
 
-        {/* ── 4. OPENING HOURS ───────────────────────────────────────────── */}
+        {/* 4. OPENING HOURS */}
         <section>
           <SectionHead>Opening hours</SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>Days</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>Hours</span>
-            <span />
+            {["Days","Hours",""].map((h, i) => (
+              <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{h}</span>
+            ))}
           </div>
           {form.hours.map((row, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 6, alignItems: "center" }}>
@@ -469,15 +665,15 @@ export default function EditParkPage() {
           </p>
         </section>
 
-        {/* ── 5. AT A GLANCE ─────────────────────────────────────────────── */}
+        {/* 5. AT A GLANCE */}
         <section>
           <SectionHead>At a glance</SectionHead>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 16, lineHeight: 1.9 }}>
             Icons from <a href="https://fonts.google.com/icons" target="_blank" rel="noopener" style={{ color: "var(--accent)" }}>Material Symbols</a>.
-            Common names: <span style={{ color: "var(--foreground)" }}>skatepark · wb_sunny · water_drop · groups · timer · directions_walk · local_parking · wc · star</span>
+            Common: <span style={{ color: "var(--foreground)" }}>skatepark · wb_sunny · water_drop · groups · timer · directions_walk · local_parking · wc · star</span>
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr auto auto", gap: 8, marginBottom: 8 }}>
-            {["Icon name", "Value", "Label", "On", ""].map((h, i) => (
+            {["Icon name","Value","Label","On",""].map((h, i) => (
               <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{h}</span>
             ))}
           </div>
@@ -500,7 +696,7 @@ export default function EditParkPage() {
           <AddRowBtn onClick={() => upd("glance", [...form.glance, { icon: "", value: "", label: "", available: true }])} />
         </section>
 
-        {/* ── 6. FACTS ───────────────────────────────────────────────────── */}
+        {/* 6. FACTS */}
         <section>
           <SectionHead>Facts</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -521,11 +717,11 @@ export default function EditParkPage() {
           </div>
         </section>
 
-        {/* ── 7. SOCIAL LINKS ────────────────────────────────────────────── */}
+        {/* 7. SOCIAL LINKS */}
         <section>
           <SectionHead>Social links</SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 160px auto", gap: 8, marginBottom: 8 }}>
-            {["Platform", "URL", "Button label", ""].map((h, i) => (
+            {["Platform","URL","Button label",""].map((h, i) => (
               <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{h}</span>
             ))}
           </div>
@@ -544,140 +740,229 @@ export default function EditParkPage() {
           <AddRowBtn onClick={() => upd("socials", [...form.socials, { platform: "instagram", url: "", label: "" }])} />
         </section>
 
-        {/* ── 8. GALLERY ─────────────────────────────────────────────────── */}
-        <section>
-          <SectionHead>Gallery — editorial layout</SectionHead>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 20, lineHeight: 1.8 }}>
-            Each slot maps directly to a position in the editorial grid on the park page. Click a slot to upload, or paste a URL below it. Uploads go to Supabase Storage → park-images/{slug}/
-          </p>
+        {/* 8. GALLERY */}
+<section>
+  <SectionHead>Gallery — editorial layout</SectionHead>
+  <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 20, lineHeight: 1.8 }}>
+    Build rows of 1–3 columns. Each column can stack multiple slots vertically.
+  </p>
 
-          <input
-            ref={slotFileInputRef} type="file" accept="image/*" style={{ display: "none" }}
-            onChange={e => { handleSlotUpload(slotUploadIndexRef.current, e.target.files); e.target.value = ""; }}
-          />
+  <input
+    ref={slotFileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }}
+    onChange={e => { handleSlotUpload(slotUploadIndexRef.current, e.target.files); e.target.value = ""; }}
+  />
 
-          {(() => {
-            const slotMeta = [
-              { label: "Full width · top",      aspect: "16/7"  },
-              { label: "Left · row 2",          aspect: "3/2"   },
-              { label: "Right · row 2",         aspect: "3/2"   },
-              { label: "Left · row 3 (model)",  aspect: "1/1"   },
-              { label: "Right · row 3",         aspect: "1/1"   },
-              { label: "Full width · mid",      aspect: "21/9"  },
-              { label: "Full width · lower",    aspect: "21/9"  },
-              { label: "Full width · bottom",   aspect: "21/9"  },
-            ];
+  <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 6 }}>
+    {galleryRows.map((row, rowIdx) => (
+      <div key={rowIdx} style={{ border: "1px solid var(--border)", background: "var(--card)" }}>
 
-            const renderSlot = (i: number) => {
-              const { label, aspect } = slotMeta[i];
-              const url = form.gallery_images[i] ?? "";
-              const isHovered  = hoveredSlot === i;
-              const isUploading = uploadingSlot === i;
+        {/* Row header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)", flex: 1 }}>
+            Row {rowIdx + 1} · {row.length === 1 ? "full width" : `${row.length} cols`}
+          </span>
+          {rowIdx > 0 && (
+            <button type="button" onClick={() => {
+              setGalleryRows(prev => {
+                const next = [...prev];
+                [next[rowIdx - 1], next[rowIdx]] = [next[rowIdx], next[rowIdx - 1]];
+                return next;
+              });
+            }} style={{ ...btnStyle }}>↑</button>
+          )}
+          {rowIdx < galleryRows.length - 1 && (
+            <button type="button" onClick={() => {
+              setGalleryRows(prev => {
+                const next = [...prev];
+                [next[rowIdx], next[rowIdx + 1]] = [next[rowIdx + 1], next[rowIdx]];
+                return next;
+              });
+            }} style={{ ...btnStyle }}>↓</button>
+          )}
+          {row.length < 3 && (
+            <button type="button" onClick={() => {
+              setGalleryRows(prev => {
+                const next = [...prev];
+                const nextSlot = Math.max(...next.flatMap(r => r.flatMap(col => col.slots.map(s => s.slot))), -1) + 1;
+                next[rowIdx] = [...next[rowIdx], { slots: [{ slot: nextSlot, ratio: "1/1", type: "image" as const }] }];
+                return next;
+              });
+            }} style={{ ...btnStyle }}>+ col</button>
+          )}
+          <button type="button" onClick={() => {
+            setGalleryRows(prev => prev.filter((_, i) => i !== rowIdx));
+          }} style={{ ...btnStyle, color: "var(--accent)" }}>× row</button>
+        </div>
 
-              return (
-                <div key={i}>
-                  <div
-                    style={{ position: "relative", aspectRatio: aspect, background: "var(--card)", overflow: "hidden", cursor: "pointer" }}
-                    onMouseEnter={() => setHoveredSlot(i)}
-                    onMouseLeave={() => setHoveredSlot(null)}
-                    onClick={() => { slotUploadIndexRef.current = i; slotFileInputRef.current?.click(); }}
-                  >
-                    {url
-                      ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> // eslint-disable-line @next/next/no-img-element
-                      : (
-                        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{label}</span>
-                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--border)" }}>click to upload</span>
-                        </div>
-                      )
-                    }
+        {/* Columns */}
+        <div style={{ display: "flex", gap: 2, padding: 10 }}>
+          {row.map((col, colIdx) => (
+            <div key={colIdx} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+              {col.slots.map((slot, slotIdx) => {
+                const url = form.gallery_images[slot.slot] ?? "";
+                return (
+                  <div key={slotIdx} style={{ display: "flex", flexDirection: "column", gap: 6, ...(slotIdx > 0 ? { borderTop: "1px dashed var(--border)", paddingTop: 8 } : {}) }}>
 
-                    {/* Hover / uploading overlay */}
-                    {(isHovered || isUploading) && (
-                      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                        {isUploading
-                          ? <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#fff" }}>Uploading…</span>
-                          : <>
-                              <button type="button"
-                                onClick={e => { e.stopPropagation(); slotUploadIndexRef.current = i; slotFileInputRef.current?.click(); }}
-                                style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "var(--accent)", border: "none", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
-                                {url ? "Replace" : "Upload"}
-                              </button>
-                              {url && (
-                                <>
-                                  <button type="button"
-                                    onClick={e => { e.stopPropagation(); setForm(f => ({ ...f, hero_image: url })); }}
-                                    style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "#333", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
-                                    Set hero
-                                  </button>
-                                  <button type="button"
-                                    onClick={e => { e.stopPropagation(); removeSlotImage(i); }}
-                                    style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.08em", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "5px 10px", cursor: "pointer" }}>
-                                    Remove
-                                  </button>
-                                </>
-                              )}
-                            </>
-                        }
+                    {/* Type + ratio selectors */}
+                    <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                      {(["image","video","gif","glb"] as const).map(t => (
+                        <button key={t} type="button"
+                          onClick={() => setGalleryRows(prev => {
+                            const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                            next[rowIdx][colIdx].slots[slotIdx] = { ...slot, type: t };
+                            return next;
+                          })}
+                          style={{ ...btnStyle, background: slot.type === t ? "var(--foreground)" : "var(--card)", color: slot.type === t ? "var(--background)" : "var(--muted)" }}
+                        >{t}</button>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+                      {RATIO_OPTIONS.map(r => (
+                        <button key={r.label} type="button"
+                          onClick={() => setGalleryRows(prev => {
+                            const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                            next[rowIdx][colIdx].slots[slotIdx] = { ...slot, ratio: r.aspect };
+                            return next;
+                          })}
+                          style={{ ...btnStyle, background: slot.ratio === r.aspect ? "var(--foreground)" : "var(--card)", color: slot.ratio === r.aspect ? "var(--background)" : "var(--muted)" }}
+                        >{r.label}</button>
+                      ))}
+                      <input
+                        type="text"
+                        defaultValue={RATIO_OPTIONS.some(r => r.aspect === slot.ratio) ? "" : slot.ratio}
+                        placeholder="w/h"
+                        onBlur={e => {
+                          const v = e.target.value.trim();
+                          if (/^\d+\/\d+$/.test(v)) setGalleryRows(prev => {
+                            const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                            next[rowIdx][colIdx].slots[slotIdx] = { ...slot, ratio: v };
+                            return next;
+                          });
+                        }}
+                        style={{ ...btnStyle, width: 52, padding: "3px 5px", color: "var(--foreground)" }}
+                      />
+                    </div>
+
+                    {/* Preview */}
+                    <div
+                      style={{ position: "relative", aspectRatio: slot.ratio, background: "var(--card)", border: "1px solid var(--border)", overflow: "hidden", cursor: slot.type !== "glb" ? "pointer" : "default" }}
+                      onClick={() => {
+                        if (slot.type === "glb") return;
+                        slotUploadIndexRef.current = slot.slot;
+                        slotFileInputRef.current?.click();
+                      }}
+                    >
+                      {slot.type === "glb"
+                        ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>3D model slot</span></div>
+                        : url
+                          ? slot.type === "video"
+                            ? <video src={url} autoPlay loop muted playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                            : <img src={url} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} /> // eslint-disable-line @next/next/no-img-element
+                          : <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                              <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--border)", textTransform: "uppercase", letterSpacing: "0.1em" }}>click to upload</span>
+                            </div>
+                      }
+                    </div>
+
+                    {/* GLB file path input */}
+                    {slot.type === "glb" && (
+                      <input
+                        type="text"
+                        value={slot.glbFile ?? ""}
+                        onChange={e => setGalleryRows(prev => {
+                          const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                          next[rowIdx][colIdx].slots[slotIdx] = { ...slot, glbFile: e.target.value };
+                          return next;
+                        })}
+                        placeholder="/images/parks/crystal-palace/model.glb"
+                        style={{ width: "100%", background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 8, padding: "5px 7px", outline: "none", boxSizing: "border-box" }}
+                      />
+                    )}
+
+                    {/* URL input */}
+                    {slot.type !== "glb" && (
+                      <div style={{ display: "flex", gap: 2 }}>
+                        <input
+                          type="text"
+                          value={slotUrls[slot.slot] ?? ""}
+                          onChange={e => setSlotUrls(prev => { const n = [...prev]; n[slot.slot] = e.target.value; return n; })}
+                          onKeyDown={e => {
+                            if (e.key !== "Enter") return;
+                            const u = slotUrls[slot.slot]?.trim();
+                            if (u) { setSlotImage(slot.slot, u); setSlotUrls(prev => { const n = [...prev]; n[slot.slot] = ""; return n; }); }
+                          }}
+                          placeholder="Paste URL + Enter"
+                          style={{ flex: 1, background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 8, padding: "5px 7px", outline: "none" }}
+                        />
+                        <button type="button"
+                          onClick={() => { const u = slotUrls[slot.slot]?.trim(); if (u) { setSlotImage(slot.slot, u); setSlotUrls(prev => { const n = [...prev]; n[slot.slot] = ""; return n; }); }}}
+                          style={{ ...btnStyle }}>→</button>
                       </div>
                     )}
 
-                    {/* Slot label badge */}
-                    <div style={{ position: "absolute", bottom: 0, left: 0, padding: "3px 7px", background: "rgba(0,0,0,0.45)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.55)", pointerEvents: "none" }}>
-                      {label}
-                    </div>
+                    {/* Set hero / remove image */}
+                    {url && slot.type !== "glb" && (
+                      <div style={{ display: "flex", gap: 2 }}>
+                        <button type="button"
+                          onClick={() => setForm(f => ({ ...f, hero_image: url }))}
+                          style={{ ...btnStyle, flex: 1 }}>set hero</button>
+                        <button type="button"
+                          onClick={() => setSlotImage(slot.slot, "")}
+                          style={{ ...btnStyle, color: "var(--accent)" }}>×</button>
+                      </div>
+                    )}
 
-                    {/* Hero badge */}
-                    {form.hero_image === url && url && (
-                      <div style={{ position: "absolute", top: 6, left: 6, background: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 7, textTransform: "uppercase", letterSpacing: "0.06em", color: "#fff", padding: "3px 6px" }}>Hero</div>
+                    {/* Remove slot from column (only when column has multiple slots) */}
+                    {col.slots.length > 1 && (
+                      <button type="button"
+                        onClick={() => setGalleryRows(prev => {
+                          const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                          next[rowIdx][colIdx].slots = next[rowIdx][colIdx].slots.filter((_, i) => i !== slotIdx);
+                          return next;
+                        })}
+                        style={{ ...btnStyle, color: "var(--accent)", width: "100%" }}>× slot</button>
                     )}
                   </div>
+                );
+              })}
 
-                  {/* URL paste row */}
-                  <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
-                    <input
-                      type="text"
-                      value={slotUrls[i] ?? ""}
-                      onChange={e => setSlotUrls(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
-                      onKeyDown={e => {
-                        if (e.key !== "Enter") return;
-                        const u = slotUrls[i]?.trim();
-                        if (u) { setSlotImage(i, u); setSlotUrls(prev => { const n = [...prev]; n[i] = ""; return n; }); }
-                      }}
-                      placeholder={`Slot ${i} — paste URL and press → or Enter`}
-                      style={{ flex: 1, background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 9, padding: "6px 8px", outline: "none" }}
-                    />
-                    <button type="button"
-                      onClick={() => {
-                        const u = slotUrls[i]?.trim();
-                        if (u) { setSlotImage(i, u); setSlotUrls(prev => { const n = [...prev]; n[i] = ""; return n; }); }
-                      }}
-                      style={{ flexShrink: 0, padding: "6px 12px", background: "var(--card)", border: "1px solid var(--border)", color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 12, cursor: "pointer" }}>
-                      →
-                    </button>
-                  </div>
-                </div>
-              );
-            };
+              {/* Add stacked slot within this column */}
+              <button type="button"
+                onClick={() => setGalleryRows(prev => {
+                  const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                  const nextSlot = Math.max(...next.flatMap(r => r.flatMap(c => c.slots.map(s => s.slot))), -1) + 1;
+                  next[rowIdx][colIdx].slots = [...next[rowIdx][colIdx].slots, { slot: nextSlot, ratio: "1/1", type: "image" as const }];
+                  return next;
+                })}
+                style={{ ...btnStyle, width: "100%", textAlign: "center" }}>+ stack</button>
 
-            return (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--background)" }}>
-                {renderSlot(0)}
-                <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 10 }}>
-                  {renderSlot(1)}{renderSlot(2)}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {renderSlot(3)}{renderSlot(4)}
-                </div>
-                {renderSlot(5)}
-                {renderSlot(6)}
-                {renderSlot(7)}
-              </div>
-            );
-          })()}
-        </section>
+              {/* Remove this column (only when row has multiple columns) */}
+              {row.length > 1 && (
+                <button type="button"
+                  onClick={() => setGalleryRows(prev => {
+                    const next = prev.map(r => [...r]);
+                    next[rowIdx] = next[rowIdx].filter((_, i) => i !== colIdx);
+                    return next;
+                  })}
+                  style={{ ...btnStyle, color: "var(--accent)", width: "100%" }}>× col</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
 
-        {/* ── 9. HERO & 3D MODEL ──────────────────────────────────────────── */}
+  <button type="button"
+    onClick={() => {
+      const nextSlot = galleryRows.length === 0 ? 0 : Math.max(...galleryRows.flatMap(r => r.flatMap(col => col.slots.map(s => s.slot))), -1) + 1;
+      setGalleryRows(prev => [...prev, [{ slots: [{ slot: nextSlot, ratio: "16/9", type: "image" as const }] }]]);
+    }}
+    style={{ width: "100%", padding: "9px 16px", fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--accent)", background: "none", border: "1px dashed var(--accent)", cursor: "pointer" }}
+  >+ Add row</button>
+</section>
+
+        {/* 9. HERO & 3D MODEL */}
         <section>
           <SectionHead>Hero image & 3D model</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -685,27 +970,25 @@ export default function EditParkPage() {
               <div>
                 <FieldLabel hint="set from gallery above or paste a URL">Hero image URL</FieldLabel>
                 <Input value={form.hero_image} onChange={v => upd("hero_image", v)}
-                  placeholder="https://… or /images/parks/crystal-palace/gallery-01.webp" />
+                  placeholder="https://… or /images/parks/crystal-palace/hero.webp" />
               </div>
-              {form.hero_image ? (
+              {form.hero_image
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.hero_image} alt="" style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
-              ) : (
-                <div style={{ width: "100%", aspectRatio: "16/9", background: "var(--card)", border: "1px dashed var(--border)" }} />
-              )}
+                ? <img src={form.hero_image} alt="" style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
+                : <div style={{ width: "100%", aspectRatio: "16/9", background: "var(--card)", border: "1px dashed var(--border)" }} />
+              }
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, alignItems: "end" }}>
               <div>
-                <FieldLabel hint="directory / find-a-park grid (3:4 portrait, 720×960)">Thumbnail image URL</FieldLabel>
+                <FieldLabel hint="directory / find-a-park grid (3:4 portrait)">Thumbnail image URL</FieldLabel>
                 <Input value={form.thumbnail} onChange={v => upd("thumbnail", v)}
-                  placeholder="/images/parks/bloblands/thumb-01.webp" />
+                  placeholder="/images/parks/crystal-palace/thumb.webp" />
               </div>
-              {form.thumbnail ? (
+              {form.thumbnail
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.thumbnail} alt="" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
-              ) : (
-                <div style={{ width: "100%", aspectRatio: "3/4", background: "var(--card)", border: "1px dashed var(--border)" }} />
-              )}
+                ? <img src={form.thumbnail} alt="" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
+                : <div style={{ width: "100%", aspectRatio: "3/4", background: "var(--card)", border: "1px dashed var(--border)" }} />
+              }
             </div>
             <div>
               <FieldLabel hint="/images/parks/{slug}/model.glb">3D model file path</FieldLabel>
@@ -735,7 +1018,6 @@ export default function EditParkPage() {
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--accent)" }}>{error}</p>
         )}
 
-        {/* ── Actions ──────────────────────────────────────────────────────── */}
         <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
             <button type="submit" disabled={saving} style={{

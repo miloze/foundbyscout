@@ -53,3 +53,57 @@ a {
 .mapboxgl-map {
   font-family: inherit !important;
 }
+
+/* ── Park page: photos + sidebar grid ───────────────────────────────────── */
+.park-photos-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 40px;
+  align-items: start;
+}
+.park-photos-sidebar {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+@media (max-width: 768px) {
+  .park-photos-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  .park-photos-sidebar {
+    position: static;
+  }
+}
+
+/* ── Floating decorative assets ─────────────────────────────────────────── */
+@keyframes fbs-float {
+  0%, 100% { transform: translateY(0px) rotate(var(--fbs-rotate, 0deg)); }
+  50%       { transform: translateY(-14px) rotate(var(--fbs-rotate, 0deg)); }
+}
+@keyframes fbs-drift {
+  0%   { transform: translate(0px, 0px) rotate(var(--fbs-rotate, 0deg)); }
+  25%  { transform: translate(8px, -10px) rotate(var(--fbs-rotate, 0deg)); }
+  50%  { transform: translate(-6px, -18px) rotate(var(--fbs-rotate, 0deg)); }
+  75%  { transform: translate(-10px, -6px) rotate(var(--fbs-rotate, 0deg)); }
+  100% { transform: translate(0px, 0px) rotate(var(--fbs-rotate, 0deg)); }
+}
+@keyframes fbs-sway {
+  0%, 100% { transform: rotate(calc(var(--fbs-rotate, 0deg) - 6deg)); }
+  50%       { transform: rotate(calc(var(--fbs-rotate, 0deg) + 6deg)); }
+}
+@keyframes fbs-blink {
+  0%, 88%, 100% { transform: translateY(var(--fbs-ty, 0px)) rotate(var(--fbs-rotate, 0deg)) scaleY(1); }
+  92%            { transform: translateY(var(--fbs-ty, 0px)) rotate(var(--fbs-rotate, 0deg)) scaleY(0.05); }
+  96%            { transform: translateY(var(--fbs-ty, 0px)) rotate(var(--fbs-rotate, 0deg)) scaleY(1); }
+}
+@keyframes fbs-float-y {
+  0%, 100% { --fbs-ty: 0px; transform: translateY(0px) rotate(var(--fbs-rotate, 0deg)) scaleY(1); }
+  50%       { --fbs-ty: -14px; transform: translateY(-14px) rotate(var(--fbs-rotate, 0deg)) scaleY(1); }
+}
+.fbs-float  { animation: fbs-float  var(--fbs-dur, 6s) ease-in-out infinite; }
+.fbs-drift  { animation: fbs-drift  var(--fbs-dur, 9s) ease-in-out infinite; }
+.fbs-sway   { animation: fbs-sway   var(--fbs-dur, 5s) ease-in-out infinite; }
+.fbs-blink  { animation: fbs-blink  var(--fbs-dur, 4s) ease-in-out infinite; }
