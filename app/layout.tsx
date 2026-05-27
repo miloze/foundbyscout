@@ -35,19 +35,23 @@ export default function RootLayout({
               <main style={{ flex: 1 }}>{children}</main>
               <footer style={{
                 borderTop: "1px solid var(--border)",
-                paddingTop: 32, paddingBottom: 40,
+                paddingTop: 24, paddingBottom: 32,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 gap: 24, flexWrap: "wrap",
               }}>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em" }}>
                   © {new Date().getFullYear()} Found by Scout
                 </p>
-                <div style={{ display: "flex", gap: 24 }}>
-                  {[["Parks", "/parks"]].map(([label, href]) => (
-                    <a key={href} href={href} style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
-                      {label}
-                    </a>
-                  ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                  <a href="https://instagram.com/foundbyscout" target="_blank" rel="noopener noreferrer"
+                    style={{ color: "var(--muted)", display: "flex", alignItems: "center", transition: "color 0.15s" }}
+                    aria-label="Instagram">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                      <circle cx="12" cy="12" r="4.5"/>
+                      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+                    </svg>
+                  </a>
                 </div>
               </footer>
             </div>
