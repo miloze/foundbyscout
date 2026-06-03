@@ -42,7 +42,12 @@ export default function RootLayout({
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em" }}>
                   © {new Date().getFullYear()} Found by Scout
                 </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+                  {[["Parks", "/parks"], ["About", "/about"], ["Contact", "/contact"]].map(([label, href]) => (
+                    <a key={href} href={href} style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
+                      {label}
+                    </a>
+                  ))}
                   <a href="https://instagram.com/foundbyscout" target="_blank" rel="noopener noreferrer"
                     style={{ color: "var(--muted)", display: "flex", alignItems: "center", transition: "color 0.15s" }}
                     aria-label="Instagram">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState, useEffect } from "react";
+import { Suspense, useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -9,8 +9,7 @@ import type { Group } from "three";
 // Coerce to numbers — Supabase numeric[] returns strings
 const n = (v: unknown[]): [number, number, number] => [+v[0]!, +v[1]!, +v[2]!];
 
-// Draco decoder (handles both compressed and uncompressed GLBs)
-useGLTF.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+useGLTF.setDecoderPath("/draco/");
 
 // ── Mesh ───────────────────────────────────────────────────────────────────
 function Model({ onLoad, modelFile, modelRotation }: {
@@ -19,28 +18,26 @@ function Model({ onLoad, modelFile, modelRotation }: {
   modelRotation: [number, number, number];
 }) {
   const { scene } = useGLTF(modelFile);
-  const ref = useRef<Group>(null);
+
   useEffect(() => {
-    // Force double-sided on all materials so backface culling
-    // doesn't cause polygons to vanish on photogrammetry meshes
+    // Keep original PBR materials — ambient-only lighting gives a flat
+    // baked-texture look. Fixes side/depthWrite so faces don't vanish.
     scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         const mesh = obj as THREE.Mesh;
-
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        mats.forEach(m => {
-          const mat = m as THREE.Material;
-          mat.side        = THREE.DoubleSide;
-          mat.transparent = false;
-          mat.depthWrite  = true;
-          mat.needsUpdate = true;
+        mats.forEach((m) => {
+          m.side        = THREE.DoubleSide;
+          m.depthWrite  = true;
+          m.needsUpdate = true;
         });
       }
     });
     onLoad();
   }, [scene, onLoad]);
+
   return (
-    <group ref={ref}>
+    <group>
       <primitive object={scene} rotation={modelRotation} position={[0, 4, 0]} />
     </group>
   );
@@ -91,8 +88,8 @@ function PingPongCamera({ posA, posB, target }: {
   return null;
 }
 
-// ── Pan clamp — limits how far the user can pan from the origin ───────────
-const PAN_LIMIT = 18;
+// ── Pan clamp — tightened to keep model centred in frame ──────────────────
+const PAN_LIMIT = 12;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PanClamp({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   useFrame(() => {
@@ -100,7 +97,7 @@ function PanClamp({ controlsRef }: { controlsRef: React.RefObject<any> }) {
     if (!ctrl) return;
     const t  = ctrl.target;
     const cx = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.x));
-    const cy = Math.max(-4,         Math.min(12,         t.y));
+    const cy = Math.max(0,          Math.min(8,          t.y));
     const cz = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.z));
     if (cx !== t.x || cy !== t.y || cz !== t.z) {
       const dx = cx - t.x, dy = cy - t.y, dz = cz - t.z;
@@ -114,30 +111,75 @@ function PanClamp({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   return null;
 }
 
-// ── Debug live camera readout ──────────────────────────────────────────────
-function LivePos({ onPos }: { onPos: (s: string) => void }) {
+// ── Debug: live camera position ────────────────────────────────────────────
+function LivePos({ onPos, controlsRef }: {
+  onPos: (s: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  controlsRef: React.RefObject<any>;
+}) {
   const { camera } = useThree();
   const last = useRef("");
   useFrame(() => {
     const { x, y, z } = camera.position;
-    const s = `[${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}]`;
+    const t   = controlsRef.current?.target;
+    const pos = `pos [${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}]`;
+    const tgt = t ? `  tgt [${t.x.toFixed(2)}, ${t.y.toFixed(2)}, ${t.z.toFixed(2)}]` : "";
+    const s   = pos + tgt;
     if (s !== last.current) { last.current = s; onPos(s); }
   });
+  return null;
+}
+
+// ── Renderer config — updates toneMappingExposure dynamically ─────────────
+function RendererConfig({ exposure }: { exposure: number }) {
+  const { gl } = useThree();
+  useLayoutEffect(() => { gl.toneMappingExposure = exposure; }, [gl, exposure]);
+  return null;
+}
+
+// ── Frame capture — saves canvas as JPEG via a ref callback ───────────────
+function CaptureSetup({ captureRef, filterRef }: {
+  captureRef: React.MutableRefObject<(() => void) | undefined>;
+  filterRef:  React.MutableRefObject<string>;
+}) {
+  const { gl } = useThree();
+  useEffect(() => {
+    captureRef.current = () => {
+      const src  = gl.domElement;
+      const out  = document.createElement("canvas");
+      out.width  = src.width;
+      out.height = src.height;
+      // No background fill — keep alpha transparent so the park is a cutout
+      const ctx  = out.getContext("2d")!;
+      ctx.filter = filterRef.current;   // applies B&W + brightness + contrast
+      ctx.drawImage(src, 0, 0);
+      const url  = out.toDataURL("image/png");
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = "park-preview.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+    return () => { captureRef.current = undefined; };
+  }, [gl, captureRef, filterRef]);
   return null;
 }
 
 // ── Main export ────────────────────────────────────────────────────────────
 export default function ParkModel({
   modelFile,
-  cameraPos     = [0, 18, 25],
-  cameraTarget  = [0, 0, 0],
+  preloadImage,
+  cameraPos     = [0, 22, 32] as [number, number, number],
+  cameraTarget  = [0, 2, 0]  as [number, number, number],
   modelRotation = [-Math.PI / 2, 0, 0] as [number, number, number],
   pingPong,
   autoRotate    = false,
   debug         = false,
-  fov           = 50,
+  fov           = 45,
 }: {
   modelFile: string;
+  preloadImage?: string;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
@@ -146,15 +188,25 @@ export default function ParkModel({
   debug?: boolean;
   fov?: number;
 }) {
-  const [loaded,   setLoaded]   = useState(false);
-  const [viewMode, setViewMode] = useState<"bw" | "colour">("bw");
-  const [camPos,   setCamPos]   = useState("loading…");
+  const [viewMode,    setViewMode]    = useState<"bw" | "colour">("bw");
+  const [camPos,      setCamPos]      = useState("loading…");
+  const [brightness,  setBrightness]  = useState(1.20);
+  const [contrast,    setContrast]    = useState(1.45);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const controlsRef = useRef<any>(null);
+  const controlsRef  = useRef<any>(null);
+  const preloadRef   = useRef<HTMLImageElement>(null);
+  const captureRef   = useRef<(() => void) | undefined>(undefined);
 
   const startPos    = [+cameraPos[0], +cameraPos[1], +cameraPos[2]] as [number, number, number];
-  const filter      = viewMode === "bw" ? "grayscale(1) contrast(1.1)" : "none";
+  const bwFilter    = `grayscale(1) brightness(${brightness.toFixed(2)}) contrast(${contrast.toFixed(2)})`;
+  const clrFilter   = `brightness(${brightness.toFixed(2)}) contrast(${contrast.toFixed(2)})`;
+  const filter      = viewMode === "bw" ? bwFilter : clrFilter;
+  const filterRef   = useRef(filter);
+  filterRef.current = filter;           // always current without re-running effects
   const canvasStart = pingPong ? n(pingPong[0]) : startPos;
+  const handleLoad = useCallback(() => {
+    if (preloadRef.current) preloadRef.current.style.opacity = "0";
+  }, []);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -173,21 +225,63 @@ export default function ParkModel({
         ))}
       </div>
 
-      {/* ── Debug overlay ─────────────────────────────────────────────── */}
+      {/* ── Debug overlay — camera + image controls ───────────────────── */}
       {debug && (
         <div style={{
           position: "absolute", bottom: 80, left: 12, zIndex: 20,
-          background: "rgba(0,0,0,0.75)", color: "#0f0", padding: "10px 14px",
-          fontFamily: "monospace", fontSize: 12, lineHeight: 1.8,
-          borderRadius: 4, pointerEvents: "none",
+          background: "rgba(0,0,0,0.82)", color: "#0f0", padding: "12px 16px",
+          fontFamily: "monospace", fontSize: 11, lineHeight: 1.9,
+          borderRadius: 4, pointerEvents: "auto", minWidth: 260,
         }}>
-          <div style={{ color: "#aaa", fontSize: 10, marginBottom: 4 }}>CAMERA POSITION</div>
-          <div>{camPos}</div>
+          <div style={{ color: "#aaa", fontSize: 9, letterSpacing: "0.12em", marginBottom: 6 }}>CAMERA POSITION</div>
+          <div style={{ marginBottom: 12 }}>{camPos}</div>
+
+          <div style={{ color: "#aaa", fontSize: 9, letterSpacing: "0.12em", marginBottom: 8 }}>IMAGE</div>
+          {([
+            ["BRIGHTNESS", brightness, setBrightness, 0.5, 3.0, 0.05] as const,
+            ["CONTRAST",   contrast,   setContrast,   0.5, 3.0, 0.05] as const,
+          ]).map(([label, val, set, min, max, step]) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ color: "#888", fontSize: 9, width: 72, letterSpacing: "0.08em" }}>{label}</span>
+              <input
+                type="range" min={min} max={max} step={step} value={val}
+                onChange={e => set(+e.target.value)}
+                style={{ flex: 1, accentColor: "var(--accent)", cursor: "pointer" }}
+              />
+              <span style={{ width: 36, textAlign: "right" }}>{(val as number).toFixed(2)}</span>
+            </div>
+          ))}
+
+          <button
+            onClick={() => captureRef.current?.()}
+            style={{
+              marginTop: 10, width: "100%", padding: "6px 0",
+              background: "var(--accent)", border: "none", color: "#fff",
+              fontFamily: "monospace", fontSize: 9, letterSpacing: "0.12em",
+              textTransform: "uppercase", cursor: "pointer", borderRadius: 2,
+            }}
+          >
+            Save frame as PNG
+          </button>
         </div>
       )}
 
-      {/* ── Loading ───────────────────────────────────────────────────── */}
-      {!loaded && (
+      {/* ── Preload image — fades out via DOM ref (no React state update) ── */}
+      {preloadImage && (
+        <img
+          ref={preloadRef}
+          src={preloadImage}
+          alt=""
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            objectFit: "cover", pointerEvents: "none", zIndex: 4,
+            opacity: 1, transition: "opacity 0.7s ease",
+          }}
+        />
+      )}
+
+      {/* ── Loading text fallback when no preload image ────────────────── */}
+      {!preloadImage && (
         <div style={{
           position: "absolute", inset: 0, display: "flex",
           alignItems: "center", justifyContent: "center",
@@ -199,22 +293,20 @@ export default function ParkModel({
         </div>
       )}
 
-      {/* ── Canvas ────────────────────────────────────────────────────── */}
+      {/* ── Canvas — filter on wrapper div, not on canvas itself ───────── */}
+      <div style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}>
       <Canvas
         camera={{ position: canvasStart, fov, near: 0.5, far: 400 }}
-        style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}
+        style={{ position: "absolute", inset: 0 }}
         gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
       >
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[-15, 40, 15]} intensity={7.0} color="#ffffff" />
-        <directionalLight position={[20, 5, 10]}  intensity={1.5} color="#d0e4ff" />
-        <directionalLight position={[0, 10, -20]} intensity={2.0} color="#ffffff" />
-        <pointLight position={[0, 15, 0]} intensity={3.0} color="#ffffff" />
-        <pointLight position={[0, -8, 0]} intensity={2.5} color="#ff7040" />
+        <ambientLight intensity={2.0} />
+
+        {debug && <CaptureSetup captureRef={captureRef} filterRef={filterRef} />}
 
         <Suspense fallback={null}>
           <Model
-            onLoad={() => setLoaded(true)}
+            onLoad={handleLoad}
             modelFile={modelFile}
             modelRotation={modelRotation}
           />
@@ -235,18 +327,19 @@ export default function ParkModel({
           enableZoom={debug || !pingPong}
           enableRotate={!pingPong || debug}
           autoRotate={autoRotate && !debug}
-          autoRotateSpeed={0.6}
-          minDistance={debug ? 1 : 8}
-          maxDistance={debug ? 500 : 80}
-          minPolarAngle={debug ? 0 : Math.PI / 12}
-          maxPolarAngle={debug ? Math.PI : Math.PI / 2.2}
+          autoRotateSpeed={0.5}
+          minDistance={debug ? 1 : 10}
+          maxDistance={debug ? 500 : 70}
+          minPolarAngle={debug ? 0 : Math.PI / 7}
+          maxPolarAngle={debug ? Math.PI : Math.PI * 0.42}
         />
 
-        {/* Pan clamp — keeps user from panning off the model */}
         {!pingPong && !debug && <PanClamp controlsRef={controlsRef} />}
 
-        {debug && <LivePos onPos={setCamPos} />}
+        {debug && <LivePos onPos={setCamPos} controlsRef={controlsRef} />}
+
       </Canvas>
+      </div>
     </div>
   );
 }

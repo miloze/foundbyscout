@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import ContourModelClient from "./ContourModelClient";
 import ParkModelClient from "./ParkModelClient";
 
 type Props = {
   modelFile: string;
   heroImage?: string;
-  useContourModel?: boolean;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
@@ -17,7 +15,7 @@ type Props = {
 };
 
 export default function ParkHeroViewer({
-  modelFile, heroImage, useContourModel,
+  modelFile, heroImage,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug,
 }: Props) {
   const [isMobile, setIsMobile] = useState(false);
@@ -43,27 +41,18 @@ export default function ParkHeroViewer({
         ) : (
           <div style={{ position: "absolute", inset: 0, background: "#111" }} />
         )}
-
-        {/* Bottom gradient for text legibility */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />
       </div>
     );
   }
 
   // ── Desktop: 3D model ─────────────────────────────────────────────────────
-  if (useContourModel) {
-    return (
-      <div style={{ position: "absolute", inset: 0 }}>
-        <ContourModelClient modelFile={modelFile} cameraPos={cameraPos} cameraTarget={cameraTarget} modelRotation={modelRotation} />
-      </div>
-    );
-  }
-
   return (
     <>
       <div style={{ position: "absolute", inset: 0 }}>
         <ParkModelClient
           modelFile={modelFile}
+          preloadImage={heroImage}
           cameraPos={cameraPos}
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}

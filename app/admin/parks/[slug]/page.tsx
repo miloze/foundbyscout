@@ -670,7 +670,7 @@ export default function EditParkPage() {
           <SectionHead>At a glance</SectionHead>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 16, lineHeight: 1.9 }}>
             Icons from <a href="https://fonts.google.com/icons" target="_blank" rel="noopener" style={{ color: "var(--accent)" }}>Material Symbols</a>.
-            Common: <span style={{ color: "var(--foreground)" }}>skatepark · wb_sunny · water_drop · groups · timer · directions_walk · local_parking · wc · star</span>
+            Common: <span style={{ color: "var(--foreground)" }}>skatepark · wb_sunny · water_drop · groups · timer · directions_walk · local_parking · wc · star · water</span>
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr auto auto", gap: 8, marginBottom: 8 }}>
             {["Icon name","Value","Label","On",""].map((h, i) => (
@@ -729,7 +729,7 @@ export default function EditParkPage() {
             <div key={i} style={{ display: "grid", gridTemplateColumns: "130px 1fr 160px auto", gap: 8, marginBottom: 6, alignItems: "center" }}>
               <Select value={s.platform}
                 onChange={v => { const a = [...form.socials]; a[i] = { ...a[i], platform: v }; upd("socials", a); }}
-                options={["instagram", "facebook", "youtube", "tiktok", "website"]} />
+                options={["instagram", "facebook", "youtube", "tiktok", "website", "builder"]} />
               <Input value={s.url} placeholder="https://instagram.com/…"
                 onChange={v => { const a = [...form.socials]; a[i] = { ...a[i], url: v }; upd("socials", a); }} />
               <Input value={s.label} placeholder="Instagram (optional)"

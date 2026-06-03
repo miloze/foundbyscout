@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useRef, useState, useEffect, useCallback } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
 
-useGLTF.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+useGLTF.setDecoderPath("/draco/");
 
 // ── Live camera position readout ───────────────────────────────────────────
 function LivePos({ onPos }: { onPos: (s: string) => void }) {
@@ -25,10 +25,8 @@ function Model({ modelFile, onLoad }: {
   onLoad: (obj: THREE.Group) => void;
 }) {
   const { scene } = useGLTF(modelFile);
-  const fixed = useRef(false);
 
-  if (!fixed.current) {
-    fixed.current = true;
+  useEffect(() => {
     scene.traverse(child => {
       if (!(child as THREE.Mesh).isMesh) return;
       const mesh = child as THREE.Mesh;
@@ -42,7 +40,7 @@ function Model({ modelFile, onLoad }: {
       });
     });
     onLoad(scene);
-  }
+  }, [scene, onLoad]);
 
   return <primitive object={scene} />;
 }
@@ -61,7 +59,7 @@ function SceneContent({ modelFile, debug, onPos, fixedPos }: {
   const controlsRef = useRef<any>(null);
   const [fit, setFit] = useState<FitInfo | null>(null);
 
-  function handleLoad(obj: THREE.Group) {
+  const handleLoad = useCallback((obj: THREE.Group) => {
     const box    = new THREE.Box3().setFromObject(obj);
     const center = box.getCenter(new THREE.Vector3());
     const size   = box.getSize(new THREE.Vector3());
@@ -85,7 +83,7 @@ function SceneContent({ modelFile, debug, onPos, fixedPos }: {
     }
 
     setFit({ center, maxDim });
-  }
+  }, [camera, fixedPos]);
 
   const d = fit?.maxDim ?? 1;
   const c = fit?.center ?? new THREE.Vector3();
