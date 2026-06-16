@@ -78,9 +78,9 @@ export default function ParkHeroViewer({
           parkName=""
           modelFile={modelFile}
           modelFileMobile={modelFileMobile}
-          cameraPos={cameraPos ? Array.from(cameraPos) : undefined}
-          cameraTarget={cameraTarget ? Array.from(cameraTarget) : undefined}
-          modelRotation={modelRotation ? Array.from(modelRotation) : undefined}
+          cameraPos={cameraPos}
+          cameraTarget={cameraTarget}
+          modelRotation={modelRotation}
           pingPong={pingPong}
           autoRotate={autoRotate}
           ambientIntensity={ambientIntensity}
