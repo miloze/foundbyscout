@@ -32,10 +32,12 @@ function Model({ modelFile, onLoad }: {
       const mesh = child as THREE.Mesh;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       mats.forEach(m => {
-        const mat = m as THREE.Material;
+        const mat = m as THREE.MeshStandardMaterial;
         mat.side        = THREE.DoubleSide;
         mat.transparent = false;
         mat.depthWrite  = true;
+        if (mat.map)         mat.map.colorSpace         = THREE.SRGBColorSpace;
+        if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
         mat.needsUpdate = true;
       });
     });
@@ -90,13 +92,10 @@ function SceneContent({ modelFile, debug, onPos, fixedPos }: {
 
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight color={0xffffff} intensity={1.2} />
       {fit && (
         <>
-          <hemisphereLight args={["#fff8f0", "#806040", 0.5]} />
-          <directionalLight position={[c.x - d, c.y + d * 2, c.z + d]}               intensity={0.8} color="#ffffff" />
-          <directionalLight position={[c.x + d * 1.5, c.y + d * 0.5, c.z + d * 0.5]} intensity={0.4} color="#ffd0b0" />
-          <directionalLight position={[c.x, c.y + d * 0.8, c.z - d * 1.5]}            intensity={0.6} color="#e8f0ff" />
+          <directionalLight color={0xffffff} position={[c.x - d, c.y + d * 2, c.z + d]}  intensity={1.5} />
         </>
       )}
       <Suspense fallback={null}>
@@ -136,17 +135,16 @@ export default function GalleryModelSlot({
   const [localBri,   setLocalBri]   = useState(brightness);
   const [localCon,   setLocalCon]   = useState(contrast);
 
-  const canvasFilter = `brightness(${localBri}%) contrast(${localCon}%)`;
-
   return (
     <div style={{ position: "absolute", inset: 0, background }}>
       <Canvas
         camera={{ position: [0, 1, 3], fov: 16, near: 0.01, far: 100000 }}
-        style={{ position: "absolute", inset: 0, filter: canvasFilter, transition: "filter 0.7s ease" }}
+        style={{ position: "absolute", inset: 0 }}
         gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
         onCreated={({ gl }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 0.7;
+          gl.toneMapping = THREE.NoToneMapping;
+          gl.toneMappingExposure = 1.0;
+          gl.outputColorSpace = THREE.SRGBColorSpace;
         }}
       >
         <SceneContent modelFile={modelFile} debug={debug} onPos={setPos} fixedPos={fixedPos} />

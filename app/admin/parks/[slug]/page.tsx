@@ -134,7 +134,7 @@ type FormState = {
   socials: SocialItem[];
   gallery_images: string[];
   brief: string; description: string;
-  hero_image: string; thumbnail: string; model_file: string;
+  hero_image: string; thumbnail: string; model_file: string; model_file_low: string; preload_image_url: string;
   camera_pos: string; camera_target: string; model_rotation: string;
 };
 
@@ -146,7 +146,7 @@ const EMPTY: FormState = {
   lat: "", lng: "",
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
   brief: "", description: "",
-  hero_image: "", thumbnail: "", model_file: "",
+  hero_image: "", thumbnail: "", model_file: "", model_file_low: "", preload_image_url: "",
   camera_pos: "", camera_target: "", model_rotation: "",
 };
 
@@ -187,6 +187,13 @@ export default function EditParkPage() {
 
   const [galleryRows, setGalleryRows] = useState<GalleryColumn[][]>([])
 
+  const [viewerSettings, setViewerSettings] = useState({
+    ambientIntensity:     0.9,
+    directionalIntensity: 1.0,
+    environmentPreset:    "warehouse",
+    environmentIntensity: 0.85,
+  });
+
   const slotFileInputRef   = useRef<HTMLInputElement>(null);
   const slotUploadIndexRef = useRef<number>(-1);
 
@@ -225,11 +232,14 @@ export default function EditParkPage() {
             : (park.description ?? ""),
           hero_image:     park.hero_image   ?? "",
           thumbnail:      park.thumbnail    ?? "",
-          model_file:     park.model_file   ?? "",
+          model_file:         park.model_file         ?? "",
+          model_file_low:     park.model_file_low     ?? "",
+          preload_image_url:  park.preload_image_url  ?? "",
           camera_pos:     numArrToStr(park.camera_pos),
           camera_target:  numArrToStr(park.camera_target),
           model_rotation: numArrToStr(park.model_rotation),
         });
+        if (park.viewer_settings) setViewerSettings(vs => ({ ...vs, ...park.viewer_settings }));
         if (Array.isArray(park.slot_ratios)) setSlotRatios(park.slot_ratios);
         if (Array.isArray(park.slot_order))  setSlotOrder(park.slot_order);
         if (Array.isArray(park.gallery_rows)) {
@@ -293,9 +303,10 @@ export default function EditParkPage() {
       camera_pos:     strToNumArr(form.camera_pos),
       camera_target:  strToNumArr(form.camera_target),
       model_rotation: strToNumArr(form.model_rotation),
-      slot_ratios: slotRatios,
-      slot_order:  slotOrder,
-      gallery_rows: galleryRows,
+      slot_ratios:     slotRatios,
+      slot_order:      slotOrder,
+      gallery_rows:    galleryRows,
+      viewer_settings: viewerSettings,
     };
 
     const res = await fetch(`/api/admin/parks/${slug}`, {
@@ -995,6 +1006,18 @@ export default function EditParkPage() {
               <Input value={form.model_file} onChange={v => upd("model_file", v)}
                 placeholder="/images/parks/crystal-palace/model.glb" />
             </div>
+            <div style={G2}>
+              <div>
+                <FieldLabel hint="served to phones — leave blank to use main model on all devices">Model (low / mobile)</FieldLabel>
+                <Input value={form.model_file_low} onChange={v => upd("model_file_low", v)}
+                  placeholder="/images/parks/crystal-palace/model-500k.glb" />
+              </div>
+              <div>
+                <FieldLabel hint="shown while GLB loads — leave blank to auto-derive from model path">Preload image URL</FieldLabel>
+                <Input value={form.preload_image_url} onChange={v => upd("preload_image_url", v)}
+                  placeholder="/images/parks/crystal-palace/glb-preload.png" />
+              </div>
+            </div>
             <div style={G3}>
               <div>
                 <FieldLabel hint="x, y, z from ?debug=1 on park page">Camera position</FieldLabel>
@@ -1007,6 +1030,65 @@ export default function EditParkPage() {
               <div>
                 <FieldLabel hint="x, y, z in radians">Model rotation</FieldLabel>
                 <Input value={form.model_rotation} onChange={v => upd("model_rotation", v)} placeholder="-1.5708, 0, 0" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 10. VIEWER SETTINGS */}
+        <section>
+          <SectionHead>Viewer lighting</SectionHead>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={G2}>
+              <div>
+                <FieldLabel hint="0 – 2">Ambient light</FieldLabel>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="range" min={0} max={2} step={0.05}
+                    value={viewerSettings.ambientIntensity}
+                    onChange={e => setViewerSettings(s => ({ ...s, ambientIntensity: +e.target.value }))}
+                    style={{ flex: 1, accentColor: "var(--accent)" }} />
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, width: 36, textAlign: "right" }}>
+                    {viewerSettings.ambientIntensity.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <FieldLabel hint="0 – 2">Directional light</FieldLabel>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="range" min={0} max={2} step={0.05}
+                    value={viewerSettings.directionalIntensity}
+                    onChange={e => setViewerSettings(s => ({ ...s, directionalIntensity: +e.target.value }))}
+                    style={{ flex: 1, accentColor: "var(--accent)" }} />
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, width: 36, textAlign: "right" }}>
+                    {viewerSettings.directionalIntensity.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div style={G2}>
+              <div>
+                <FieldLabel>Environment preset</FieldLabel>
+                <select
+                  value={viewerSettings.environmentPreset}
+                  onChange={e => setViewerSettings(s => ({ ...s, environmentPreset: e.target.value }))}
+                  style={{ width: "100%", background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontSize: 13, padding: "10px 12px", outline: "none", fontFamily: "var(--font-body)" }}
+                >
+                  {["warehouse", "city", "studio", "apartment", "forest"].map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel hint="0 – 1.5">Environment intensity</FieldLabel>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="range" min={0} max={1.5} step={0.05}
+                    value={viewerSettings.environmentIntensity}
+                    onChange={e => setViewerSettings(s => ({ ...s, environmentIntensity: +e.target.value }))}
+                    style={{ flex: 1, accentColor: "var(--accent)" }} />
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, width: 36, textAlign: "right" }}>
+                    {viewerSettings.environmentIntensity.toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

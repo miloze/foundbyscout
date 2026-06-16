@@ -21,6 +21,7 @@ export default function ParkWeather({ lat, lng }: { lat: number; lng: number }) 
   const [checkedAt, setCheckedAt] = useState("");
 
   useEffect(() => {
+    if (!lat || !lng) { setStatus("unknown"); return; }
     fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&current=precipitation&hourly=precipitation` +

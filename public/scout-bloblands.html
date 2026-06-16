@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloblands Skatepark — Found By Scout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Rubik:wght@300;400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:     #202020;
+    --fg:     #f0f0eb;
+    --accent: #ff5841;
+    --muted:  #888888;
+    --border: #333333;
+    --card:   #2a2a2a;
+    --fh: 'Rubik', sans-serif;
+    --fb: 'Geist', sans-serif;
+    --fm: 'DM Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--fb);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img { display: block; max-width: 100%; }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 36px;
+    background: rgba(32,32,32,0.88);
+    backdrop-filter: blur(14px);
+    border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  }
+  .nav-logo {
+    font-family: var(--fm); font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .nav-right {
+    display: flex; gap: 28px; align-items: center;
+    font-family: var(--fm); font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  }
+  .nav-back { transition: color 0.2s; }
+  .nav-back:hover { color: var(--fg); }
+  .nav-code { border: 0.5px solid var(--border); padding: 4px 10px; }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative; height: 100vh; min-height: 600px; overflow: hidden;
+  }
+  .hero-img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: center center;
+    filter: grayscale(1) contrast(1.08) brightness(0.92);
+    transition: filter 0.5s;
+    will-change: transform;
+  }
+  .hero-img.clr { filter: none; }
+  .hero-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom,
+      rgba(32,32,32,0.05) 0%,
+      rgba(32,32,32,0.2) 45%,
+      rgba(32,32,32,0.82) 82%,
+      rgba(32,32,32,0.97) 100%);
+  }
+  .hero-toggle {
+    position: absolute; top: 80px; right: 36px; z-index: 5; display: flex; gap: 2px;
+  }
+  .tbtn {
+    padding: 5px 12px; font-family: var(--fm); font-size: 9px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    background: rgba(0,0,0,0.5); border: none;
+    color: rgba(255,255,255,0.45); cursor: pointer; transition: all 0.2s;
+  }
+  .tbtn.on { background: var(--accent); color: #fff; }
+  .hero-badge {
+    position: absolute; top: 80px; left: 36px;
+    width: 76px; height: 76px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center;
+    justify-content: center; z-index: 5;
+  }
+  .hero-badge span {
+    font-family: var(--fh); font-size: 16px; font-weight: 300;
+    color: #fff; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .hero-content {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 0 48px 52px; z-index: 5;
+    display: flex; align-items: flex-end;
+    justify-content: space-between; gap: 32px;
+  }
+  .hero-title {
+    font-family: var(--fh);
+    font-size: clamp(4.5rem, 11vw, 9.5rem);
+    font-weight: 300; line-height: 0.86;
+    letter-spacing: -0.025em; text-transform: uppercase; color: #fff;
+  }
+  .hero-title .dim { color: rgba(255,255,255,0.38); display: block; }
+  .hero-right { text-align: right; flex-shrink: 0; }
+  .hero-loc {
+    font-family: var(--fm); font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 10px;
+  }
+  .hero-tags { display: flex; gap: 6px; justify-content: flex-end; }
+  .htag {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; border: 0.5px solid rgba(255,255,255,0.18);
+    padding: 4px 9px; color: rgba(255,255,255,0.45);
+  }
+  .scroll-cue {
+    position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
+    z-index: 5; display: flex; flex-direction: column; align-items: center;
+    animation: cueIn 1s 2s both;
+  }
+  .scroll-line {
+    width: 0.5px; height: 44px;
+    background: rgba(255,255,255,0.18);
+    animation: linePulse 2.2s infinite;
+  }
+  @keyframes linePulse { 0%,100%{opacity:.18} 50%{opacity:.55} }
+  @keyframes cueIn { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+  /* ── STATS STRIP ── */
+  .stats {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    border-bottom: 0.5px solid var(--border);
+  }
+  .stat {
+    padding: 22px 28px;
+    border-right: 0.5px solid var(--border);
+  }
+  .stat:last-child { border-right: none; }
+  .slabel {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 7px;
+  }
+  .sval {
+    font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .sdot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  /* ── PANORAMA STRIP ── */
+  .pano {
+    width: 100%; overflow: hidden; position: relative;
+    border-bottom: 0.5px solid var(--border);
+    cursor: grab;
+  }
+  .pano:active { cursor: grabbing; }
+  .pano-img {
+    width: 200%; height: 380px; object-fit: cover;
+    filter: grayscale(0.25);
+    transition: transform 0.1s linear;
+    will-change: transform;
+    user-select: none;
+  }
+  .pano-label {
+    position: absolute; bottom: 18px; left: 28px;
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: rgba(255,255,255,0.35);
+  }
+  .pano-hint {
+    position: absolute; bottom: 18px; right: 28px;
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: rgba(255,255,255,0.25);
+  }
+
+  /* ── SCAN SECTION ── */
+  .scan-wrap {
+    display: grid; grid-template-columns: 1fr 1fr;
+    min-height: 520px; border-bottom: 0.5px solid var(--border);
+  }
+  .scan-panel {
+    background: #111; position: relative;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .scan-img {
+    flex: 1; position: relative; overflow: hidden;
+  }
+  .scan-img img {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: grayscale(1) brightness(0.45);
+    display: block;
+  }
+  .scan-topo {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scan-caption {
+    position: absolute; top: 20px; left: 20px;
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: rgba(255,255,255,0.28);
+  }
+  .scan-bar {
+    padding: 14px 18px; display: flex; gap: 6px;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+    border-top: 0.5px solid rgba(255,255,255,0.05); flex-shrink: 0;
+  }
+  .schip {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 5px 12px;
+    background: rgba(255,255,255,0.05);
+    border: 0.5px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.4); cursor: pointer;
+    transition: all 0.2s; border-radius: 2px;
+  }
+  .schip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .schip:hover:not(.on) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
+  .scan-info {
+    padding: 52px 48px; display: flex; flex-direction: column;
+    justify-content: center; border-left: 0.5px solid var(--border);
+  }
+  .scan-idx {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 20px;
+  }
+  .scan-h {
+    font-family: var(--fh); font-size: clamp(1.6rem, 2.8vw, 2.4rem);
+    font-weight: 300; line-height: 1.1; text-transform: uppercase;
+    letter-spacing: -0.01em; margin-bottom: 18px;
+  }
+  .scan-p {
+    font-size: 14px; line-height: 1.8; color: var(--muted);
+    max-width: 36ch; margin-bottom: 34px;
+  }
+  .cta {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--fm); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--fg);
+    border-bottom: 0.5px solid var(--fg);
+    padding-bottom: 4px; width: fit-content;
+    transition: color 0.2s, border-color 0.2s; cursor: pointer;
+  }
+  .cta:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── FULL BLEED ── */
+  .bleed {
+    width: 100%; position: relative; overflow: hidden;
+  }
+  .bleed img {
+    width: 100%; display: block; object-fit: cover;
+    transition: transform 8s ease;
+    will-change: transform;
+  }
+  .bleed:hover img { transform: scale(1.025); }
+  .bleed-cap {
+    position: absolute; bottom: 20px; right: 28px;
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: rgba(255,255,255,0.3);
+  }
+
+  /* ── ALT BLOCKS ── */
+  .alt {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-top: 0.5px solid var(--border);
+    border-bottom: 0.5px solid var(--border);
+  }
+  .alt-img {
+    overflow: hidden; min-height: 440px; position: relative;
+  }
+  .alt-img img {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: grayscale(0.3);
+    transition: filter 0.6s, transform 0.7s;
+    display: block;
+  }
+  .alt-img:hover img { filter: grayscale(0); transform: scale(1.04); }
+  .alt-txt {
+    padding: 56px 48px; display: flex; flex-direction: column;
+    justify-content: center; border-left: 0.5px solid var(--border);
+  }
+  .alt.rev .alt-img { order: 2; }
+  .alt.rev .alt-txt { order: 1; border-left: none; border-right: 0.5px solid var(--border); }
+  .fnum {
+    font-family: var(--fh); font-size: 80px; font-weight: 300;
+    color: rgba(255,255,255,0.04); line-height: 1; margin-bottom: 6px;
+    letter-spacing: -0.04em;
+  }
+  .flabel {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
+  }
+  .fhead {
+    font-family: var(--fh); font-size: clamp(1.4rem, 2.4vw, 2rem);
+    font-weight: 300; text-transform: uppercase; line-height: 1.1;
+    letter-spacing: -0.01em; margin-bottom: 18px;
+  }
+  .fbody {
+    font-size: 13.5px; line-height: 1.8; color: var(--muted);
+    max-width: 34ch; margin-bottom: 24px;
+  }
+  .ftags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ftag {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; border: 0.5px solid var(--border);
+    padding: 4px 9px; color: var(--muted); border-radius: 2px;
+  }
+
+  /* ── PHOTO GRID ── */
+  .pgrid-wrap { border-top: 0.5px solid var(--border); }
+  .pgrid-hd {
+    padding: 26px 48px 18px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .pgrid-hd span:last-child { color: var(--border); }
+  .pgrid {
+    display: grid; grid-template-columns: 2fr 1fr 1fr;
+    grid-template-rows: auto auto; gap: 2px; background: var(--border);
+  }
+  .pc { overflow: hidden; background: var(--card); }
+  .pc.tall { grid-row: span 2; }
+  .pc img {
+    width: 100%; height: 100%; object-fit: cover; min-height: 210px;
+    filter: grayscale(0.3) contrast(1.04);
+    transition: filter 0.5s, transform 0.6s; display: block;
+  }
+  .pc:hover img { filter: grayscale(0) contrast(1); transform: scale(1.04); }
+
+  /* ── ABOUT + FACTS ── */
+  .about-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 72px; padding: 64px 48px;
+    border-bottom: 0.5px solid var(--border); align-items: start;
+  }
+  .sec-label {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 22px;
+  }
+  .about-h {
+    font-family: var(--fh); font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300; text-transform: uppercase;
+    line-height: 1.0; letter-spacing: -0.02em; margin-bottom: 22px;
+  }
+  .about-body { font-size: 14px; line-height: 1.85; color: var(--muted); }
+  .about-body p + p { margin-top: 14px; }
+  .facts { display: flex; flex-direction: column; gap: 2px; margin-top: 28px; }
+  .fact {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px; background: var(--card);
+  }
+  .fkey {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .fval { font-size: 13px; font-weight: 500; }
+
+  /* ── EXPECT ── */
+  .expect {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-top: 0.5px solid var(--border);
+    border-bottom: 0.5px solid var(--border);
+  }
+  .ecol { padding: 48px; }
+  .ecol:first-child { border-right: 0.5px solid var(--border); }
+  .ecol-title {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 28px;
+  }
+  .erow {
+    display: grid; grid-template-columns: 110px 1fr; gap: 12px;
+    padding: 13px 0; border-bottom: 0.5px solid var(--border);
+    font-size: 13px; align-items: start;
+  }
+  .erow:last-child { border-bottom: none; }
+  .ekey {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); padding-top: 2px;
+  }
+  .pill {
+    display: inline-block; font-family: var(--fm); font-size: 9px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 2px; margin-right: 4px;
+  }
+  .pill-a { background: var(--accent); color: #fff; }
+  .pill-o { border: 0.5px solid var(--border); color: var(--muted); }
+  .pill-d { background: var(--card); color: var(--fg); }
+
+  /* ── NEARBY ── */
+  .nearby { padding: 48px; background: #181818; }
+  .nearby-label {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 26px;
+  }
+  .ngrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+  .ncard {
+    background: var(--card); padding: 26px 22px;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .ncard:hover { background: #333; }
+  .ncode {
+    font-family: var(--fm); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  .nname {
+    font-family: var(--fh); font-size: 22px; font-weight: 300;
+    text-transform: uppercase; letter-spacing: -0.01em; margin-bottom: 8px;
+  }
+  .ndist {
+    font-family: var(--fm); font-size: 10px;
+    color: var(--muted); letter-spacing: 0.06em; margin-bottom: 14px;
+  }
+  .nimg {
+    width: 100%; aspect-ratio: 16/9; object-fit: cover;
+    filter: grayscale(0.5); transition: filter 0.3s;
+  }
+  .ncard:hover .nimg { filter: grayscale(0); }
+
+  /* ── FADE UPS ── */
+  .fu {
+    opacity: 0; transform: translateY(22px);
+    transition: opacity 0.75s ease, transform 0.75s ease;
+  }
+  .fu.in { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo"><div class="nav-dot"></div>Found By Scout</div>
+  <div class="nav-right">
+    <a href="#" class="nav-back">← All Parks</a>
+    <span class="nav-code">SK / 005</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <img class="hero-img" id="heroImg"
+    src="images/parks/bloblands/hero-01.webp" alt="Bloblands Skatepark">
+  <div class="hero-overlay"></div>
+  <div class="hero-toggle">
+    <button class="tbtn on" onclick="setMode('bw',this)">B&W</button>
+    <button class="tbtn" onclick="setMode('clr',this)">CLR</button>
+  </div>
+  <div class="hero-badge"><span>SE1</span></div>
+  <div class="hero-content">
+    <div>
+      <h1 class="hero-title">Blob<br>lands<span class="dim">Skatepark</span></h1>
+    </div>
+    <div class="hero-right">
+      <div class="hero-loc">Bermondsey · SE1</div>
+      <div class="hero-tags">
+        <span class="htag">Street</span>
+        <span class="htag">Free</span>
+        <span class="htag">Outdoor</span>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue"><div class="scroll-line"></div></div>
+</section>
+
+<!-- STATS -->
+<div class="stats fu">
+  <div class="stat"><div class="slabel">Type</div><div class="sval">Street</div></div>
+  <div class="stat"><div class="slabel">Surface</div><div class="sval">Concrete</div></div>
+  <div class="stat"><div class="slabel">Entry</div><div class="sval"><span class="sdot"></span>Free</div></div>
+  <div class="stat"><div class="slabel">Setting</div><div class="sval">Outdoor</div></div>
+  <div class="stat"><div class="slabel">Borough</div><div class="sval">Southwark</div></div>
+</div>
+
+<!-- PANORAMA -->
+<div class="pano fu" id="pano">
+  <img class="pano-img" id="panoImg" src="images/parks/bloblands/panorama.webp" alt="Bloblands panorama" draggable="false">
+  <div class="pano-label">360° Panorama</div>
+  <div class="pano-hint">← drag →</div>
+</div>
+
+<!-- SCAN SECTION -->
+<div class="scan-wrap fu">
+  <div class="scan-panel">
+    <div class="scan-img">
+      <img src="images/parks/bloblands/glb-preload.webp" alt="">
+      <div class="scan-topo">
+        <svg width="320" height="240" viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="160" cy="120" rx="140" ry="96" fill="none" stroke="rgba(255,88,65,0.18)" stroke-width="0.8"/>
+          <ellipse cx="160" cy="120" rx="112" ry="74" fill="none" stroke="rgba(255,88,65,0.24)" stroke-width="0.8"/>
+          <ellipse cx="160" cy="120" rx="84" ry="54" fill="none" stroke="rgba(255,88,65,0.3)" stroke-width="0.8"/>
+          <ellipse cx="160" cy="120" rx="58" ry="36" fill="none" stroke="rgba(255,88,65,0.36)" stroke-width="0.8"/>
+          <ellipse cx="160" cy="120" rx="34" ry="22" fill="none" stroke="rgba(255,88,65,0.44)" stroke-width="0.8"/>
+          <ellipse cx="160" cy="120" rx="15" ry="9" fill="none" stroke="rgba(255,88,65,0.55)" stroke-width="0.8"/>
+          <ellipse cx="88" cy="162" rx="36" ry="22" fill="none" stroke="rgba(255,88,65,0.18)" stroke-width="0.8"/>
+          <ellipse cx="88" cy="162" rx="18" ry="11" fill="none" stroke="rgba(255,88,65,0.28)" stroke-width="0.8"/>
+          <ellipse cx="244" cy="82" rx="30" ry="18" fill="none" stroke="rgba(255,88,65,0.18)" stroke-width="0.8"/>
+          <ellipse cx="244" cy="82" rx="14" ry="8" fill="none" stroke="rgba(255,88,65,0.3)" stroke-width="0.8"/>
+          <text x="158" y="123" fill="rgba(255,255,255,0.18)" font-size="8" font-family="monospace" text-anchor="middle">3D SCAN</text>
+        </svg>
+      </div>
+      <div class="scan-caption">3D Photogrammetry — 2024</div>
+    </div>
+    <div class="scan-bar">
+      <div class="schip on">Explore</div>
+      <div class="schip">Measure</div>
+      <div class="schip">Spots</div>
+      <div class="schip">Overlay</div>
+    </div>
+  </div>
+  <div class="scan-info">
+    <div class="scan-idx">01 — 3D Scan</div>
+    <h2 class="scan-h">Walk the park<br>before you arrive</h2>
+    <p class="scan-p">Full photogrammetry scan of Bloblands. Orbit the space, check obstacles, measure run-ups. The model loads directly from the real concrete — nothing idealised.</p>
+    <div class="cta">Enter full scan →</div>
+  </div>
+</div>
+
+<!-- FULL BLEED 1 -->
+<div class="bleed fu">
+  <img src="images/parks/bloblands/gallery-01.webp" alt="Bloblands skatepark" style="aspect-ratio:21/9">
+  <div class="bleed-cap">Bloblands — Bermondsey, SE1</div>
+</div>
+
+<!-- ALT BLOCK 1 -->
+<div class="alt fu">
+  <div class="alt-img">
+    <img src="images/parks/bloblands/gallery-02.webp" alt="Bloblands street features">
+  </div>
+  <div class="alt-txt">
+    <div class="fnum">01</div>
+    <div class="flabel">Street</div>
+    <h3 class="fhead">Concrete obstacles —<br>raw and varied</h3>
+    <p class="fbody">A compact but well-considered layout. Manual pads, ledges and transitions sit close together — the kind of park where every inch gets used. Nothing wasted, nothing over-designed.</p>
+    <div class="ftags">
+      <span class="ftag">Manual pads</span>
+      <span class="ftag">Ledges</span>
+      <span class="ftag">Banks</span>
+      <span class="ftag">Compact layout</span>
+    </div>
+  </div>
+</div>
+
+<!-- ALT BLOCK 2 reversed -->
+<div class="alt rev fu">
+  <div class="alt-img">
+    <img src="images/parks/bloblands/gallery-03.webp" alt="Bloblands detail">
+  </div>
+  <div class="alt-txt">
+    <div class="fnum">02</div>
+    <div class="flabel">Community</div>
+    <h3 class="fhead">Neighbourhood park —<br>properly local</h3>
+    <p class="fbody">Tucked into Bermondsey, Bloblands draws a consistent local scene. No crowds, no tourists. The kind of spot you hear about from people who actually skate south London.</p>
+    <div class="ftags">
+      <span class="ftag">Local scene</span>
+      <span class="ftag">Quiet</span>
+      <span class="ftag">Bermondsey</span>
+    </div>
+  </div>
+</div>
+
+<!-- FULL BLEED 2 -->
+<div class="bleed fu">
+  <img src="images/parks/bloblands/gallery-04.webp" alt="Bloblands" style="aspect-ratio:21/9">
+  <div class="bleed-cap">Bloblands — street section, 2024</div>
+</div>
+
+<!-- PHOTO GRID -->
+<div class="pgrid-wrap fu">
+  <div class="pgrid-hd">
+    <span style="color:var(--muted)">Photography</span>
+    <span>4 images</span>
+  </div>
+  <div class="pgrid">
+    <div class="pc tall"><img src="images/parks/bloblands/gallery-01.webp" alt=""></div>
+    <div class="pc"><img src="images/parks/bloblands/gallery-02.webp" alt=""></div>
+    <div class="pc"><img src="images/parks/bloblands/gallery-03.webp" alt=""></div>
+    <div class="pc"><img src="images/parks/bloblands/gallery-04.webp" alt=""></div>
+    <div class="pc"><img src="images/parks/bloblands/hero-01.webp" alt=""></div>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<div class="about-grid fu">
+  <div>
+    <div class="sec-label">About</div>
+    <h2 class="about-h">What to expect</h2>
+    <div class="about-body">
+      <p>A neighbourhood concrete gem tucked away in Bermondsey. Raw, local, and well-loved. The kind of park that doesn't make much noise online but gets sessioned hard by the people who know about it.</p>
+      <p>Compact and street-focused, Bloblands is worth knowing as part of a wider south London circuit — especially if you're working your way from Southbank down toward Crystal Palace.</p>
+    </div>
+  </div>
+  <div>
+    <div class="facts" style="margin-top:0">
+      <div class="fact"><span class="fkey">Best for</span><span class="fval">All levels</span></div>
+      <div class="fact"><span class="fkey">Crowds</span><span class="fval">Generally quiet</span></div>
+      <div class="fact"><span class="fkey">Setting</span><span class="fval">Outdoor / neighbourhood</span></div>
+      <div class="fact"><span class="fkey">Entry</span><span class="fval">Free, always</span></div>
+      <div class="fact"><span class="fkey">Hours</span><span class="fval">Dawn to dusk</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPECT -->
+<div class="expect fu">
+  <div class="ecol">
+    <div class="ecol-title">Conditions</div>
+    <div class="erow"><span class="ekey">Skill level</span><span><span class="pill pill-d">Beginner</span><span class="pill pill-a">Intermediate</span></span></div>
+    <div class="erow"><span class="ekey">Surface</span><span>Concrete</span></div>
+    <div class="erow"><span class="ekey">Wet weather</span><span>No cover — check forecast</span></div>
+    <div class="erow"><span class="ekey">Lighting</span><span>None</span></div>
+    <div class="erow"><span class="ekey">Facilities</span><span><span class="pill pill-o">None on site</span></span></div>
+  </div>
+  <div class="ecol">
+    <div class="ecol-title">Getting there</div>
+    <div class="erow"><span class="ekey">Tube</span><span>Bermondsey — Jubilee line, 8 min walk</span></div>
+    <div class="erow"><span class="ekey">Rail</span><span>London Bridge — 12 min walk</span></div>
+    <div class="erow"><span class="ekey">Bus</span><span>Multiple routes on Jamaica Road</span></div>
+    <div class="erow"><span class="ekey">Parking</span><span>Street parking nearby</span></div>
+  </div>
+</div>
+
+<!-- NEARBY -->
+<div class="nearby fu">
+  <div class="nearby-label">Also in South London</div>
+  <div class="ngrid">
+    <div class="ncard">
+      <div class="ncode">SK / 002</div>
+      <div class="nname">Southbank</div>
+      <div class="ndist">3km west · SE1</div>
+      <img class="nimg" src="images/parks/southbank/gallery-01.webp" alt="Southbank">
+    </div>
+    <div class="ncard">
+      <div class="ncode">SK / 003</div>
+      <div class="nname">Stockwell</div>
+      <div class="ndist">5km south-west · SW9</div>
+      <img class="nimg" src="images/parks/stockwell/gallery-01.webp" alt="Stockwell">
+    </div>
+    <div class="ncard">
+      <div class="ncode">SK / 001</div>
+      <div class="nname">Crystal Palace</div>
+      <div class="ndist">9km south · SE19</div>
+      <img class="nimg" src="images/parks/crystal-palace/gallery-01.webp" alt="Crystal Palace">
+    </div>
+  </div>
+</div>
+
+<script>
+  // B&W toggle
+  function setMode(mode, btn) {
+    document.querySelectorAll('.tbtn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    const img = document.getElementById('heroImg');
+    if (mode === 'clr') img.classList.add('clr');
+    else img.classList.remove('clr');
+  }
+
+  // Scroll fade-ups
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); } });
+  }, { threshold: 0.07, rootMargin: '0px 0px -36px 0px' });
+  document.querySelectorAll('.fu').forEach(el => obs.observe(el));
+
+  // Hero parallax
+  const heroImg = document.getElementById('heroImg');
+  window.addEventListener('scroll', () => {
+    heroImg.style.transform = `translateY(${window.pageYOffset * 0.28}px)`;
+  }, { passive: true });
+
+  // Draggable panorama
+  const pano = document.getElementById('pano');
+  const panoImg = document.getElementById('panoImg');
+  let isDragging = false, startX = 0, scrollLeft = 0, currentOffset = 0;
+  const maxOffset = 0;
+  const minOffset = -(panoImg.naturalWidth * 0.5) || -600;
+
+  pano.addEventListener('mousedown', e => {
+    isDragging = true; startX = e.pageX; pano.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mouseup', () => { isDragging = false; pano.style.cursor = 'grab'; });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.pageX - startX;
+    currentOffset = Math.max(-800, Math.min(0, currentOffset + dx * 0.6));
+    panoImg.style.transform = `translateX(${currentOffset}px)`;
+    startX = e.pageX;
+  });
+
+  // Touch support for panorama
+  pano.addEventListener('touchstart', e => { isDragging = true; startX = e.touches[0].pageX; });
+  pano.addEventListener('touchend', () => { isDragging = false; });
+  pano.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const dx = e.touches[0].pageX - startX;
+    currentOffset = Math.max(-800, Math.min(0, currentOffset + dx * 0.6));
+    panoImg.style.transform = `translateX(${currentOffset}px)`;
+    startX = e.touches[0].pageX;
+  });
+</script>
+</body>
+</html>

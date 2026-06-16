@@ -59,7 +59,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
   const db = createServerClient();
   const { data: park } = await db
     .from("parks")
-    .select("*")
+    .select("*, viewer_settings, model_file_mobile, model_file_low, preload_image_url")
     .eq("slug", slug)
     .eq("published", true)
     .single();
@@ -83,8 +83,8 @@ const galleryImages = park.gallery_images?.length
 
 const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
 
-  // Model file: use DB value or fall back to the known local path for bloblands
   const modelFile = park.model_file || (slug === "bloblands" ? "/images/parks/bloblands/model.glb" : null);
+  const modelFileMobile = park.model_file_mobile ?? undefined;
 
   const bleed = "calc(-1 * clamp(16px, 4vw, 56px))";
 
@@ -102,13 +102,20 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         {modelFile ? (
           <ParkHeroViewer
             modelFile={modelFile}
+            modelFileLow={park.model_file_low ?? undefined}
+            modelFileMobile={modelFileMobile}
             heroImage={park.hero_image}
+            preloadImageUrl={park.preload_image_url ?? undefined}
             cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
             cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
             modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
             pingPong={park.ping_pong ?? undefined}
             autoRotate={park.auto_rotate ?? false}
             debug={isDebug}
+            ambientIntensity={park.viewer_settings?.ambientIntensity}
+            directionalIntensity={park.viewer_settings?.directionalIntensity}
+            environmentPreset={park.viewer_settings?.environmentPreset}
+            environmentIntensity={park.viewer_settings?.environmentIntensity}
           />
         ) : (
           <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px), repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px)" }} />

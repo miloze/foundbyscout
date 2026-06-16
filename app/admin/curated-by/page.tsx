@@ -1,6 +1,8 @@
 import { createServerClient } from "@/lib/supabase-server";
 import CuratedByAdmin from "./CuratedByAdmin";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminCuratedByPage() {
   const db = createServerClient();
   const { data: issues } = await db

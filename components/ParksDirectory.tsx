@@ -129,13 +129,13 @@ export default function ParksDirectory() {
   // ── On map ready + parks loaded: zoom to London ───────────────────────────
   useEffect(() => {
     if (mapStatus !== "ready" || !mapRef.current || parks.length === 0) return;
-    const londonParks = parks.filter(p => p.location?.includes("London"));
+    const londonParks = parks.filter(p => p.location?.includes("London") && p.lat != null && p.lng != null);
     if (!londonParks.length) return;
     const park = londonParks[Math.floor(Math.random() * londonParks.length)];
     mapRef.current.setView([park.lat, park.lng], 11, { animate: false });
     if (view === "map") openPark(park);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapStatus, parks]);
+  }, [mapStatus, parks, mapRef.current]);
 
   // ── Theme tile swap ───────────────────────────────────────────────────────
   useEffect(() => {

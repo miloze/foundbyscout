@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF, OrbitControls } from "@react-three/drei";
+import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import type { Group } from "three";
 
@@ -27,9 +27,13 @@ function Model({ onLoad, modelFile, modelRotation }: {
         const mesh = obj as THREE.Mesh;
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach((m) => {
-          m.side        = THREE.DoubleSide;
-          m.depthWrite  = true;
-          m.needsUpdate = true;
+          const mat = m as THREE.MeshStandardMaterial;
+          mat.side        = THREE.DoubleSide;
+          mat.transparent = false;
+          mat.depthWrite  = true;
+          if (mat.map)         mat.map.colorSpace         = THREE.SRGBColorSpace;
+          if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+          mat.needsUpdate = true;
         });
       }
     });
@@ -151,7 +155,6 @@ function CaptureSetup({ captureRef, filterRef }: {
       out.height = src.height;
       // No background fill — keep alpha transparent so the park is a cutout
       const ctx  = out.getContext("2d")!;
-      ctx.filter = filterRef.current;   // applies B&W + brightness + contrast
       ctx.drawImage(src, 0, 0);
       const url  = out.toDataURL("image/png");
       const a    = document.createElement("a");
@@ -170,16 +173,22 @@ function CaptureSetup({ captureRef, filterRef }: {
 export default function ParkModel({
   modelFile,
   preloadImage,
-  cameraPos     = [0, 22, 32] as [number, number, number],
-  cameraTarget  = [0, 2, 0]  as [number, number, number],
-  modelRotation = [-Math.PI / 2, 0, 0] as [number, number, number],
+  onLoad,
+  cameraPos            = [0, 22, 32] as [number, number, number],
+  cameraTarget         = [0, 2, 0]  as [number, number, number],
+  modelRotation        = [-Math.PI / 2, 0, 0] as [number, number, number],
   pingPong,
-  autoRotate    = false,
-  debug         = false,
-  fov           = 45,
+  autoRotate           = false,
+  debug                = false,
+  fov                  = 45,
+  ambientIntensity     = 0.9,
+  directionalIntensity = 1.0,
+  environmentPreset    = "warehouse",
+  environmentIntensity = 0.85,
 }: {
   modelFile: string;
   preloadImage?: string;
+  onLoad?: () => void;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
@@ -187,26 +196,29 @@ export default function ParkModel({
   autoRotate?: boolean;
   debug?: boolean;
   fov?: number;
+  ambientIntensity?: number;
+  directionalIntensity?: number;
+  environmentPreset?: string;
+  environmentIntensity?: number;
 }) {
   const [viewMode,    setViewMode]    = useState<"bw" | "colour">("bw");
   const [camPos,      setCamPos]      = useState("loading…");
-  const [brightness,  setBrightness]  = useState(1.20);
-  const [contrast,    setContrast]    = useState(1.45);
+  const [modelLoaded, setModelLoaded] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef  = useRef<any>(null);
   const preloadRef   = useRef<HTMLImageElement>(null);
   const captureRef   = useRef<(() => void) | undefined>(undefined);
 
   const startPos    = [+cameraPos[0], +cameraPos[1], +cameraPos[2]] as [number, number, number];
-  const bwFilter    = `grayscale(1) brightness(${brightness.toFixed(2)}) contrast(${contrast.toFixed(2)})`;
-  const clrFilter   = `brightness(${brightness.toFixed(2)}) contrast(${contrast.toFixed(2)})`;
-  const filter      = viewMode === "bw" ? bwFilter : clrFilter;
+  const filter      = viewMode === "bw" ? "grayscale(1)" : "none";
   const filterRef   = useRef(filter);
-  filterRef.current = filter;           // always current without re-running effects
+  filterRef.current = filter;
   const canvasStart = pingPong ? n(pingPong[0]) : startPos;
   const handleLoad = useCallback(() => {
     if (preloadRef.current) preloadRef.current.style.opacity = "0";
-  }, []);
+    setModelLoaded(true);
+    onLoad?.();
+  }, [onLoad]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -236,22 +248,6 @@ export default function ParkModel({
           <div style={{ color: "#aaa", fontSize: 9, letterSpacing: "0.12em", marginBottom: 6 }}>CAMERA POSITION</div>
           <div style={{ marginBottom: 12 }}>{camPos}</div>
 
-          <div style={{ color: "#aaa", fontSize: 9, letterSpacing: "0.12em", marginBottom: 8 }}>IMAGE</div>
-          {([
-            ["BRIGHTNESS", brightness, setBrightness, 0.5, 3.0, 0.05] as const,
-            ["CONTRAST",   contrast,   setContrast,   0.5, 3.0, 0.05] as const,
-          ]).map(([label, val, set, min, max, step]) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <span style={{ color: "#888", fontSize: 9, width: 72, letterSpacing: "0.08em" }}>{label}</span>
-              <input
-                type="range" min={min} max={max} step={step} value={val}
-                onChange={e => set(+e.target.value)}
-                style={{ flex: 1, accentColor: "var(--accent)", cursor: "pointer" }}
-              />
-              <span style={{ width: 36, textAlign: "right" }}>{(val as number).toFixed(2)}</span>
-            </div>
-          ))}
-
           <button
             onClick={() => captureRef.current?.()}
             style={{
@@ -276,6 +272,7 @@ export default function ParkModel({
             position: "absolute", inset: 0, width: "100%", height: "100%",
             objectFit: "cover", pointerEvents: "none", zIndex: 4,
             opacity: 1, transition: "opacity 0.7s ease",
+            filter,
           }}
         />
       )}
@@ -293,14 +290,28 @@ export default function ParkModel({
         </div>
       )}
 
+      {/* ── Controls hint ─────────────────────────────────────────────── */}
+      {!pingPong && !debug && (
+        <div style={{
+          position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
+          zIndex: 5, pointerEvents: "none",
+          fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em",
+          textTransform: "uppercase", color: "rgba(255,255,255,0.45)",
+        }}>
+          drag to rotate · scroll to zoom
+        </div>
+      )}
+
       {/* ── Canvas — filter on wrapper div, not on canvas itself ───────── */}
       <div style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}>
       <Canvas
         camera={{ position: canvasStart, fov, near: 0.5, far: 400 }}
         style={{ position: "absolute", inset: 0 }}
-        gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
+        gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true, toneMapping: THREE.NoToneMapping, toneMappingExposure: 1.0, outputColorSpace: THREE.SRGBColorSpace }}
       >
-        <ambientLight intensity={2.0} />
+        <ambientLight color={0xffffff} intensity={ambientIntensity} />
+        <directionalLight color={0xffffff} position={[10, 20, 10]} intensity={directionalIntensity} />
+        <Environment preset={environmentPreset as any} environmentIntensity={environmentIntensity} />
 
         {debug && <CaptureSetup captureRef={captureRef} filterRef={filterRef} />}
 
@@ -326,7 +337,7 @@ export default function ParkModel({
           enablePan={debug || !pingPong}
           enableZoom={debug || !pingPong}
           enableRotate={!pingPong || debug}
-          autoRotate={autoRotate && !debug}
+          autoRotate={modelLoaded && !debug && !pingPong}
           autoRotateSpeed={0.5}
           minDistance={debug ? 1 : 10}
           maxDistance={debug ? 500 : 70}
