@@ -89,7 +89,17 @@ export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: P
       {/* Viewer */}
       <div style={{ position: "relative", flex: 1 }}>
         <ParkHeroViewer
-          {...viewerProps}
+          modelFile={viewerProps.modelFile}
+          modelFileMobile={viewerProps.modelFileMobile}
+          cameraPos={viewerProps.cameraPos}
+          cameraTarget={viewerProps.cameraTarget}
+          modelRotation={viewerProps.modelRotation}
+          pingPong={viewerProps.pingPong}
+          autoRotate={viewerProps.autoRotate}
+          ambientIntensity={viewerProps.ambientIntensity}
+          directionalIntensity={viewerProps.directionalIntensity}
+          environmentPreset={viewerProps.environmentPreset}
+          environmentIntensity={viewerProps.environmentIntensity}
           heroImage=""
           debug={false}
           forceViewer
