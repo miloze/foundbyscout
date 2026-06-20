@@ -1,21 +1,119 @@
 import Link from "next/link";
-import HomeSpotlight from "@/components/HomeSpotlight";
 import { createServerClient } from "@/lib/supabase-server";
 
 export default async function Home() {
   const db = createServerClient();
-  const { data: featuredParks } = await db
-    .from("parks")
-    .select("slug, name, location, type, hero_image, thumbnail")
-    .eq("published", true)
-    .gt("sort_order", 0)
-    .order("sort_order", { ascending: true })
-    .limit(4);
+
+  const [{ data: featuredParks }, { data: featured }] = await Promise.all([
+    db
+      .from("parks")
+      .select("slug, name, location, type, hero_image, thumbnail")
+      .eq("published", true)
+      .gt("sort_order", 0)
+      .order("sort_order", { ascending: true })
+      .limit(4),
+    // TEMP: hardcoded to Bloblands while homepage feature content/layout is being finalised.
+    // Future: replace with either curated "significant park" selection or random-from-archive.
+    db
+      .from("parks")
+      .select("*")
+      .eq("slug", "bloblands")
+      .eq("published", true)
+      .single(),
+  ]);
+
+  // Derive tag list from structured fields
+  const featureTags: string[] = featured ? [
+    featured.type,
+    featured.is_free ? "Free" : null,
+    featured.is_covered ? "Covered" : "Outdoor",
+  ].filter(Boolean) as string[] : [];
 
   return (
     <div>
-      {/* HERO */}
-      <HomeSpotlight />
+      {/* HERO — static single-park feature */}
+      {featured && (
+        <section
+          style={{
+            position: "relative",
+            height: "78vh",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-end",
+            padding: "8rem clamp(16px,4vw,56px) 3rem",
+            marginLeft: "calc(-1 * clamp(16px, 4vw, 56px))",
+            marginRight: "calc(-1 * clamp(16px, 4vw, 56px))",
+            overflow: "hidden",
+            userSelect: "none",
+          }}
+        >
+          {/* Hero background */}
+          {featured.hero_image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={featured.hero_image}
+              alt=""
+              style={{
+                position: "absolute", inset: 0, width: "100%", height: "100%",
+                objectFit: "cover", objectPosition: "center center",
+              }}
+            />
+          ) : (
+            <div style={{ position: "absolute", inset: 0, background: "#111" }} />
+          )}
+
+          {/* Gradient scrim — darkens bottom of hero so text reads cleanly */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "linear-gradient(to top, rgba(20,20,18,0.82) 0%, rgba(20,20,18,0.3) 40%, rgba(20,20,18,0) 70%)",
+            pointerEvents: "none",
+            zIndex: 1,
+          }} />
+
+
+          {/* Postcode badge */}
+          {featured.postcode && (
+            <div style={{
+              position: "absolute", top: "clamp(20px,4vw,36px)", left: "clamp(16px,4vw,56px)",
+              width: 80, height: 80, borderRadius: "50%", background: "var(--accent)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 2, pointerEvents: "none",
+            }}>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                {featured.postcode.split(" ")[0]}
+              </span>
+            </div>
+          )}
+
+          {/* Archive content block — z-index 2 sits above blur band (z-index 1) */}
+          <div style={{ position: "relative", zIndex: 2, maxWidth: 900 }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 20 }}>
+              Park Spotlight
+            </p>
+            {featured.catalogue_id && (
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: "0.15em", marginBottom: 6 }}>
+                {featured.catalogue_id}
+              </p>
+            )}
+            <h1 style={{ fontSize: "clamp(3.5rem, 11vw, 9rem)", lineHeight: 0.88, letterSpacing: "-0.02em", color: "#fff", fontWeight: 300, marginBottom: 16 }}>
+              {featured.name}
+            </h1>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", marginBottom: 12 }}>
+              {[featured.location, "London", featured.postcode?.split(" ")[0]].filter(Boolean).join("/")}
+            </p>
+            <div style={{ display: "flex", gap: 24, fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", marginBottom: 28 }}>
+              {featured.opened  && <span>Opened {featured.opened}</span>}
+              {featured.scanned && <span>Scanned {featured.scanned}</span>}
+            </div>
+            <Link
+              href={`/parks/${featured.slug}`}
+              style={{ display: "inline-block", padding: "7px 16px", fontSize: 10, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.12em", background: "var(--accent)", color: "#fff", fontFamily: "var(--font-mono)" }}
+            >
+              View scan →
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* DIRECTORY CTA + FEATURED PARKS */}
       <section style={{ paddingTop: "5rem", paddingBottom: "6rem", borderBottom: "1px solid var(--border)" }}>
@@ -51,7 +149,7 @@ export default async function Home() {
               href="/parks"
               style={{
                 display: "inline-block",
-                padding: "12px 28px", fontWeight: "bold", fontSize: 11,
+                padding: "7px 16px", fontWeight: "bold", fontSize: 10,
                 textTransform: "uppercase", letterSpacing: "0.14em",
                 background: "var(--accent)", color: "#fff",
                 fontFamily: "var(--font-mono)",

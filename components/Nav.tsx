@@ -7,6 +7,7 @@ import { useTheme } from "./ThemeProvider";
 
 const links = [
   { href: "/parks", label: "Parks" },
+  { href: "/about", label: "About" },
 ];
 
 export default function Nav() {
@@ -15,7 +16,7 @@ export default function Nav() {
   const { theme, toggle } = useTheme();
 
   return (
-    <header style={{ borderBottom: "none" }} className="sticky top-0 z-50">
+    <header style={{ borderBottom: "none", position: "relative" }} className="sticky top-0 z-50">
       <nav
         className="flex items-center justify-between"
         style={{ background: "var(--background)", paddingTop: "12px", paddingBottom: "12px", paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)", borderBottom: "1px solid var(--border)" }}
@@ -101,15 +102,25 @@ export default function Nav() {
         </div>
       </nav>
 
-      {/* Mobile menu */}
+      {/* Mobile menu — drops inline below the nav bar, right-aligned to match burger position */}
       {menuOpen && (
-        <div className="md:hidden px-6 pb-6 flex flex-col gap-4" style={{ background: "var(--background)" }}>
+        <div className="md:hidden" style={{
+          position: "absolute", top: "100%", right: 0,
+          background: "var(--background)", borderBottom: "1px solid var(--border)",
+          borderLeft: "1px solid var(--border)",
+          padding: "8px 0", minWidth: 140,
+          zIndex: 50,
+        }}>
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm"
-              style={{ color: pathname === link.href ? "var(--accent)" : "var(--foreground)" }}
+              style={{
+                display: "block", padding: "10px 20px",
+                fontFamily: "var(--font-mono)", fontSize: 11,
+                textTransform: "uppercase", letterSpacing: "0.1em",
+                color: pathname === link.href ? "var(--accent)" : "var(--foreground)",
+              }}
               onClick={() => setMenuOpen(false)}
             >
               {link.label}

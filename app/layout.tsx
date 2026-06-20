@@ -5,9 +5,9 @@ import Nav from "@/components/Nav";
 import ThemeProvider from "@/components/ThemeProvider";
 import Grain from "@/components/Grain";
 
-const bodyFont    = Geist({ subsets: ["latin"], weight: ["300","400","500","600","700"], variable: "--font-body" });
 const headingFont = Rubik({ subsets: ["latin"], weight: ["300"], variable: "--font-heading" });
 const monoFont    = DM_Mono({ subsets: ["latin"], weight: ["300","400"], variable: "--font-mono" });
+const bodyFont    = Geist({ subsets: ["latin"], weight: ["300","400"], variable: "--font-body" });
 
 export const metadata: Metadata = {
   title: "Found By Scout — UK Skatepark Directory",
@@ -26,9 +26,9 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
       </head>
-      <body className={`${bodyFont.variable} ${headingFont.variable} ${monoFont.variable}`} style={{ fontFamily: "var(--font-body), sans-serif", margin: 0, background: "var(--background)", color: "var(--foreground)" }}>
+      <body className={`${headingFont.variable} ${monoFont.variable} ${bodyFont.variable}`} style={{ fontFamily: "var(--font-body), sans-serif", margin: 0, background: "var(--background)", color: "var(--foreground)" }}>
         <ThemeProvider>
-          {/* <Grain /> */}
+          <Grain />
           <Nav />
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", padding: "0 clamp(16px, 4vw, 56px)" }}>
             <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", flex: 1 }}>

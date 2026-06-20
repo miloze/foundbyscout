@@ -12,7 +12,7 @@ type Park = {
   hero_image: string; brief: string;
 };
 
-const TYPE_FILTERS = ["All", "Street", "Transition", "Bowl", "Free", "Covered"];
+const TYPE_FILTERS = ["All", "Street", "Bowl", "Free"];
 
 // Repeating editorial card size pattern — [colSpan out of 12]
 // Pairs: [5,7] then [7,5] then [4,4,4] then repeat

@@ -134,6 +134,7 @@ type FormState = {
   socials: SocialItem[];
   gallery_images: string[];
   brief: string; description: string;
+  catalogue_id: string; scanned: string;
   hero_image: string; thumbnail: string; model_file: string; model_file_low: string; preload_image_url: string;
   camera_pos: string; camera_target: string; model_rotation: string;
 };
@@ -146,6 +147,7 @@ const EMPTY: FormState = {
   lat: "", lng: "",
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
   brief: "", description: "",
+  catalogue_id: "", scanned: "",
   hero_image: "", thumbnail: "", model_file: "", model_file_low: "", preload_image_url: "",
   camera_pos: "", camera_target: "", model_rotation: "",
 };
@@ -226,6 +228,8 @@ export default function EditParkPage() {
           glance:    Array.isArray(park.glance)    ? park.glance    : [],
           socials:   Array.isArray(park.socials)   ? park.socials   : [],
           gallery_images: Array.isArray(park.gallery_images) ? park.gallery_images : [],
+          catalogue_id: park.catalogue_id ?? "",
+          scanned:      park.scanned      ?? "",
           brief:       park.brief ?? "",
           description: Array.isArray(park.description)
             ? park.description.join("\n\n")
@@ -511,7 +515,7 @@ export default function EditParkPage() {
 
       <div style={{ marginBottom: 40 }}>
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)", marginBottom: 8 }}>Parks</p>
-        <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "2rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.02em" }}>
           {form.name || slug}
         </h1>
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", marginTop: 4 }}>/{slug}</p>
@@ -711,19 +715,29 @@ export default function EditParkPage() {
         <section>
           <SectionHead>Facts</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={G2}>
+            <div style={G3}>
+              <div>
+                <FieldLabel hint="e.g. 001 — shown in archive blocks">Catalogue ID</FieldLabel>
+                <Input value={form.catalogue_id} onChange={v => upd("catalogue_id", v)} placeholder="001" />
+              </div>
               <div>
                 <FieldLabel>Opened</FieldLabel>
                 <Input value={form.opened} onChange={v => upd("opened", v)} placeholder="1978" />
               </div>
               <div>
+                <FieldLabel hint="e.g. March 2024 — shown in archive blocks">Scanned</FieldLabel>
+                <Input value={form.scanned} onChange={v => upd("scanned", v)} placeholder="March 2024" />
+              </div>
+            </div>
+            <div style={G2}>
+              <div>
                 <FieldLabel>Builder</FieldLabel>
                 <Input value={form.builder} onChange={v => upd("builder", v)} placeholder="Canvas Skateparks" />
               </div>
-            </div>
-            <div>
-              <FieldLabel>Managed by</FieldLabel>
-              <Input value={form.managed_by} onChange={v => upd("managed_by", v)} placeholder="GLL / London Borough of Bromley" />
+              <div>
+                <FieldLabel>Managed by</FieldLabel>
+                <Input value={form.managed_by} onChange={v => upd("managed_by", v)} placeholder="GLL / London Borough of Bromley" />
+              </div>
             </div>
           </div>
         </section>

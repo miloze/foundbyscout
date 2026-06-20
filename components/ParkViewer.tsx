@@ -165,7 +165,7 @@ export default function ParkViewer({
           <button key={mode} onClick={() => setViewMode(mode)} style={{
             padding: "5px 12px", border: "none", cursor: "pointer",
             background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
-            color: "#fff", fontFamily: "monospace", fontSize: 10,
+            color: "#fff", fontFamily: "var(--font-mono)", fontSize: 10,
             letterSpacing: "0.1em", borderRadius: 2,
           }}>
             {mode === "bw" ? "B&W" : "CLR"}
@@ -194,7 +194,7 @@ export default function ParkViewer({
         transition: "opacity 0.6s ease",
       }}>
         <span style={{
-          fontFamily: "monospace", fontSize: 10, letterSpacing: "0.14em",
+          fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em",
           textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
           background: "rgba(0,0,0,0.35)", padding: "5px 12px", borderRadius: 2,
           backdropFilter: "blur(4px)",

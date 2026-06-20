@@ -229,7 +229,7 @@ export default function ParkModel({
           <button key={mode} onClick={() => setViewMode(mode)} style={{
             padding: "5px 12px", border: "none", cursor: "pointer",
             background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
-            color: "#fff", fontFamily: "monospace", fontSize: 10,
+            color: "#fff", fontFamily: "var(--font-mono)", fontSize: 10,
             letterSpacing: "0.1em", borderRadius: 2,
           }}>
             {mode === "bw" ? "B&W" : "CLR"}
@@ -242,7 +242,7 @@ export default function ParkModel({
         <div style={{
           position: "absolute", bottom: 80, left: 12, zIndex: 20,
           background: "rgba(0,0,0,0.82)", color: "#0f0", padding: "12px 16px",
-          fontFamily: "monospace", fontSize: 11, lineHeight: 1.9,
+          fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.9,
           borderRadius: 4, pointerEvents: "auto", minWidth: 260,
         }}>
           <div style={{ color: "#aaa", fontSize: 9, letterSpacing: "0.12em", marginBottom: 6 }}>CAMERA POSITION</div>
@@ -253,7 +253,7 @@ export default function ParkModel({
             style={{
               marginTop: 10, width: "100%", padding: "6px 0",
               background: "var(--accent)", border: "none", color: "#fff",
-              fontFamily: "monospace", fontSize: 9, letterSpacing: "0.12em",
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.12em",
               textTransform: "uppercase", cursor: "pointer", borderRadius: 2,
             }}
           >

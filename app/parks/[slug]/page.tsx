@@ -1,10 +1,10 @@
 import EditorialGallery, { GalleryRow } from "@/components/EditorialGallery";
+import OpenScanButton from "@/components/OpenScanButton";
 import FloatingAsset from "@/components/FloatingAsset";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ParkHeroViewer from "@/components/ParkHeroViewer";
 import ParkWeather from "@/components/ParkWeather";
-import ParkBusy from "@/components/ParkBusy";
 import { createServerClient } from "@/lib/supabase-server";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -132,11 +132,39 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(20px, 4vw, 36px)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, pointerEvents: "none", zIndex: 3 }}>
           <div>
             <Link href="/parks" style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.1em", textTransform: "uppercase", display: "inline-block", marginBottom: 12, pointerEvents: "auto" }}>← All Parks</Link>
-            <h1 style={{ fontSize: "clamp(40px, 8vw, 84px)", lineHeight: 0.92, color: "#fff", letterSpacing: "-0.02em", fontWeight: 300 }}>{park.name}</h1>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginTop: 10 }}>{park.address.join(", ")} · {park.postcode}</p>
-            <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <h1 style={{ fontSize: "clamp(22px, 3.5vw, 44px)", lineHeight: 1.05, color: "#fff", letterSpacing: "-0.01em", fontWeight: 300, marginBottom: 8 }}>
+              {park.catalogue_id ? `Entry /${park.catalogue_id} — ${park.name}` : park.name}
+            </h1>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", marginBottom: 6 }}>
+              {[park.address?.[0], park.location, "London", park.postcode?.split(" ")[0]].filter(Boolean).join("/")}
+            </p>
+            {park.lat != null && park.lng != null && (
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 8 }}>
+                {Math.abs(park.lat).toFixed(4)}° {park.lat >= 0 ? "N" : "S"}, {Math.abs(park.lng).toFixed(4)}° {park.lng >= 0 ? "E" : "W"}
+              </p>
+            )}
+            <div style={{ display: "flex", gap: 20, fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", marginBottom: 10 }}>
+              {park.opened  && <span>Opened {park.opened}</span>}
+              {park.scanned && <span>Scanned {park.scanned}</span>}
+            </div>
+            {modelFile && (
+              <OpenScanButton
+                modelFile={modelFile}
+                modelFileMobile={modelFileMobile}
+                parkName={park.name}
+                cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
+                cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
+                modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
+                pingPong={park.ping_pong ?? undefined}
+                autoRotate={park.auto_rotate ?? false}
+                ambientIntensity={park.viewer_settings?.ambientIntensity}
+                directionalIntensity={park.viewer_settings?.directionalIntensity}
+                environmentPreset={park.viewer_settings?.environmentPreset}
+                environmentIntensity={park.viewer_settings?.environmentIntensity}
+              />
+            )}
+            <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "flex-start" }}>
               <ParkWeather lat={park.lat} lng={park.lng} />
-              <ParkBusy lit={park.is_covered} />
             </div>
           </div>
         </div>
