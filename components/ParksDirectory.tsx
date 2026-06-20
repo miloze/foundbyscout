@@ -396,24 +396,7 @@ export default function ParksDirectory() {
           />
         </div>
 
-        {/* Type filter pills — gallery only */}
-        {view === "gallery" && (
-          <div style={{ display: "flex", overflowX: "auto", scrollbarWidth: "none", flex: 1 }}>
-            {TYPE_FILTERS.map(f => (
-              <button key={f} onClick={() => setTypeFilter(f === typeFilter ? "All" : f)} style={{
-                flexShrink: 0, height: 44, padding: "0 14px",
-                fontSize: 10, fontWeight: "bold", fontFamily: "var(--font-mono)",
-                textTransform: "uppercase", letterSpacing: "0.1em",
-                cursor: "pointer",
-                background: typeFilter === f ? "var(--accent)" : "transparent",
-                color: typeFilter === f ? "#fff" : "var(--muted)",
-                border: "none", borderRight: "1px solid var(--border)",
-                transition: "background 0.15s, color 0.15s",
-              }}>{f}</button>
-            ))}
-          </div>
-        )}
-        {view === "map" && <div style={{ flex: 1 }} />}
+        <div style={{ flex: 1 }} />
 
         {/* Gallery / Map toggle */}
         <div style={{ display: "flex", flexShrink: 0, borderLeft: "1px solid var(--border)" }}>
