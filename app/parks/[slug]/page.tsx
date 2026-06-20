@@ -133,9 +133,14 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
 
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(20px, 4vw, 36px)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, pointerEvents: "none", zIndex: 3 }}>
           <div>
-            <Link href="/parks" style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.1em", textTransform: "uppercase", display: "inline-block", marginBottom: 12, pointerEvents: "auto" }}>← All Parks</Link>
+            <Link href="/parks" style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12, pointerEvents: "auto", textDecoration: "none" }}>
+              <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ color: "#fff", fontSize: 12, lineHeight: 1 }}>←</span>
+              </span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.1em", textTransform: "uppercase" }}>All Parks</span>
+            </Link>
             <h1 style={{ fontSize: "clamp(22px, 3.5vw, 44px)", lineHeight: 1.05, color: "#fff", letterSpacing: "-0.01em", fontWeight: 300, marginBottom: 8 }}>
-              {park.catalogue_id ? `Entry /${park.catalogue_id} — ${park.name}` : park.name}
+              {park.catalogue_id ? `/${park.catalogue_id} — ${park.name}` : park.name}
             </h1>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", marginBottom: 6 }}>
               {[park.address?.[0], park.location, "London", park.postcode?.split(" ")[0]].filter(Boolean).join("/")}
