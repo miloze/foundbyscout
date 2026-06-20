@@ -54,7 +54,7 @@ export default function Grain() {
         height: "100%",
         pointerEvents: "none",
         zIndex: 9999,
-        opacity: 0.08,
+        opacity: 0.03,
         mixBlendMode: "overlay",
       }}
       aria-hidden="true"
