@@ -146,7 +146,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
               {[park.address?.[0], park.location, "London", park.postcode?.split(" ")[0]].filter(Boolean).join("/")}
             </p>
             {park.lat != null && park.lng != null && (
-              <p style={{ display: "inline-block", fontFamily: "var(--font-mono)", fontSize: 10, color: "#fff", letterSpacing: "0.06em", marginBottom: 8, background: "var(--accent)", borderRadius: 999, padding: "3px 10px" }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 8 }}>
                 {Math.abs(park.lat).toFixed(4)}° {park.lat >= 0 ? "N" : "S"}, {Math.abs(park.lng).toFixed(4)}° {park.lng >= 0 ? "E" : "W"}
               </p>
             )}
