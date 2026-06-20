@@ -6,8 +6,8 @@ import { useState } from "react";
 import { useTheme } from "./ThemeProvider";
 
 const links = [
-  { href: "/parks", label: "Parks" },
-  { href: "/about", label: "About" },
+  { href: "/parks", label: "PARKS" },
+  { href: "/about", label: "ABOUT" },
 ];
 
 export default function Nav() {
