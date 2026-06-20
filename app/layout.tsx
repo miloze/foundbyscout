@@ -30,7 +30,7 @@ export default function RootLayout({
         <ThemeProvider>
           <Grain />
           <Nav />
-          <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", padding: "0 clamp(16px, 4vw, 56px)" }}>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", padding: "44px clamp(16px, 4vw, 56px) 0" }}>
             <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
               <main style={{ flex: 1 }}>{children}</main>
               <footer style={{

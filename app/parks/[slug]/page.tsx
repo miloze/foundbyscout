@@ -97,6 +97,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         height: "78vh",
         minHeight: 340, overflow: "hidden",
         background: "var(--background)",
+        marginTop: "-44px",
         marginLeft: bleed, marginRight: bleed,
       }}>
         {modelFile ? (

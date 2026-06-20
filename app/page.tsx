@@ -41,6 +41,7 @@ export default async function Home() {
             flexDirection: "column",
             justifyContent: "flex-end",
             padding: "8rem clamp(16px,4vw,56px) 3rem",
+            marginTop: "-44px",
             marginLeft: "calc(-1 * clamp(16px, 4vw, 56px))",
             marginRight: "calc(-1 * clamp(16px, 4vw, 56px))",
             overflow: "hidden",
@@ -118,14 +119,11 @@ export default async function Home() {
       {/* DIRECTORY CTA + FEATURED PARKS */}
       <section style={{ paddingTop: "5rem", paddingBottom: "6rem", borderBottom: "1px solid var(--border)" }}>
 
-        {/* Header row — label + View All link */}
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
+        {/* Header row — label */}
+        <div style={{ marginBottom: 24 }}>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)" }}>
             The Directory
           </p>
-          <Link href="/parks" style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--muted)", textDecoration: "none" }}>
-            View All →
-          </Link>
         </div>
 
         {/* Full-width heading + description */}
