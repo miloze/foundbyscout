@@ -83,14 +83,10 @@ export default function ParksDirectory() {
       if (!el) { setMapStatus("error"); setMapError("Map container not found"); return; }
       try {
         const map = L.map(el, { center: [54.2, -3.5], zoom: 6, zoomControl: false });
-        const mbToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
         const tileUrl = theme === "light"
           ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          : `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token=${mbToken}`;
-        const attribution = theme === "light"
-          ? "© OpenStreetMap contributors © CARTO"
-          : "© <a href='https://www.mapbox.com/about/maps/'>Mapbox</a> © <a href='http://www.openstreetmap.org/copyright'>OpenStreetMap</a>";
-        tileLayerRef.current = L.tileLayer(tileUrl, { attribution, subdomains: "abcd", maxZoom: 22 }).addTo(map);
+          : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+        tileLayerRef.current = L.tileLayer(tileUrl, { attribution: "© OpenStreetMap contributors © CARTO", subdomains: "abcd", maxZoom: 19 }).addTo(map);
         L.control.zoom({ position: "bottomright" }).addTo(map);
         mapRef.current = map;
         setMapStatus("ready");
