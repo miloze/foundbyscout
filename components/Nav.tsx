@@ -16,7 +16,7 @@ export default function Nav() {
   const { theme, toggle } = useTheme();
 
   return (
-    <header style={{ borderBottom: "none", position: "relative" }} className="fixed top-0 left-0 right-0 w-full z-50">
+    <header style={{ borderBottom: "none" }} className="fixed top-0 left-0 right-0 w-full z-50">
       <nav
         className="flex items-center justify-between"
         style={{ background: "var(--background)", paddingTop: "12px", paddingBottom: "12px", paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)", borderBottom: "1px solid var(--border)" }}
