@@ -100,6 +100,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         marginLeft: bleed, marginRight: bleed,
       }}>
         {modelFile ? (
+          <div style={{ position: "absolute", inset: 0, isolation: "isolate" }}>
           <ParkHeroViewer
             modelFile={modelFile}
             modelFileLow={park.model_file_low ?? undefined}
@@ -117,6 +118,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
             environmentPreset={park.viewer_settings?.environmentPreset}
             environmentIntensity={park.viewer_settings?.environmentIntensity}
           />
+          </div>
         ) : (
           <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px), repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px)" }} />
         )}
