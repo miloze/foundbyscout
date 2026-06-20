@@ -139,7 +139,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
               {[park.address?.[0], park.location, "London", park.postcode?.split(" ")[0]].filter(Boolean).join("/")}
             </p>
             {park.lat != null && park.lng != null && (
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 8 }}>
+              <p style={{ display: "inline-block", fontFamily: "var(--font-mono)", fontSize: 10, color: "#fff", letterSpacing: "0.06em", marginBottom: 8, background: "var(--accent)", borderRadius: 999, padding: "3px 10px" }}>
                 {Math.abs(park.lat).toFixed(4)}° {park.lat >= 0 ? "N" : "S"}, {Math.abs(park.lng).toFixed(4)}° {park.lng >= 0 ? "E" : "W"}
               </p>
             )}
@@ -147,22 +147,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
               {park.opened  && <span>Opened {park.opened}</span>}
               {park.scanned && <span>Scanned {park.scanned}</span>}
             </div>
-            {modelFile && (
-              <OpenScanButton
-                modelFile={modelFile}
-                modelFileMobile={modelFileMobile}
-                parkName={park.name}
-                cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
-                cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
-                modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
-                pingPong={park.ping_pong ?? undefined}
-                autoRotate={park.auto_rotate ?? false}
-                ambientIntensity={park.viewer_settings?.ambientIntensity}
-                directionalIntensity={park.viewer_settings?.directionalIntensity}
-                environmentPreset={park.viewer_settings?.environmentPreset}
-                environmentIntensity={park.viewer_settings?.environmentIntensity}
-              />
-            )}
             <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "flex-start" }}>
               <ParkWeather lat={park.lat} lng={park.lng} />
             </div>
