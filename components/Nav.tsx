@@ -32,8 +32,7 @@ export default function Nav() {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className="text-sm transition-colors"
-                style={{ color: pathname === link.href ? "var(--accent)" : "var(--muted)" }}
+                style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", color: pathname === link.href ? "var(--accent)" : "var(--muted)" }}
               >
                 {link.label}
               </Link>
