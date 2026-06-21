@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
+import ParkHeroMeta from "@/components/ParkHeroMeta";
 
 export default async function Home() {
   const db = createServerClient();
@@ -63,10 +64,12 @@ export default async function Home() {
             <div style={{ position: "absolute", inset: 0, background: "#111" }} />
           )}
 
-          {/* Gradient scrim — darkens bottom of hero so text reads cleanly */}
+          {/* Gradient scrim */}
           <div style={{
-            position: "absolute", inset: 0,
-            background: "linear-gradient(to top, rgba(20,20,18,0.82) 0%, rgba(20,20,18,0.3) 40%, rgba(20,20,18,0) 70%)",
+            position: "absolute",
+            bottom: 0, left: 0, right: 0,
+            height: 200,
+            background: "linear-gradient(180deg, rgba(20,19,15,0) 0%, rgba(20,19,15,0.5) 30%, rgba(20,19,15,0.88) 100%)",
             pointerEvents: "none",
             zIndex: 1,
           }} />
@@ -86,32 +89,17 @@ export default async function Home() {
             </div>
           )}
 
-          {/* Archive content block — z-index 2 sits above blur band (z-index 1) */}
-          <div style={{ position: "relative", zIndex: 2, maxWidth: 900 }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 20 }}>
-              Park Spotlight
-            </p>
-            {featured.catalogue_id && (
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: "0.15em", marginBottom: 6 }}>
-                {featured.catalogue_id}
-              </p>
-            )}
-            <h1 style={{ fontSize: "clamp(3.5rem, 11vw, 9rem)", lineHeight: 0.88, letterSpacing: "-0.02em", color: "#fff", fontWeight: 300, marginBottom: 16 }}>
-              {featured.name}
-            </h1>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", marginBottom: 12 }}>
-              {[featured.location, "London", featured.postcode?.split(" ")[0]].filter(Boolean).join("/")}
-            </p>
-            <div style={{ display: "flex", gap: 24, fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", marginBottom: 28 }}>
-              {featured.opened  && <span>Opened {featured.opened}</span>}
-              {featured.scanned && <span>Scanned {featured.scanned}</span>}
-            </div>
-            <Link
-              href={`/parks/${featured.slug}`}
-              style={{ display: "inline-block", padding: "7px 16px", fontSize: 10, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.12em", background: "var(--accent)", color: "#fff", fontFamily: "var(--font-mono)" }}
-            >
-              View scan →
-            </Link>
+          {/* Hero meta block */}
+          <div style={{ position: "relative", zIndex: 2 }}>
+            <ParkHeroMeta
+              catalogueId={featured.catalogue_id ?? undefined}
+              name={featured.name}
+              address={featured.address}
+              postcode={featured.postcode}
+              opened={featured.opened}
+              scanned={featured.scanned}
+              slug={featured.slug}
+            />
           </div>
         </section>
       )}

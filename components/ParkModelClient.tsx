@@ -8,6 +8,7 @@ export default function ParkModelClient({
   modelFile, preloadImage, onLoad, cameraPos, cameraTarget, modelRotation,
   pingPong, autoRotate, debug,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
+  grayscale,
 }: {
   modelFile: string;
   preloadImage?: string;
@@ -22,6 +23,7 @@ export default function ParkModelClient({
   directionalIntensity?: number;
   environmentPreset?: string;
   environmentIntensity?: number;
+  grayscale?: boolean;
 }) {
   return (
     <ParkModel
@@ -30,6 +32,7 @@ export default function ParkModelClient({
       pingPong={pingPong} autoRotate={autoRotate} debug={debug}
       ambientIntensity={ambientIntensity} directionalIntensity={directionalIntensity}
       environmentPreset={environmentPreset} environmentIntensity={environmentIntensity}
+      grayscale={grayscale}
     />
   );
 }

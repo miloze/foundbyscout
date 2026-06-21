@@ -3,8 +3,7 @@ import OpenScanButton from "@/components/OpenScanButton";
 import FloatingAsset from "@/components/FloatingAsset";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ParkHeroViewer from "@/components/ParkHeroViewer";
-import ParkWeather from "@/components/ParkWeather";
+import ParkHeroShell from "@/components/ParkHeroShell";
 import { createServerClient } from "@/lib/supabase-server";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -86,81 +85,36 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
   const modelFile = park.model_file || (slug === "bloblands" ? "/images/parks/bloblands/model.glb" : null);
   const modelFileMobile = park.model_file_mobile ?? undefined;
 
-  const bleed = "calc(-1 * clamp(16px, 4vw, 56px))";
-
   return (
     <article>
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <div style={{
-        position: "relative",
-        height: "78vh",
-        minHeight: 340, overflow: "hidden",
-        background: "var(--background)",
-        marginTop: "-44px",
-        marginLeft: bleed, marginRight: bleed,
-      }}>
-        {modelFile ? (
-          <div style={{ position: "absolute", inset: 0, isolation: "isolate" }}>
-          <ParkHeroViewer
-            modelFile={modelFile}
-            modelFileLow={park.model_file_low ?? undefined}
-            modelFileMobile={modelFileMobile}
-            heroImage={park.hero_image}
-            preloadImageUrl={park.preload_image_url ?? undefined}
-            cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
-            cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
-            modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
-            pingPong={park.ping_pong ?? undefined}
-            autoRotate={park.auto_rotate ?? false}
-            debug={isDebug}
-            ambientIntensity={park.viewer_settings?.ambientIntensity}
-            directionalIntensity={park.viewer_settings?.directionalIntensity}
-            environmentPreset={park.viewer_settings?.environmentPreset}
-            environmentIntensity={park.viewer_settings?.environmentIntensity}
-          />
-          </div>
-        ) : (
-          <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px), repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px)" }} />
-        )}
-
-        {/* Always-on gradient so the title reads over any hero content */}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 35%)", pointerEvents: "none", zIndex: 1 }} />
-
-        {/* Postcode badge */}
-        <div style={{ position: "absolute", top: "clamp(20px, 4vw, 36px)", left: "clamp(16px, 4vw, 56px)", width: 80, height: 80, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>{(park.postcode ?? "").split(" ")[0]}</span>
-        </div>
-
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(20px, 4vw, 36px)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, pointerEvents: "none", zIndex: 3 }}>
-          <div>
-            <Link href="/parks" style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12, pointerEvents: "auto", textDecoration: "none" }}>
-              <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ color: "#fff", fontSize: 12, lineHeight: 1 }}>←</span>
-              </span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.1em", textTransform: "uppercase" }}>All Parks</span>
-            </Link>
-            <h1 style={{ fontSize: "clamp(22px, 3.5vw, 44px)", lineHeight: 1.05, color: "#fff", letterSpacing: "-0.01em", fontWeight: 300, marginBottom: 8 }}>
-              {park.catalogue_id ? `/${park.catalogue_id} — ${park.name}` : park.name}
-            </h1>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em", marginBottom: 6 }}>
-              {[park.address?.[0], park.location, "London", park.postcode?.split(" ")[0]].filter(Boolean).join("/")}
-            </p>
-            {park.lat != null && park.lng != null && (
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", marginBottom: 8 }}>
-                {Math.abs(park.lat).toFixed(4)}° {park.lat >= 0 ? "N" : "S"}, {Math.abs(park.lng).toFixed(4)}° {park.lng >= 0 ? "E" : "W"}
-              </p>
-            )}
-            <div style={{ display: "flex", gap: 20, fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", marginBottom: 10 }}>
-              {park.opened  && <span>Opened {park.opened}</span>}
-              {park.scanned && <span>Scanned {park.scanned}</span>}
-            </div>
-            <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <ParkWeather lat={park.lat} lng={park.lng} />
-            </div>
-          </div>
-        </div>
-      </div>
+      <ParkHeroShell
+        modelFile={modelFile}
+        modelFileLow={park.model_file_low ?? undefined}
+        modelFileMobile={modelFileMobile}
+        heroImage={park.hero_image}
+        preloadImageUrl={park.preload_image_url ?? undefined}
+        cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
+        cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
+        modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
+        pingPong={park.ping_pong ?? undefined}
+        autoRotate={park.auto_rotate ?? false}
+        debug={isDebug}
+        ambientIntensity={park.viewer_settings?.ambientIntensity}
+        directionalIntensity={park.viewer_settings?.directionalIntensity}
+        environmentPreset={park.viewer_settings?.environmentPreset}
+        environmentIntensity={park.viewer_settings?.environmentIntensity}
+        catalogueId={park.catalogue_id ?? undefined}
+        name={park.name}
+        address={park.address}
+        location={park.location}
+        postcode={park.postcode}
+        lat={park.lat}
+        lng={park.lng}
+        opened={park.opened}
+        scanned={park.scanned}
+      />
 
       {/* ── ABOUT ────────────────────────────────────────────────────── */}
       <div style={{ paddingTop: 40, paddingBottom: 40, borderBottom: "1px solid var(--border)", maxWidth: 680 }}>

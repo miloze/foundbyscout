@@ -22,12 +22,14 @@ type Props = {
   directionalIntensity?: number;
   environmentPreset?: string;
   environmentIntensity?: number;
+  grayscale?: boolean;
 };
 
 export default function ParkHeroViewer({
   modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, forceViewer,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
+  grayscale,
 }: Props) {
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -72,7 +74,7 @@ export default function ParkHeroViewer({
   // ── Mobile: static image + tap-to-expand modal ───────────────────────────
   if (isMobile && !forceViewer) {
     return (
-      <div style={{ position: "absolute", inset: 0 }}>
+      <div style={{ position: "absolute", inset: 0, filter: grayscale ? "grayscale(1)" : "none", transition: "filter 0.4s ease" }}>
         <ParkHeroMobile
           heroImage={preloadSrc || heroImage}
           parkName=""
@@ -112,6 +114,7 @@ export default function ParkHeroViewer({
           directionalIntensity={directionalIntensity}
           environmentPreset={environmentPreset}
           environmentIntensity={environmentIntensity}
+          grayscale={grayscale}
         />
       </div>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />

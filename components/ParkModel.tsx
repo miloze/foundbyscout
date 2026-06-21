@@ -185,6 +185,7 @@ export default function ParkModel({
   directionalIntensity = 1.0,
   environmentPreset    = "warehouse",
   environmentIntensity = 0.85,
+  grayscale,
 }: {
   modelFile: string;
   preloadImage?: string;
@@ -200,8 +201,11 @@ export default function ParkModel({
   directionalIntensity?: number;
   environmentPreset?: string;
   environmentIntensity?: number;
+  grayscale?: boolean;
 }) {
+  // When grayscale prop is provided externally, use it; otherwise fall back to internal toggle.
   const [viewMode,    setViewMode]    = useState<"bw" | "colour">("bw");
+  const externallyControlled = grayscale !== undefined;
   const [camPos,      setCamPos]      = useState("loading…");
   const [modelLoaded, setModelLoaded] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -210,7 +214,9 @@ export default function ParkModel({
   const captureRef   = useRef<(() => void) | undefined>(undefined);
 
   const startPos    = [+cameraPos[0], +cameraPos[1], +cameraPos[2]] as [number, number, number];
-  const filter      = viewMode === "bw" ? "grayscale(1)" : "none";
+  const filter      = externallyControlled
+    ? (grayscale ? "grayscale(1)" : "none")
+    : (viewMode === "bw" ? "grayscale(1)" : "none");
   const filterRef   = useRef(filter);
   filterRef.current = filter;
   const canvasStart = pingPong ? n(pingPong[0]) : startPos;
@@ -223,19 +229,21 @@ export default function ParkModel({
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
 
-      {/* ── B&W / CLR toggle ──────────────────────────────────────────── */}
-      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 11, display: "flex", gap: 2 }}>
-        {(["bw", "colour"] as const).map(mode => (
-          <button key={mode} onClick={() => setViewMode(mode)} style={{
-            padding: "5px 12px", border: "none", cursor: "pointer",
-            background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
-            color: "#fff", fontFamily: "var(--font-mono)", fontSize: 10,
-            letterSpacing: "0.1em", borderRadius: 2,
-          }}>
-            {mode === "bw" ? "B&W" : "CLR"}
-          </button>
-        ))}
-      </div>
+      {/* ── B&W / CLR toggle — only shown when not controlled by hero shell ── */}
+      {!externallyControlled && (
+        <div style={{ position: "absolute", top: 12, right: 12, zIndex: 11, display: "flex", gap: 2 }}>
+          {(["bw", "colour"] as const).map(mode => (
+            <button key={mode} onClick={() => setViewMode(mode)} style={{
+              padding: "5px 12px", border: "none", cursor: "pointer",
+              background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
+              color: "#fff", fontFamily: "var(--font-mono)", fontSize: 10,
+              letterSpacing: "0.1em", borderRadius: 2,
+            }}>
+              {mode === "bw" ? "B&W" : "CLR"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Debug overlay — camera + image controls ───────────────────── */}
       {debug && (
