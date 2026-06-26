@@ -1,9 +1,25 @@
 "use client";
 
-import { useState, useRef } from "react";
-import Link from "next/link";
+import { useState, useRef, useEffect } from "react";
+
+const MONTHS: Record<string, string> = {
+  january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",
+  july:"07",august:"08",september:"09",october:"10",november:"11",december:"12",
+};
+
+function fmtDate(val: string): string {
+  const parts = val.trim().split(/\s+/);
+  if (parts.length === 2) {
+    const m = MONTHS[parts[0].toLowerCase()];
+    const y = parts[1].slice(-2);
+    if (m) return `${m}/${y}`;
+  }
+  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0].slice(-2);
+  return val;
+}
 import ParkHeroViewer from "./ParkHeroViewer";
 import ParkWeather from "./ParkWeather";
+import ParkViewerModal from "./ParkViewerModal";
 
 type Props = {
   // Viewer
@@ -43,10 +59,11 @@ function BwIcon({ active }: { active: boolean }) {
   );
 }
 
-function ExpandIcon() {
+function ArIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
-      <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 2l8 4.5v9L12 22l-8-6.5V6.5z"/>
+      <path d="M12 2v20M4 6.5l8 5.5 8-5.5"/>
     </svg>
   );
 }
@@ -58,16 +75,16 @@ export default function ParkHeroShell({
   catalogueId, name, address, location, postcode, lat, lng, opened, scanned,
 }: Props) {
   const [bw, setBw] = useState(true);
+  const [open3D, setOpen3D] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
 
-  function toggleFullscreen() {
-    if (!heroRef.current) return;
-    if (!document.fullscreenElement) {
-      heroRef.current.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen();
-    }
-  }
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const bleed = "calc(-1 * clamp(16px, 4vw, 56px))";
   const postcodePrefix = postcode?.split(" ")[0];
@@ -81,6 +98,24 @@ export default function ParkHeroShell({
   const hasCoords = lat != null && lng != null;
 
   return (
+    <>
+    {open3D && modelFile && (
+      <ParkViewerModal
+        modelFile={modelFile}
+        modelFileMobile={modelFileMobile}
+        parkName={name}
+        onClose={() => setOpen3D(false)}
+        cameraPos={cameraPos}
+        cameraTarget={cameraTarget}
+        modelRotation={modelRotation}
+        pingPong={pingPong}
+        autoRotate={autoRotate}
+        ambientIntensity={ambientIntensity}
+        directionalIntensity={directionalIntensity}
+        environmentPreset={environmentPreset}
+        environmentIntensity={environmentIntensity}
+      />
+    )}
     <div
       ref={heroRef}
       style={{
@@ -123,6 +158,23 @@ export default function ParkHeroShell({
         }} />
       )}
 
+      {/* Top-left postcode badge */}
+      {postcodePrefix && (
+        <div style={{
+          position: "absolute",
+          top: "clamp(64px, 8vw, 80px)",
+          left: "clamp(16px, 4vw, 56px)",
+          width: 80, height: 80, borderRadius: "50%",
+          background: "var(--accent)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 6, pointerEvents: "none",
+        }}>
+          <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            {postcodePrefix}
+          </span>
+        </div>
+      )}
+
       {/* Scrim */}
       <div style={{
         position: "absolute",
@@ -141,27 +193,11 @@ export default function ParkHeroShell({
         zIndex: 5,
         color: "#fff",
       }}>
-        {/* Back link */}
-        <Link
-          href="/parks"
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 14, textDecoration: "none" }}
-        >
-          <span style={{
-            width: 24, height: 24, borderRadius: "50%", background: "var(--accent)",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>
-            <span style={{ color: "#fff", fontSize: 12, lineHeight: 1 }}>←</span>
-          </span>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            All Parks
-          </span>
-        </Link>
-
         {/* Eyebrow */}
         {idNumber && (
           <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 19.4,
-            color: "#ff5a1f", textTransform: "uppercase",
+            fontFamily: "var(--font-mono)", fontSize: 13,
+            color: "#fff", textTransform: "uppercase",
             marginBottom: 6, lineHeight: 1, letterSpacing: "0.04em",
           }}>
             <span style={{ fontWeight: 400 }}>SCN/</span>
@@ -213,14 +249,14 @@ export default function ParkHeroShell({
             {opened && (
               <div className="fbs-field-row">
                 <div className="fbs-field-label">Opened</div>
-                <div className="fbs-field-value">{opened}</div>
+                <div className="fbs-field-value">{fmtDate(opened)}</div>
               </div>
             )}
 
             {scanned && (
               <div className="fbs-field-row">
                 <div className="fbs-field-label">Scanned</div>
-                <div className="fbs-field-value">{scanned}</div>
+                <div className="fbs-field-value">{fmtDate(scanned)}</div>
               </div>
             )}
 
@@ -256,24 +292,28 @@ export default function ParkHeroShell({
                 style={{
                   width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
                   background: "none", border: "none", cursor: "pointer",
-                  color: bw ? "#ff5a1f" : "#fff",
+                  color: bw ? "var(--accent)" : "#fff",
                 }}
               >
                 <BwIcon active={bw} />
               </button>
-              <div style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.18)" }} />
-              <button
-                onClick={toggleFullscreen}
-                title="Fullscreen"
-                className="fbs-cluster-btn"
-                style={{
-                  width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#fff",
-                }}
-              >
-                <ExpandIcon />
-              </button>
+              {isMobile && modelFile && (
+                <>
+                  <div style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.18)" }} />
+                  <button
+                    onClick={() => setOpen3D(true)}
+                    title="Explore in 3D"
+                    className="fbs-cluster-btn"
+                    style={{
+                      width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "#fff",
+                    }}
+                  >
+                    <ArIcon />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -327,7 +367,7 @@ export default function ParkHeroShell({
           gap: 6px;
         }
         .fbs-coord::after { content: "↗"; font-size: 11px; opacity: .6; }
-        .fbs-coord:hover { color: #ff5a1f; border-color: #ff5a1f; }
+        .fbs-coord:hover { color: var(--accent); border-color: var(--accent); }
         .fbs-coord:hover::after { opacity: 1; }
         .fbs-cond-mobile { display: none; }
         @media (max-width: 767px) {
@@ -340,5 +380,6 @@ export default function ParkHeroShell({
         }
       `}</style>
     </div>
+    </>
   );
 }

@@ -135,7 +135,7 @@ export default async function Home() {
               href="/parks"
               style={{
                 display: "inline-block",
-                padding: "7px 16px", fontWeight: "bold", fontSize: 10,
+                padding: "7px 16px", fontWeight: 400, fontSize: 10,
                 textTransform: "uppercase", letterSpacing: "0.14em",
                 background: "var(--accent)", color: "#fff",
                 fontFamily: "var(--font-mono)",
@@ -170,7 +170,7 @@ export default async function Home() {
                   position: "absolute", top: 10, left: 10,
                   fontSize: 9, padding: "3px 8px",
                   background: "var(--accent)", color: "#fff",
-                  fontWeight: "bold", letterSpacing: "0.1em",
+                  fontWeight: 400, letterSpacing: "0.1em",
                   textTransform: "uppercase", fontFamily: "var(--font-mono)",
                 }}>
                   {park.type}

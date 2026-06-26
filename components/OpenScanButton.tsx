@@ -24,8 +24,8 @@ export default function OpenScanButton({ parkName, ...viewerProps }: Props) {
       <button
         onClick={() => setOpen(true)}
         style={{
-          display: "inline-block", padding: "7px 16px",
-          fontSize: 10, fontWeight: "bold", textTransform: "uppercase",
+          display: "inline-block", padding: "5px 10px",
+          fontSize: 10, fontWeight: 400, textTransform: "uppercase",
           letterSpacing: "0.12em", background: "var(--accent)", color: "#fff",
           fontFamily: "var(--font-mono)",
           border: "none", cursor: "pointer", pointerEvents: "auto",
