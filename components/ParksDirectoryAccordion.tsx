@@ -260,7 +260,8 @@ function Row({
   park: ParkRow; idx: number; isOpen: boolean; onToggle: () => void; onNavigate: () => void;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const idNumber = park.catalogue_id?.replace(/^SCN\//i, "") || String(idx + 1).padStart(3, "0");
+  const idNumber = park.catalogue_id?.replace(/^SCN\//i, "").trim()
+    || String(park.sort_order ?? idx + 1).padStart(3, "0");
   const postcodePrefix = park.postcode?.split(" ")[0] ?? "";
   const chain = [park.address?.[0], park.location, postcodePrefix].filter(Boolean).join(" / ").toUpperCase();
 
