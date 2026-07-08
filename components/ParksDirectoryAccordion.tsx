@@ -194,7 +194,7 @@ export default function ParksDirectoryAccordion() {
         .pda-row.pda-open .pda-cat-id{ background:var(--pda-accent); color:var(--pda-ink); }
         .pda-row.pda-open .pda-loc-chain{ background:var(--pda-accent); color:var(--pda-ink); }
         .pda-row.pda-open .pda-title-line{ background:var(--pda-accent); }
-        .pda-row.pda-open .pda-title-line .pda-name{ color:var(--pda-ink); }
+        .pda-row.pda-open .pda-title-line .pda-name{ color:#fff; }
         .pda-row.pda-open .pda-title-line .pda-postcode{ color:var(--pda-ink); }
 
         .pda-expand-wrap{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .5s var(--pda-ease); }
