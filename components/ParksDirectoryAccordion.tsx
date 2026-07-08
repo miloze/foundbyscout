@@ -29,6 +29,7 @@ type ParkRow = {
   location: string | null;
   catalogue_id: string | null;
   hero_image: string | null;
+  directory_image_url: string | null;
   lat: number | null;
   lng: number | null;
   opened: string | null;
@@ -82,7 +83,7 @@ export default function ParksDirectoryAccordion() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
       db.from("parks")
-        .select("id, slug, name, postcode, address, location, catalogue_id, hero_image, lat, lng, opened, sort_order")
+        .select("id, slug, name, postcode, address, location, catalogue_id, hero_image, directory_image_url, lat, lng, opened, sort_order")
         .eq("published", true)
         .order("sort_order", { ascending: true })
         .then(({ data }) => { if (data) setParks(data as ParkRow[]); });
@@ -304,9 +305,9 @@ function Row({
         <div className="pda-expand-wrap"><div className="pda-expand-inner" ref={contentRef}>
           <div className="pda-render-panel">
             <div className="pda-render-img" onClick={nav}>
-              {park.hero_image && (
+              {(park.directory_image_url || park.hero_image) && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={park.hero_image} alt="" loading="lazy" />
+                <img src={park.directory_image_url || park.hero_image!} alt="" loading="lazy" />
               )}
             </div>
             <div className="pda-arrow-box" onClick={nav}>

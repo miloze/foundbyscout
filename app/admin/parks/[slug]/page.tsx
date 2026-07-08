@@ -135,7 +135,7 @@ type FormState = {
   gallery_images: string[];
   brief: string; description: string;
   catalogue_id: string; scanned: string;
-  hero_image: string; thumbnail: string; model_file: string; model_file_low: string; preload_image_url: string;
+  hero_image: string; thumbnail: string; directory_image_url: string; model_file: string; model_file_low: string; preload_image_url: string;
   camera_pos: string; camera_target: string; model_rotation: string;
 };
 
@@ -148,7 +148,7 @@ const EMPTY: FormState = {
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
   brief: "", description: "",
   catalogue_id: "", scanned: "",
-  hero_image: "", thumbnail: "", model_file: "", model_file_low: "", preload_image_url: "",
+  hero_image: "", thumbnail: "", directory_image_url: "", model_file: "", model_file_low: "", preload_image_url: "",
   camera_pos: "", camera_target: "", model_rotation: "",
 };
 
@@ -236,6 +236,7 @@ export default function EditParkPage() {
             : (park.description ?? ""),
           hero_image:         park.hero_image        || "",
           thumbnail:          park.thumbnail         || `/images/parks/${slug}/thumb.webp`,
+          directory_image_url: park.directory_image_url || `/images/parks/${slug}/directory.webp`,
           model_file:         park.model_file        || `/images/parks/${slug}/model.glb`,
           model_file_low:     park.model_file_low    || `/images/parks/${slug}/model-500k.glb`,
           preload_image_url:  park.preload_image_url || `/images/parks/${slug}/glb-preload.png`,
@@ -1013,6 +1014,18 @@ export default function EditParkPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={form.thumbnail} alt="" style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
                 : <div style={{ width: "100%", aspectRatio: "3/4", background: "var(--card)", border: "1px dashed var(--border)" }} />
+              }
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, alignItems: "end" }}>
+              <div>
+                <FieldLabel hint="parks directory list — 2:1 crop, duotone treatment">Directory image URL</FieldLabel>
+                <Input value={form.directory_image_url} onChange={v => upd("directory_image_url", v)}
+                  placeholder="/images/parks/crystal-palace/directory.webp" />
+              </div>
+              {form.directory_image_url
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={form.directory_image_url} alt="" style={{ width: "100%", aspectRatio: "2/1", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
+                : <div style={{ width: "100%", aspectRatio: "2/1", background: "var(--card)", border: "1px dashed var(--border)" }} />
               }
             </div>
             <div>
