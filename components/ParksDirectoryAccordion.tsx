@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+const ParksMap = lazy(() => import("./ParksMap"));
 
 // ── Local preview component ──────────────────────────────────────────────
 // Ported from the "Parks Directory" prototype handoff. Uses coral (--accent)
@@ -71,6 +73,7 @@ export default function ParksDirectoryAccordion() {
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("az");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [view, setView] = useState<"list" | "map">("list");
 
   useEffect(() => {
     import("@supabase/supabase-js").then(({ createClient }) => {
@@ -161,6 +164,7 @@ export default function ParksDirectoryAccordion() {
         .pda-sort-controls{ display:flex; gap:16px; }
         .pda-sort-controls button{ background:none; border:none; color:var(--pda-muted); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; padding:2px 0 4px; border-bottom:1px solid transparent; transition:color .15s var(--pda-ease), border-color .15s var(--pda-ease); }
         .pda-sort-controls button.pda-active, .pda-sort-controls button:hover{ color:var(--pda-accent); border-color:var(--pda-accent); }
+        .pda-divider{ display:inline-block; width:1px; height:12px; background:var(--pda-line); margin:0 6px; align-self:center; }
 
         .pda-row{ box-shadow:0 1px 0 var(--pda-line); transition:box-shadow .45s var(--pda-ease); }
         .pda-row.pda-open{ box-shadow:0 4px 0 var(--pda-accent); }
@@ -226,28 +230,41 @@ export default function ParksDirectoryAccordion() {
           <div className="pda-filter-row">
             <span className="pda-sub">Browse the Scout database of parks</span>
             <div className="pda-sort-controls">
-              <button className={sortMode === "az" ? "pda-active" : ""} onClick={() => handleSort("az")}>A–Z</button>
-              <button className={sortMode === "date" ? "pda-active" : ""} onClick={() => handleSort("date")}>Date</button>
-              <button className={sortMode === "nearest" ? "pda-active" : ""} onClick={() => handleSort("nearest")}>Nearest</button>
+              {view === "list" && <>
+                <button className={sortMode === "az" ? "pda-active" : ""} onClick={() => handleSort("az")}>A–Z</button>
+                <button className={sortMode === "date" ? "pda-active" : ""} onClick={() => handleSort("date")}>Date</button>
+                <button className={sortMode === "nearest" ? "pda-active" : ""} onClick={() => handleSort("nearest")}>Nearest</button>
+                <span className="pda-divider" />
+              </>}
+              <button className={view === "list" ? "pda-active" : ""} onClick={() => setView("list")}>List</button>
+              <button className={view === "map" ? "pda-active" : ""} onClick={() => setView("map")}>Map</button>
             </div>
           </div>
         </header>
 
-        <div>
-          {displayedParks.map((park, idx) => (
-            <Row
-              key={park.id}
-              park={park}
-              idx={idx}
-              isOpen={openId === park.id}
-              onToggle={() => setOpenId(cur => (cur === park.id ? null : park.id))}
-              onNavigate={() => goToPark(park.slug)}
-            />
-          ))}
-          {displayedParks.length === 0 && (
-            <div className="pda-empty">No parks match your filters</div>
-          )}
-        </div>
+        {view === "map" ? (
+          <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
+            <div style={{ height: "calc(100vh - 160px)", margin: "0 -24px" }}>
+              <ParksMap initialSearch={search} />
+            </div>
+          </Suspense>
+        ) : (
+          <div>
+            {displayedParks.map((park, idx) => (
+              <Row
+                key={park.id}
+                park={park}
+                idx={idx}
+                isOpen={openId === park.id}
+                onToggle={() => setOpenId(cur => (cur === park.id ? null : park.id))}
+                onNavigate={() => goToPark(park.slug)}
+              />
+            ))}
+            {displayedParks.length === 0 && (
+              <div className="pda-empty">No parks match your filters</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

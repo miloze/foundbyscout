@@ -31,7 +31,7 @@ type CardState = "hidden" | "peek";
 
 const PEEK_H = 196;
 
-export default function ParksMap() {
+export default function ParksMap({ initialSearch = "" }: { initialSearch?: string }) {
   const router = useRouter();
   const [parks, setParks] = useState<Park[]>([]);
 
@@ -52,7 +52,7 @@ export default function ParksMap() {
 
   const [activeFilter] = useState("All");
   const [typeFilter,   setTypeFilter]   = useState("All");
-  const [search,       setSearch]       = useState("");
+  const [search,       setSearch]       = useState(initialSearch);
   const [satellite,    setSatellite]    = useState(false);
   const [isMobile,     setIsMobile]     = useState(true);
   const [mapStatus,    setMapStatus]    = useState<"loading"|"ready"|"error">("loading");
