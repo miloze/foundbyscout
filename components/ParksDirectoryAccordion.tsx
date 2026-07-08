@@ -162,7 +162,8 @@ export default function ParksDirectoryAccordion() {
         .pda-sort-controls button{ background:none; border:none; color:var(--pda-muted); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; padding:2px 0 4px; border-bottom:1px solid transparent; transition:color .15s var(--pda-ease), border-color .15s var(--pda-ease); }
         .pda-sort-controls button.pda-active, .pda-sort-controls button:hover{ color:var(--pda-accent); border-color:var(--pda-accent); }
 
-        .pda-row{ border-bottom:1px solid var(--pda-line); }
+        .pda-row{ box-shadow:0 1px 0 var(--pda-line); transition:box-shadow .45s var(--pda-ease); }
+        .pda-row.pda-open{ box-shadow:0 4px 0 var(--pda-accent); }
         .pda-row-head{ padding:20px 20px 18px; }
         .pda-row-head-btn{ cursor:pointer; }
         .pda-cat-id{
@@ -197,8 +198,6 @@ export default function ParksDirectoryAccordion() {
         .pda-expand-inner{ overflow:hidden; min-height:0; }
 
         .pda-render-panel{ display:flex; height:230px; margin-top:16px; background:var(--pda-bg); }
-        .pda-card-foot{ height:4px; background:var(--pda-accent); margin-top:16px; opacity:0; transition:opacity .25s ease .1s; }
-        .pda-row.pda-open .pda-card-foot{ opacity:1; }
         .pda-render-img{ flex:1.7; position:relative; cursor:pointer; overflow:hidden; background:#111; }
         .pda-render-img img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:${imgFilter}; transition:filter .2s var(--pda-ease); }
         .pda-render-panel:hover .pda-render-img img{ filter:brightness(1.15) grayscale(1) contrast(1.05); }
@@ -297,7 +296,6 @@ function Row({
               <span className="pda-glyph">&#8594;</span>
             </div>
           </div>
-          <div className="pda-card-foot" />
         </div></div>
       </div>
     </div>
