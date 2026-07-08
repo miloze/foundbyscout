@@ -145,7 +145,7 @@ export default function ParksDirectoryAccordion() {
         .pda-root{
           --pda-bg:var(--background); --pda-panel:var(--card); --pda-fg:var(--foreground);
           --pda-address:var(--muted); --pda-muted:var(--muted); --pda-line:var(--border);
-          --pda-accent:var(--accent, #ff5841); --pda-ink:#fff;
+          --pda-accent:var(--accent, #ff5841); --pda-ink:#0a0a0a;
           --pda-ease: cubic-bezier(0.16, 1, 0.3, 1);
           --pda-font-mono: 'DM Mono', ui-monospace, monospace;
           --pda-font-ui: 'Rubik', Arial, sans-serif;
@@ -195,7 +195,7 @@ export default function ParksDirectoryAccordion() {
         .pda-row.pda-open .pda-loc-chain{ background:var(--pda-accent); color:var(--pda-ink); }
         .pda-row.pda-open .pda-title-line{ background:var(--pda-accent); }
         .pda-row.pda-open .pda-title-line .pda-name{ color:var(--pda-ink); }
-        .pda-row.pda-open .pda-title-line .pda-postcode{ color:var(--pda-fg); }
+        .pda-row.pda-open .pda-title-line .pda-postcode{ color:var(--pda-ink); }
 
         .pda-expand-wrap{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .5s var(--pda-ease); }
         .pda-row.pda-open .pda-expand-wrap{ grid-template-rows:1fr; }
