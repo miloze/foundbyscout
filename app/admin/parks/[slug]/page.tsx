@@ -234,11 +234,11 @@ export default function EditParkPage() {
           description: Array.isArray(park.description)
             ? park.description.join("\n\n")
             : (park.description ?? ""),
-          hero_image:     park.hero_image   ?? "",
-          thumbnail:      park.thumbnail    ?? "",
-          model_file:         park.model_file         ?? "",
-          model_file_low:     park.model_file_low     ?? "",
-          preload_image_url:  park.preload_image_url  ?? "",
+          hero_image:         park.hero_image        || "",
+          thumbnail:          park.thumbnail         || `/images/parks/${slug}/thumb.webp`,
+          model_file:         park.model_file        || `/images/parks/${slug}/model.glb`,
+          model_file_low:     park.model_file_low    || `/images/parks/${slug}/model-500k.glb`,
+          preload_image_url:  park.preload_image_url || `/images/parks/${slug}/glb-preload.png`,
           camera_pos:     numArrToStr(park.camera_pos),
           camera_target:  numArrToStr(park.camera_target),
           model_rotation: numArrToStr(park.model_rotation),
