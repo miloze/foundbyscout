@@ -140,9 +140,9 @@ export default function ParksDirectoryAccordion() {
           font-display:swap;
         }
         .pda-root{
-          --pda-bg:#0a0a0a; --pda-panel:#141412; --pda-fg:#f7f7f2;
-          --pda-address:#9d9d95; --pda-muted:#6f6f68; --pda-line:#232320;
-          --pda-accent:var(--accent, #ff5841); --pda-ink:#0a0a0a;
+          --pda-bg:var(--background); --pda-panel:var(--card); --pda-fg:var(--foreground);
+          --pda-address:var(--muted); --pda-muted:var(--muted); --pda-line:var(--border);
+          --pda-accent:var(--accent, #ff5841); --pda-ink:#fff;
           --pda-ease: cubic-bezier(0.16, 1, 0.3, 1);
           --pda-font-mono: 'DM Mono', ui-monospace, monospace;
           --pda-font-ui: 'Rubik', Arial, sans-serif;
