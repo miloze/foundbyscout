@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ParkCard, ParkCardThumbnail, PARK_CARD_CSS, getParkAddressChain, getParkTags } from "./ParkCard";
 
 const ParksMap = lazy(() => import("./ParksMap"));
 
@@ -34,6 +35,9 @@ type ParkRow = {
   lng: number | null;
   opened: string | null;
   sort_order: number | null;
+  type: string | null;
+  is_free: boolean | null;
+  is_covered: boolean | null;
 };
 
 type SortMode = "az" | "date" | "nearest";
@@ -65,8 +69,6 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const imgFilter = "grayscale(1) contrast(1.05) brightness(0.88)";
-
 export default function ParksDirectoryAccordion() {
   const router = useRouter();
   const [parks, setParks] = useState<ParkRow[]>([]);
@@ -83,7 +85,7 @@ export default function ParksDirectoryAccordion() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
       db.from("parks")
-        .select("id, slug, name, postcode, address, location, catalogue_id, hero_image, directory_image_url, lat, lng, opened, sort_order")
+        .select("id, slug, name, postcode, address, location, catalogue_id, hero_image, directory_image_url, lat, lng, opened, sort_order, type, is_free, is_covered")
         .eq("published", true)
         .order("sort_order", { ascending: true })
         .then(({ data }) => { if (data) setParks(data as ParkRow[]); });
@@ -155,13 +157,12 @@ export default function ParksDirectoryAccordion() {
           font-family:var(--pda-font-ui); -webkit-font-smoothing:antialiased;
         }
         .pda-wrap{ max-width:860px; margin:0 auto; padding:0 24px 100px; }
-        .pda-bar{ position:sticky; top:0; z-index:5; background:var(--pda-bg); padding:24px 0 16px; }
+        .pda-bar{ position:sticky; top:44px; z-index:5; background:var(--pda-bg); padding:24px 0 16px; }
         .pda-search-row{ display:flex; align-items:center; gap:10px; border:1px solid var(--pda-line); background:var(--pda-panel); padding:12px 16px; }
         .pda-search-row svg{ width:15px; height:15px; opacity:.6; flex-shrink:0; }
         .pda-search-row input{ flex:1; width:100%; background:none; border:none; outline:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:16px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-search-row input::placeholder{ color:var(--pda-accent); opacity:.5; }
-        .pda-filter-row{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px; font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
-        .pda-filter-row .pda-sub{ color:var(--pda-muted); }
+        .pda-filter-row{ display:flex; justify-content:flex-end; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px; font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-sort-controls{ display:flex; gap:16px; }
         .pda-sort-controls button{ background:none; border:none; color:var(--pda-muted); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; padding:2px 0 4px; border-bottom:1px solid transparent; transition:color .15s var(--pda-ease), border-color .15s var(--pda-ease); }
         .pda-sort-controls button.pda-active, .pda-sort-controls button:hover{ color:var(--pda-accent); border-color:var(--pda-accent); }
@@ -171,52 +172,21 @@ export default function ParksDirectoryAccordion() {
         .pda-row.pda-open{ box-shadow:0 4px 0 var(--pda-accent); }
         .pda-row-head{ padding:20px 20px 18px; }
         .pda-row-head-btn{ cursor:pointer; }
-        .pda-cat-id{
-          font-family:var(--pda-font-mono); font-size:12px; color:var(--pda-muted);
-          letter-spacing:.02em; font-weight:500;
-          display:block; width:fit-content; padding:2px 7px; margin-bottom:0;
-          transition:background .3s var(--pda-ease), color .3s var(--pda-ease);
-        }
-        .pda-title-line{
-          font-family:var(--pda-font-display); text-transform:uppercase; line-height:0.85;
-          font-size:clamp(28px, 6.6vw, 58px); letter-spacing:.005em;
-          font-style:italic; font-weight:700; font-variation-settings:'wght' 700, 'ital' 1;
-          display:block; padding:14px 12px 10px; margin:0;
-          transition:background .3s var(--pda-ease);
-        }
-        .pda-title-line .pda-name{ color:var(--pda-fg); transition:color .3s var(--pda-ease); }
-        .pda-title-line .pda-postcode{ color:var(--pda-accent); transition:color .3s var(--pda-ease); }
-        .pda-loc-chain{
-          font-family:var(--pda-font-mono); font-size:10px; letter-spacing:.03em; text-transform:uppercase;
-          color:var(--pda-address); display:block; width:fit-content; padding:3px 7px; margin-top:0;
-          transition:background .3s var(--pda-ease), color .3s var(--pda-ease);
-        }
+        .pda-row .pcard-id, .pda-row .pcard-title, .pda-row .pcard-location{ transition:background .3s var(--pda-ease), color .3s var(--pda-ease); }
 
-        .pda-row.pda-open .pda-cat-id{ background:var(--pda-accent); color:var(--pda-ink); }
-        .pda-row.pda-open .pda-loc-chain{ background:var(--pda-accent); color:var(--pda-ink); }
-        .pda-row.pda-open .pda-title-line{ background:var(--pda-accent); }
-        .pda-row.pda-open .pda-title-line .pda-name{ color:#fff; }
-        .pda-row.pda-open .pda-title-line .pda-postcode{ color:var(--pda-ink); }
+        .pda-row.pda-open .pcard-id{ background:var(--pda-accent); color:var(--pda-ink); }
+        .pda-row.pda-open .pcard-address-inline{ background:var(--pda-accent); color:var(--pda-ink); }
+        .pda-row.pda-open .pcard-title{ background:var(--pda-accent); }
+        .pda-row.pda-open .pcard-title .pcard-name{ color:#fff; }
+        .pda-row.pda-open .pcard-title .pcard-postcode{ color:var(--pda-ink); }
 
         .pda-expand-wrap{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .5s var(--pda-ease); }
         .pda-row.pda-open .pda-expand-wrap{ grid-template-rows:1fr; }
         .pda-expand-inner{ overflow:hidden; min-height:0; }
 
-        .pda-render-panel{ display:flex; height:230px; margin-top:16px; background:var(--pda-bg); }
-        .pda-render-img{ flex:1.7; position:relative; cursor:pointer; overflow:hidden; background:#111; }
-        .pda-render-img img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:${imgFilter}; transition:filter .2s var(--pda-ease); }
-        .pda-render-panel:hover .pda-render-img img{ filter:brightness(1.15) grayscale(1) contrast(1.05); }
-
-        .pda-arrow-box{ flex:1; min-width:160px; background:var(--pda-bg); display:flex; align-items:center; justify-content:center; cursor:pointer; }
-        .pda-glyph{
-          font-family:var(--pda-font-display); font-style:italic; font-weight:900; font-variation-settings:'wght' 700;
-          font-size:clamp(70px, 11vw, 130px); color:var(--pda-fg); line-height:1;
-          transition:transform .25s var(--pda-ease), color .2s var(--pda-ease);
-        }
-        .pda-render-panel:hover .pda-glyph{ transform:translateX(18px); color:var(--pda-accent); }
-
         .pda-empty{ padding:80px 24px; text-align:center; color:var(--pda-muted); font-size:12px; text-transform:uppercase; letter-spacing:.12em; font-family:var(--pda-font-mono); }
         ::selection{ background:var(--pda-accent); color:var(--pda-ink); }
+        ${PARK_CARD_CSS}
       `}</style>
 
       <div className="pda-wrap">
@@ -229,7 +199,6 @@ export default function ParksDirectoryAccordion() {
             />
           </div>
           <div className="pda-filter-row">
-            <span className="pda-sub">Browse the Scout database of parks</span>
             <div className="pda-sort-controls">
               {view === "list" && <>
                 <button className={sortMode === "az" ? "pda-active" : ""} onClick={() => handleSort("az")}>A–Z</button>
@@ -245,8 +214,8 @@ export default function ParksDirectoryAccordion() {
 
         {view === "map" ? (
           <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
-            <div style={{ height: "calc(100vh - 160px)", margin: "0 -24px" }}>
-              <ParksMap initialSearch={search} />
+            <div style={{ height: "calc(100dvh - 170px)", margin: "0 -24px" }}>
+              <ParksMap search={search} />
             </div>
           </Suspense>
         ) : (
@@ -277,10 +246,8 @@ function Row({
   park: ParkRow; idx: number; isOpen: boolean; onToggle: () => void; onNavigate: () => void;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const idNumber = park.catalogue_id?.replace(/^SCN\//i, "").trim()
-    || String(park.sort_order ?? idx + 1).padStart(3, "0");
-  const postcodePrefix = park.postcode?.split(" ")[0] ?? "";
-  const chain = [park.address?.[0], park.location, postcodePrefix].filter(Boolean).join(" / ").toUpperCase();
+  const chain = getParkAddressChain(park);
+  const tags = getParkTags(park);
 
   const nav = (e: React.MouseEvent) => { e.stopPropagation(); onNavigate(); };
   const onHeaderKeyDown = (e: React.KeyboardEvent) => {
@@ -295,25 +262,17 @@ function Row({
           role="button" tabIndex={0} aria-expanded={isOpen}
           onClick={onToggle} onKeyDown={onHeaderKeyDown}
         >
-          <div className="pda-cat-id">{idNumber}/</div>
-          <span className="pda-title-line">
-            <span className="pda-name">{park.name}/</span><span className="pda-postcode">{postcodePrefix}/</span>
-          </span>
-          {chain && <span className="pda-loc-chain">{chain}</span>}
+          <ParkCard park={park} idx={idx} variant="row" showTags={false} showLocation={false} />
+          {chain && <span className="pcard-address pcard-address-inline">{chain}</span>}
         </div>
 
         <div className="pda-expand-wrap"><div className="pda-expand-inner" ref={contentRef}>
-          <div className="pda-render-panel">
-            <div className="pda-render-img" onClick={nav}>
-              {(park.directory_image_url || park.hero_image) && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={park.directory_image_url || park.hero_image!} alt="" loading="lazy" />
-              )}
+          {tags.length > 0 && (
+            <div className="pcard-tags pcard-tags-preimage">
+              {tags.map(t => <span key={t} className="pcard-tag">{t}</span>)}
             </div>
-            <div className="pda-arrow-box" onClick={nav}>
-              <span className="pda-glyph">&#8594;</span>
-            </div>
-          </div>
+          )}
+          <ParkCardThumbnail park={park} variant="row" onClick={nav} />
         </div></div>
       </div>
     </div>

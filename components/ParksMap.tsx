@@ -4,15 +4,16 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "./ThemeProvider";
+import { ParkCard, ParkCardThumbnail } from "./ParkCard";
 
 type Park = {
   id: string; slug: string; name: string; postcode: string; location: string;
   borough: string; lat: number; lng: number; type: string;
   is_covered: boolean; is_free: boolean; opened: string; builder: string;
   hero_image: string; brief: string;
+  catalogue_id: string | null; sort_order: number | null;
+  directory_image_url: string | null;
 };
-
-const TYPE_FILTERS = ["All","Bowl","Historic","Free","Covered"];
 
 const REGION_BOUNDS: Record<string,[[number,number],[number,number]]> = {
   "All":        [[49.5,-8.0],[61.0, 2.0]],
@@ -31,7 +32,7 @@ type CardState = "hidden" | "peek";
 
 const PEEK_H = 196;
 
-export default function ParksMap({ initialSearch = "" }: { initialSearch?: string }) {
+export default function ParksMap({ search }: { search: string }) {
   const router = useRouter();
   const [parks, setParks] = useState<Park[]>([]);
 
@@ -46,13 +47,10 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
   const touchStart          = useRef({ x:0, y:0 });
   const touchDir            = useRef<"h"|"v"|null>(null);
   const userChangedFilter   = useRef(false);
-  const [copied, setCopied] = useState(false);
 
   const { theme } = useTheme();
 
   const [activeFilter] = useState("All");
-  const [typeFilter,   setTypeFilter]   = useState("All");
-  const [search,       setSearch]       = useState(initialSearch);
   const [satellite,    setSatellite]    = useState(false);
   const [isMobile,     setIsMobile]     = useState(true);
   const [mapStatus,    setMapStatus]    = useState<"loading"|"ready"|"error">("loading");
@@ -60,7 +58,6 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
   const [selectedPark, setSelectedPark] = useState<Park|null>(null);
   const [carouselIdx,  setCarouselIdx]  = useState(0);
   const [cardState,    setCardState]    = useState<CardState>("hidden");
-  const [savedIds,     setSavedIds]     = useState<string[]>([]);
   const [slideDir,     setSlideDir]     = useState<"left"|"right"|null>(null);
 
   useEffect(() => {
@@ -78,16 +75,11 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
       db.from("parks")
-        .select("id, slug, name, postcode, location, borough, lat, lng, type, is_covered, is_free, opened, builder, hero_image, brief")
+        .select("id, slug, name, postcode, location, borough, lat, lng, type, is_covered, is_free, opened, builder, hero_image, brief, catalogue_id, sort_order, directory_image_url")
         .eq("published", true)
         .order("sort_order", { ascending: true })
         .then(({ data }) => { if (data) setParks(data as Park[]); });
     });
-  }, []);
-
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("fbs-saved") || "[]");
-    setSavedIds(saved);
   }, []);
 
   // ── Leaflet init (map only, no markers yet) ──
@@ -186,12 +178,8 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
 
   const filteredParks = parks.filter(p => {
     const mF = activeFilter === "All" || p.location.includes(activeFilter) || p.borough.includes(activeFilter);
-    const mT = typeFilter === "All"
-      || p.type === typeFilter
-      || (typeFilter === "Free"    && p.is_free)
-      || (typeFilter === "Covered" && p.is_covered);
     const mS = p.name.toLowerCase().includes(search.toLowerCase()) || p.location.toLowerCase().includes(search.toLowerCase());
-    return mF && mT && mS;
+    return mF && mS;
   });
 
   useEffect(() => {
@@ -231,25 +219,6 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
     panTo(filteredParks[next]);
     setTimeout(() => setSlideDir(null), 280);
   }, [carouselIdx, filteredParks, panTo]);
-
-  const toggleSave = useCallback((park: Park) => {
-    setSavedIds(prev => {
-      const next = prev.includes(park.id) ? prev.filter(id => id !== park.id) : [...prev, park.id];
-      localStorage.setItem("fbs-saved", JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const sharePark = useCallback(async (park: Park) => {
-    const url = `${window.location.origin}/parks/${park.slug}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: park.name, text: park.brief, url }); } catch {}
-    } else {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, []);
 
   const nearMe = useCallback(() => {
     if (!navigator.geolocation || !mapRef.current) return;
@@ -295,8 +264,6 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
     }
   };
 
-  const isSaved = selectedPark ? savedIds.includes(selectedPark.id) : false;
-
   const S = {
     pill: (active: boolean): React.CSSProperties => ({
       padding:"6px 14px", fontSize:11, fontWeight:"bold",
@@ -317,7 +284,7 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
   };
 
   return (
-    <div data-parks-page>
+    <div data-parks-page style={{ height: "100%" }}>
       <style>{`
         @keyframes fbs-spin      { to { transform:rotate(360deg); } }
         @keyframes fbs-fade-up   { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
@@ -333,7 +300,7 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
 
       {/* ══ MOBILE ══ */}
       {isMobile && (
-        <div style={{ position:"relative", height:"calc(100dvh - 48px)" }}>
+        <div style={{ position:"relative", height:"100%" }}>
 
           {/* Full-height map */}
           <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
@@ -351,24 +318,9 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
             </div>
           )}
 
-          {/* Floating search */}
-          <div style={{ position:"absolute",top:12,left:12,right:12,zIndex:20 }}>
-            <div style={{ position:"relative" }}>
-              <span style={{ position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--muted)",pointerEvents:"none" }}>⌕</span>
-              <input
-                type="text" placeholder="Search parks or areas…" value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ width:"100%",padding:"11px 14px 11px 36px",fontSize:15,background: theme === "dark" ? "rgba(26,26,26,0.92)" : "rgba(244,242,238,0.96)",border:"1px solid var(--border)",color:"var(--foreground)",outline:"none",boxSizing:"border-box",backdropFilter:"blur(12px)",WebkitAppearance:"none" }}
-              />
-            </div>
-          </div>
-
-          {/* Type filters + Near Me */}
-          <div style={{ position:"absolute",top:60,left:0,right:0,zIndex:20,display:"flex",gap:0,overflowX:"auto",padding:"0 12px",scrollbarWidth:"none" }}>
-            {TYPE_FILTERS.map(f => (
-              <button key={f} onClick={() => setTypeFilter(f)} style={S.pill(typeFilter === f)}>{f}</button>
-            ))}
-            <button onClick={nearMe} style={{ ...S.pill(false), marginLeft:8, display:"flex", alignItems:"center", gap:5 }}>
+          {/* Near Me + Satellite */}
+          <div style={{ position:"absolute",top:12,left:0,right:0,zIndex:20,display:"flex",gap:0,overflowX:"auto",padding:"0 12px",scrollbarWidth:"none" }}>
+            <button onClick={nearMe} style={{ ...S.pill(false), display:"flex", alignItems:"center", gap:5 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
               Near me
             </button>
@@ -387,7 +339,7 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
               onTouchMove={onCardTouchMove}
               onTouchEnd={onCardTouchEnd}
               style={{
-                position:"absolute", bottom:20, left:16, right:16, zIndex:25,
+                position:"absolute", bottom:"calc(20px + env(safe-area-inset-bottom, 0px))", left:16, right:16, zIndex:25,
                 background: theme === "dark" ? "rgba(22,22,22,0.97)" : "rgba(248,246,242,0.97)",
                 backdropFilter:"blur(16px)",
                 borderRadius:12,
@@ -400,22 +352,8 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
               {/* Swipe handle */}
               <div style={{ width:32,height:3,background:"var(--border)",borderRadius:2,margin:"0 auto 14px" }} />
 
-              {/* Badges row */}
-              <div style={{ display:"flex", gap:6, marginBottom:12 }}>
-                <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--border)",color:"var(--muted)" }}>{selectedPark.type}</span>
-                {selectedPark.is_free
-                  ? <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--accent)",color:"var(--accent)" }}>Free</span>
-                  : <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--border)",color:"var(--muted)" }}>Paid</span>
-                }
-                {selectedPark.is_covered && <span style={{ fontSize:10,fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",padding:"3px 10px",border:"1px solid var(--accent)",color:"var(--accent)" }}>Covered</span>}
-              </div>
-
-              {/* Location + Name */}
-              <p style={{ fontSize:10,textTransform:"uppercase",letterSpacing:"0.18em",color:"var(--muted)",marginBottom:4 }}>{selectedPark.location}</p>
-              <h3 style={{ fontSize:20,fontWeight:900,letterSpacing:"-0.02em",lineHeight:1.05,color:"var(--foreground)",marginBottom:10,textTransform:"uppercase" }}>{selectedPark.name}</h3>
-
-              {/* Description */}
-              <p style={{ fontSize:13,lineHeight:1.65,color:"var(--muted)" }}>{selectedPark.brief}</p>
+              <ParkCard park={selectedPark} idx={carouselIdx} variant="map" />
+              <ParkCardThumbnail park={selectedPark} variant="map" />
             </div>
           )}
 
@@ -424,7 +362,7 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
 
       {/* ══ DESKTOP ══ */}
       {!isMobile && (
-        <div style={{ position:"relative", height:"calc(100dvh - 48px)" }}>
+        <div style={{ position:"relative", height:"100%" }}>
           <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
 
           {mapStatus === "loading" && (
@@ -443,20 +381,9 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
           <>
           {/* Sidebar */}
           <div style={{ position:"absolute",top:0,left:0,bottom:0,width:320,background:"var(--background)",borderRight:"1px solid var(--border)",display:"flex",flexDirection:"column",zIndex:10 }}>
-            {/* Search */}
-            <div style={{ padding:16,borderBottom:"1px solid var(--border)",flexShrink:0 }}>
-              <p style={{ fontFamily:"var(--font-mono)",fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--muted)",marginBottom:10 }}>Skateparks</p>
-              <input type="text" placeholder="Search parks or areas…" value={search} onChange={e=>setSearch(e.target.value)}
-                style={{ width:"100%",background:"var(--card)",border:"1px solid var(--border)",color:"var(--foreground)",fontFamily:"var(--font-mono)",fontSize:12,padding:"9px 12px",outline:"none",boxSizing:"border-box",letterSpacing:"0.04em" }} />
-            </div>
             {/* Filters */}
             <div style={{ padding:"10px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0 }}>
-              {TYPE_FILTERS.filter(f=>f!=="All").map(f=>(
-                <button key={f} onClick={()=>setTypeFilter(typeFilter===f?"All":f)}
-                  style={{ fontFamily:"var(--font-mono)",fontSize:9,padding:"4px 10px",border:`1px solid ${typeFilter===f?"var(--accent)":"var(--border)"}`,color:typeFilter===f?"var(--accent)":"var(--muted)",background:typeFilter===f?"color-mix(in srgb,var(--accent) 8%,transparent)":"none",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase" as const }}>
-                  {f}
-                </button>
-              ))}
+              <p style={{ fontFamily:"var(--font-mono)",fontSize:9,textTransform:"uppercase",letterSpacing:"0.15em",color:"var(--muted)" }}>Skateparks</p>
               <button onClick={()=>setSatellite(v=>!v)}
                 style={{ fontFamily:"var(--font-mono)",fontSize:9,padding:"4px 10px",border:`1px solid ${satellite?"var(--accent)":"var(--border)"}`,color:satellite?"var(--accent)":"var(--muted)",background:satellite?"color-mix(in srgb,var(--accent) 8%,transparent)":"none",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase" as const,marginLeft:"auto" }}>
                 Satellite
@@ -491,47 +418,18 @@ export default function ParksMap({ initialSearch = "" }: { initialSearch?: strin
           {selectedPark && (
             <div style={{ position:"absolute",bottom:0,left:320,right:0,height:PEEK_H,background:"var(--background)",borderTop:"1px solid var(--border)",zIndex:11,display:"flex",alignItems:"stretch",animation:"fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both" }}>
               {/* Park photo */}
-              <div style={{ width:220,flexShrink:0,overflow:"hidden",position:"relative",background:"#111" }}>
-                {selectedPark.hero_image && (
+              <div style={{ width:220,flexShrink:0,overflow:"hidden",position:"relative",background:"var(--background)" }}>
+                {(selectedPark.directory_image_url || selectedPark.hero_image) && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedPark.hero_image} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
+                  <img src={selectedPark.directory_image_url || selectedPark.hero_image} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} style={{ width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(1) contrast(1.05)" }} />
                 )}
               </div>
               {/* Info panel */}
-              <div style={{ flex:1,padding:"20px 24px",display:"flex",flexDirection:"column",justifyContent:"space-between",borderLeft:"1px solid var(--border)",overflow:"hidden",minWidth:0 }}>
-                <div>
-                  {/* Postcode row */}
-                  <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:10 }}>
-                    <div style={{ width:32,height:32,borderRadius:"50%",background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                      <span style={{ fontFamily:"var(--font-heading)",fontSize:10,fontWeight:300,color:"#fff",letterSpacing:"0.03em" }}>{selectedPark.postcode.replace(/[0-9]/g,"")}</span>
-                    </div>
-                    <p style={{ fontFamily:"var(--font-mono)",fontSize:9,color:"var(--muted)",letterSpacing:"0.1em",textTransform:"uppercase" }}>{selectedPark.postcode} · {selectedPark.location}</p>
-                    <div style={{ display:"flex",gap:4,marginLeft:4 }}>
-                      {[selectedPark.type, selectedPark.is_free?"Free":null, selectedPark.is_covered?"Covered":null].filter(Boolean).map(t=>(
-                        <span key={t as string} style={{ fontFamily:"var(--font-mono)",fontSize:8,padding:"2px 7px",border:"1px solid var(--border)",color:"var(--muted)",letterSpacing:"0.08em",textTransform:"uppercase" as const }}>{t}</span>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Name */}
-                  <h3 style={{ fontFamily:"var(--font-heading)",fontSize:"clamp(18px,2vw,26px)",fontWeight:300,letterSpacing:"-0.02em",textTransform:"uppercase",lineHeight:1,marginBottom:8 }}>{selectedPark.name}</h3>
-                  {/* Brief */}
-                  <p style={{ fontSize:13,lineHeight:1.6,color:"var(--muted)",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden" } as React.CSSProperties}>{selectedPark.brief}</p>
-                </div>
+              <div style={{ flex:1,padding:"20px 24px",display:"flex",flexDirection:"column",justifyContent:"center",borderLeft:"1px solid var(--border)",overflow:"hidden",minWidth:0 }}>
+                <ParkCard park={selectedPark} idx={carouselIdx} variant="map" />
               </div>
               {/* Actions panel */}
-              <div style={{ flexShrink:0,padding:"16px 20px",display:"flex",flexDirection:"column",justifyContent:"space-between",gap:8,borderLeft:"1px solid var(--border)" }}>
-                <div style={{ display:"flex",gap:6 }}>
-                  <button onClick={() => toggleSave(selectedPark)} title={isSaved?"Saved":"Save"} style={{ width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer",color:isSaved?"var(--accent)":"var(--muted)" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill={isSaved?"currentColor":"none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                  <button onClick={() => sharePark(selectedPark)} title="Share" style={{ width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer",color:copied?"var(--accent)":"var(--muted)" }}>
-                    {copied
-                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                    }
-                  </button>
-                  <button onClick={dismiss} title="Close" style={{ width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--card)",border:"1px solid var(--border)",cursor:"pointer",color:"var(--muted)",fontSize:14 }}>✕</button>
-                </div>
+              <div style={{ flexShrink:0,padding:"16px 20px",display:"flex",alignItems:"center",borderLeft:"1px solid var(--border)" }}>
                 <button onClick={() => router.push(`/parks/${selectedPark.slug}`)}
                   style={{ padding:"11px 20px",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.12em",background:"var(--accent)",color:"#fff",border:"none",cursor:"pointer",fontFamily:"var(--font-body)",whiteSpace:"nowrap" }}>
                   View Park →
