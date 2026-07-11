@@ -165,8 +165,25 @@ export default function ParksMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parks, mapStatus]);
 
+  // Keep Leaflet's internal size/pixel-origin in sync with the container's
+  // actual box — the container is shared across mobile/desktop layouts and
+  // resizes whenever the list column mounts/unmounts, which is a pure CSS
+  // flex reflow (no window "resize" event fires). ResizeObserver covers the
+  // general case; the isMobile-keyed call below covers the list column
+  // toggling specifically, since that's a same-tick layout change that can
+  // race the observer's first callback.
   useEffect(() => {
-    if (mapRef.current) setTimeout(() => mapRef.current?.invalidateSize(), 50);
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => { mapRef.current?.invalidateSize(); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mapStatus]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const id = setTimeout(() => mapRef.current?.invalidateSize(), 60);
+    return () => clearTimeout(id);
   }, [isMobile]);
 
   // On load: pick a random London park, zoom to it and select it
@@ -406,11 +423,28 @@ export default function ParksMap({
         .pms-index-row.pms-active .pcard-name{ color:var(--pda-accent); }
       `}</style>
 
-      {/* ══ MOBILE ══ */}
-      {isMobile && (
-        <div style={{ position:"relative", height:"100%" }}>
+      {/* List column and map canvas are always both mounted — only the
+          overlay chrome around the map differs by breakpoint. The map
+          canvas must never unmount/remount across the mobile/desktop
+          switch, or the Leaflet instance orphans against a detached
+          container and markers stop tracking real positions. */}
+      <div style={{ display:"flex", height:"100%", minHeight:0, overflow:"hidden" }}>
+        {!isMobile && (
+          <div className="pms-index-list">
+            {filteredParks.map((park, idx) => (
+              <button
+                key={park.id}
+                type="button"
+                className={`pms-index-row${selectedPark?.id === park.id ? " pms-active" : ""}`}
+                onClick={() => { if (park.lat && park.lng) openPark(park); }}
+              >
+                <ParkCard park={park} idx={idx} variant="index" showTags={false} showLocation showAddress={false} />
+              </button>
+            ))}
+          </div>
+        )}
 
-          {/* Full-height map */}
+        <div style={{ position:"relative", flex:1, height:"100%", minHeight:0 }}>
           <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
 
           {mapStatus === "loading" && (
@@ -426,114 +460,84 @@ export default function ParksMap({
             </div>
           )}
 
-          {/* List / Map strip — thin, translucent, always visible */}
-          <div style={{ position:"absolute", top:60, left:0, right:0, zIndex:22, height:34, display:"flex", alignItems:"center", justifyContent:"center", background: theme === "dark" ? "rgba(20,20,20,0.55)" : "rgba(255,255,255,0.55)", WebkitBackdropFilter:"blur(8px)", backdropFilter:"blur(8px)" }}>
-            <div style={{ display:"flex", border:"1px solid var(--border)", borderRadius:14, overflow:"hidden" }}>
-              <button onClick={onBackToList} style={{ padding:"4px 14px", fontSize:10, fontWeight:"bold", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:"0.1em", background:"transparent", color:"var(--foreground)", border:"none", cursor:"pointer" }}>List</button>
-              <button style={{ padding:"4px 14px", fontSize:10, fontWeight:"bold", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:"0.1em", background:"var(--accent)", color:"#fff", border:"none", cursor:"default" }}>Map</button>
-            </div>
-          </div>
-
-          {/* Search — collapsible icon */}
-          <div style={{
-            position:"absolute", top:104, left:16, zIndex:21, display:"flex", alignItems:"center",
-            height:44, borderRadius:22, overflow:"hidden",
-            background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff",
-            boxShadow:"0 4px 14px rgba(0,0,0,0.15)",
-            width: searchOpen ? 230 : 44,
-            transition:"width 0.25s cubic-bezier(0.32,0.72,0,1)",
-          }}>
-            <button onClick={() => setSearchOpen(v => !v)} style={{ width:44, height:44, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
-            {searchOpen && (
-              <input
-                autoFocus
-                type="text" placeholder="Search…" value={search}
-                onChange={e => onSearchChange?.(e.target.value)}
-                style={{ flex:1, minWidth:0, height:44, border:"none", outline:"none", background:"transparent", fontFamily:"var(--font-mono)", fontSize:12, letterSpacing:"0.04em", color:"var(--foreground)", paddingRight:14 }}
-              />
-            )}
-          </div>
-
-          {/* Satellite — its own spot, no longer stacked with locate */}
-          <div style={{ position:"absolute", top:104, right:16, zIndex:21 }}>
-            <button onClick={() => setSatellite(v => !v)} title="Satellite" style={{ width:44, height:44, borderRadius:"50%", background: satellite ? "#141414" : (theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff"), border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : (theme === "dark" ? "#fff" : "#141414") }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            </button>
-          </div>
-
-          {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
-          <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:16, zIndex:21, transition:"bottom 0.3s" }}>
-            {locateTip && (
-              <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background:"#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
-                Recenter map
+          {isMobile ? (
+            <>
+              {/* List / Map strip — thin, translucent, always visible */}
+              <div style={{ position:"absolute", top:60, left:0, right:0, zIndex:22, height:34, display:"flex", alignItems:"center", justifyContent:"center", background: theme === "dark" ? "rgba(20,20,20,0.55)" : "rgba(255,255,255,0.55)", WebkitBackdropFilter:"blur(8px)", backdropFilter:"blur(8px)" }}>
+                <div style={{ display:"flex", border:"1px solid var(--border)", borderRadius:14, overflow:"hidden" }}>
+                  <button onClick={onBackToList} style={{ padding:"4px 14px", fontSize:10, fontWeight:"bold", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:"0.1em", background:"transparent", color:"var(--foreground)", border:"none", cursor:"pointer" }}>List</button>
+                  <button style={{ padding:"4px 14px", fontSize:10, fontWeight:"bold", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:"0.1em", background:"var(--accent)", color:"#fff", border:"none", cursor:"default" }}>Map</button>
+                </div>
               </div>
-            )}
-            <button onClick={nearMe} title="Recenter map" style={{ width:44, height:44, borderRadius:"50%", background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff", border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
-            </button>
-          </div>
 
-          {floatingCard}
-
-        </div>
-      )}
-
-      {/* ══ DESKTOP ══ — list column synced with the map beside it */}
-      {!isMobile && (
-        <div style={{ display:"flex", height:"100%", minHeight:0, overflow:"hidden" }}>
-          <div className="pms-index-list">
-            {filteredParks.map((park, idx) => (
-              <button
-                key={park.id}
-                type="button"
-                className={`pms-index-row${selectedPark?.id === park.id ? " pms-active" : ""}`}
-                onClick={() => { if (park.lat && park.lng) openPark(park); }}
-              >
-                <ParkCard park={park} idx={idx} variant="index" showTags={false} showLocation showAddress={false} />
-              </button>
-            ))}
-          </div>
-
-          <div style={{ position:"relative", flex:1, height:"100%", minHeight:0 }}>
-            <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
-
-            {mapStatus === "loading" && (
-              <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)" }}>
-                <div style={{ width:32,height:32,border:"3px solid var(--border)",borderTopColor:"var(--accent)",borderRadius:"50%",animation:"fbs-spin 0.8s linear infinite" }} />
-                <p style={{ marginTop:12,fontSize:12,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.12em" }}>Loading map…</p>
+              {/* Search — collapsible icon */}
+              <div style={{
+                position:"absolute", top:104, left:16, zIndex:21, display:"flex", alignItems:"center",
+                height:44, borderRadius:22, overflow:"hidden",
+                background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff",
+                boxShadow:"0 4px 14px rgba(0,0,0,0.15)",
+                width: searchOpen ? 230 : 44,
+                transition:"width 0.25s cubic-bezier(0.32,0.72,0,1)",
+              }}>
+                <button onClick={() => setSearchOpen(v => !v)} style={{ width:44, height:44, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+                {searchOpen && (
+                  <input
+                    autoFocus
+                    type="text" placeholder="Search…" value={search}
+                    onChange={e => onSearchChange?.(e.target.value)}
+                    style={{ flex:1, minWidth:0, height:44, border:"none", outline:"none", background:"transparent", fontFamily:"var(--font-mono)", fontSize:12, letterSpacing:"0.04em", color:"var(--foreground)", paddingRight:14 }}
+                  />
+                )}
               </div>
-            )}
-            {mapStatus === "error" && (
-              <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)",padding:32 }}>
-                <p style={{ fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10 }}>Map failed to load</p>
-                <p style={{ fontSize:12,color:"var(--muted)",maxWidth:300,textAlign:"center" }}>{mapError}</p>
-              </div>
-            )}
 
-            {/* Satellite + Locate — floating side by side, top-right of the map canvas */}
-            <div style={{ position:"absolute", top:20, right:20, zIndex:12, display:"flex", gap:8 }}>
-              <button onClick={()=>setSatellite(v=>!v)} title="Satellite"
-                style={{ width:38, height:38, borderRadius:4, background: satellite ? "var(--accent)" : "var(--card)", border:`1px solid ${satellite ? "var(--accent)" : "var(--border)"}`, boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : "var(--foreground)" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              </button>
-              <div style={{ position:"relative" }}>
+              {/* Satellite — its own spot, no longer stacked with locate */}
+              <div style={{ position:"absolute", top:104, right:16, zIndex:21 }}>
+                <button onClick={() => setSatellite(v => !v)} title="Satellite" style={{ width:44, height:44, borderRadius:"50%", background: satellite ? "#141414" : (theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff"), border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : (theme === "dark" ? "#fff" : "#141414") }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                </button>
+              </div>
+
+              {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
+              <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:16, zIndex:21, transition:"bottom 0.3s" }}>
                 {locateTip && (
-                  <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background:"#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background:"#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                     Recenter map
                   </div>
                 )}
-                <button onClick={nearMe} title="Recenter map" style={{ width:38, height:38, borderRadius:4, background:"var(--card)", border:"1px solid var(--border)", boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--foreground)" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                <button onClick={nearMe} title="Recenter map" style={{ width:44, height:44, borderRadius:"50%", background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff", border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
                 </button>
               </div>
-            </div>
 
-            {splitCard}
-          </div>
+              {floatingCard}
+            </>
+          ) : (
+            <>
+              {/* Satellite + Locate — floating side by side, top-right of the map canvas */}
+              <div style={{ position:"absolute", top:20, right:20, zIndex:12, display:"flex", gap:8 }}>
+                <button onClick={()=>setSatellite(v=>!v)} title="Satellite"
+                  style={{ width:38, height:38, borderRadius:4, background: satellite ? "var(--accent)" : "var(--card)", border:`1px solid ${satellite ? "var(--accent)" : "var(--border)"}`, boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : "var(--foreground)" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                </button>
+                <div style={{ position:"relative" }}>
+                  {locateTip && (
+                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background:"#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                      Recenter map
+                    </div>
+                  )}
+                  <button onClick={nearMe} title="Recenter map" style={{ width:38, height:38, borderRadius:4, background:"var(--card)", border:"1px solid var(--border)", boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--foreground)" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              {splitCard}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
