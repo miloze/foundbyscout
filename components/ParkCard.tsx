@@ -41,6 +41,9 @@ export const PARK_CARD_CSS = `
     letter-spacing:.02em; font-weight:500;
     display:block; width:fit-content; padding:2px 7px;
   }
+  /* Map card: catalogue no. sized to match the address line below it, coral like the postcode */
+  .pcard-map .pcard-id{ color:var(--pda-accent); font-size:10px; }
+  .pcard-map .pcard-address{ margin:2px 0 8px; padding:0; }
   .pcard-title{
     font-family:var(--pda-font-display); text-transform:uppercase; line-height:0.85;
     letter-spacing:.005em; font-style:italic; font-weight:700;
@@ -51,6 +54,15 @@ export const PARK_CARD_CSS = `
   .pcard-title .pcard-postcode{ color:var(--pda-accent); }
   .pcard-row .pcard-title{ font-size:clamp(28px, 6.6vw, 58px); }
   .pcard-map .pcard-title{ font-size:clamp(20px, 5vw, 26px); padding:6px 0 4px; }
+  /* Index: compact desktop split-list row — scan-and-pick, not sell-the-park.
+     Stacked: cat. no. above name, shortened area below — full address lives
+     in the map's detail card instead, per the split-list spec. */
+  .pcard-index{ display:block; padding:12px 14px; }
+  .pcard-index .pcard-id{ padding:0; margin-bottom:4px; font-size:10px; }
+  .pcard-index .pcard-title{ padding:0; margin:0; display:block; }
+  .pcard-index .pcard-title .pcard-name{ font-size:16px; line-height:1.2; }
+  .pcard-index .pcard-title .pcard-postcode{ font-size:16px; line-height:1.2; }
+  .pcard-index .pcard-location{ padding:0; margin-top:3px; font-size:9px; }
   .pcard-tags{ display:flex; gap:6px; flex-wrap:wrap; }
   .pcard-row .pcard-tags{ padding:0 12px; margin:4px 0 2px; }
   .pcard-map .pcard-tags{ margin:0 0 8px; }
@@ -89,17 +101,19 @@ export const PARK_CARD_CSS = `
 `;
 
 export function ParkCard({
-  park, idx, variant, showTags = true, showLocation = true,
+  park, idx, variant, showTags = true, showLocation = true, showAddress = false,
 }: {
   park: ParkCardPark;
   idx: number;
-  variant: "row" | "map";
+  variant: "row" | "map" | "index";
   showTags?: boolean;
   showLocation?: boolean;
+  showAddress?: boolean;
 }) {
   const idNumber = getCatalogueIdLabel(park, idx);
   const tags = getParkTags(park);
   const postcodePrefix = park.postcode?.split(" ")[0] ?? "";
+  const chain = showAddress ? getParkAddressChain(park) : "";
 
   return (
     <div className={`pcard pcard-${variant}`}>
@@ -108,6 +122,7 @@ export function ParkCard({
         <span className="pcard-name">{park.name}/</span>
         {postcodePrefix && <span className="pcard-postcode">{postcodePrefix}/</span>}
       </span>
+      {showAddress && chain && <span className="pcard-address">{chain}</span>}
       {showTags && tags.length > 0 && (
         <div className="pcard-tags">
           {tags.map(t => <span key={t} className="pcard-tag">{t}</span>)}

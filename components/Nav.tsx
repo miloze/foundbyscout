@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTheme } from "./ThemeProvider";
+import { useNavOverlay } from "./NavOverlay";
 
 const links = [
   { href: "/parks", label: "PARKS" },
@@ -14,15 +15,22 @@ export default function Nav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const { theme, toggle } = useTheme();
+  const { overlay } = useNavOverlay();
 
   return (
     <header style={{ borderBottom: "none" }} className="fixed top-0 left-0 right-0 w-full z-50">
       <nav
         className="flex items-center justify-between"
-        style={{ background: "var(--background)", paddingTop: "12px", paddingBottom: "12px", paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)", borderBottom: "1px solid var(--border)" }}
+        style={{
+          background: overlay ? "linear-gradient(180deg, rgba(0,0,0,0.35), transparent)" : "var(--background)",
+          paddingTop: "12px", paddingBottom: overlay ? "24px" : "12px",
+          paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)",
+          borderBottom: overlay ? "none" : "1px solid var(--border)",
+          transition: "background 0.2s, border-color 0.2s",
+        }}
       >
         {/* Logo */}
-        <Link href="/" className="text-sm font-black" style={{ color: "var(--accent)", letterSpacing: "0.04em" }}>
+        <Link href="/" className="text-sm font-black" style={{ color: overlay ? "#fff" : "var(--accent)", letterSpacing: "0.04em", textShadow: overlay ? "0 1px 4px rgba(0,0,0,0.4)" : "none" }}>
           Found by Scout
         </Link>
 
@@ -94,9 +102,9 @@ export default function Nav() {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
           >
-            <span className="block w-6 h-px" style={{ background: "var(--foreground)" }} />
-            <span className="block w-6 h-px" style={{ background: "var(--foreground)" }} />
-            <span className="block w-4 h-px" style={{ background: "var(--foreground)" }} />
+            <span className="block w-6 h-px" style={{ background: overlay ? "#fff" : "var(--foreground)", boxShadow: overlay ? "0 1px 3px rgba(0,0,0,0.4)" : "none" }} />
+            <span className="block w-6 h-px" style={{ background: overlay ? "#fff" : "var(--foreground)", boxShadow: overlay ? "0 1px 3px rgba(0,0,0,0.4)" : "none" }} />
+            <span className="block w-4 h-px" style={{ background: overlay ? "#fff" : "var(--foreground)", boxShadow: overlay ? "0 1px 3px rgba(0,0,0,0.4)" : "none" }} />
           </button>
         </div>
       </nav>

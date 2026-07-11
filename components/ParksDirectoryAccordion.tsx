@@ -3,6 +3,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ParkCard, ParkCardThumbnail, PARK_CARD_CSS, getParkAddressChain, getParkTags } from "./ParkCard";
+import { useNavOverlay } from "./NavOverlay";
+import { type SortMode, sortParks } from "./parkSort";
 
 const ParksMap = lazy(() => import("./ParksMap"));
 
@@ -40,35 +42,6 @@ type ParkRow = {
   is_covered: boolean | null;
 };
 
-type SortMode = "az" | "date" | "nearest";
-
-const MONTHS: Record<string, number> = {
-  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
-  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
-};
-
-function parseOpenedForSort(opened: string | null): number {
-  if (!opened) return -Infinity;
-  const parts = opened.trim().split(/\s+/);
-  if (parts.length === 2) {
-    const m = MONTHS[parts[0].toLowerCase()];
-    const y = parseInt(parts[1], 10);
-    if (m !== undefined && !Number.isNaN(y)) return Date.UTC(y, m, 1);
-  }
-  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return Date.UTC(parseInt(parts[0], 10), 0, 1);
-  return -Infinity;
-}
-
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 export default function ParksDirectoryAccordion() {
   const router = useRouter();
   const [parks, setParks] = useState<ParkRow[]>([]);
@@ -77,6 +50,21 @@ export default function ParksDirectoryAccordion() {
   const [sortMode, setSortMode] = useState<SortMode>("az");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [view, setView] = useState<"list" | "map">("list");
+  const [isMobile, setIsMobile] = useState(true);
+  const { setOverlay } = useNavOverlay();
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 900);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Mobile map view runs full-bleed behind a translucent Nav — see NavOverlay.
+  useEffect(() => {
+    setOverlay(isMobile && view === "map");
+    return () => setOverlay(false);
+  }, [isMobile, view, setOverlay]);
 
   useEffect(() => {
     import("@supabase/supabase-js").then(({ createClient }) => {
@@ -111,22 +99,14 @@ export default function ParksDirectoryAccordion() {
       (p.address ?? []).some(a => a.toLowerCase().includes(q))
     );
 
-    const sorted = [...filtered];
-    if (sortMode === "az") {
-      sorted.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortMode === "date") {
-      sorted.sort((a, b) => parseOpenedForSort(b.opened) - parseOpenedForSort(a.opened));
-    } else if (sortMode === "nearest" && userCoords) {
-      sorted.sort((a, b) => {
-        const da = a.lat != null && a.lng != null ? haversine(userCoords.lat, userCoords.lng, a.lat, a.lng) : Infinity;
-        const db = b.lat != null && b.lng != null ? haversine(userCoords.lat, userCoords.lng, b.lat, b.lng) : Infinity;
-        return da - db;
-      });
-    }
-    return sorted;
+    return sortParks(filtered, sortMode, userCoords);
   }, [parks, search, sortMode, userCoords]);
 
   const goToPark = (slug: string) => router.push(`/parks/${slug}`);
+
+  // Desktop always shows the map as a split list/map view — the header's
+  // List/Map toggle only matters on mobile, where screen space forces a choice.
+  const showMap = !isMobile || view === "map";
 
   return (
     <div className="pda-root">
@@ -157,16 +137,19 @@ export default function ParksDirectoryAccordion() {
           font-family:var(--pda-font-ui); -webkit-font-smoothing:antialiased;
         }
         .pda-wrap{ max-width:860px; margin:0 auto; padding:0 24px 100px; }
+        .pda-wrap-wide{ max-width:none; }
         .pda-bar{ position:sticky; top:44px; z-index:5; background:var(--pda-bg); padding:24px 0 16px; }
         .pda-search-row{ display:flex; align-items:center; gap:10px; border:1px solid var(--pda-line); background:var(--pda-panel); padding:12px 16px; }
         .pda-search-row svg{ width:15px; height:15px; opacity:.6; flex-shrink:0; }
         .pda-search-row input{ flex:1; width:100%; background:none; border:none; outline:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:16px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-search-row input::placeholder{ color:var(--pda-accent); opacity:.5; }
-        .pda-filter-row{ display:flex; justify-content:flex-end; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px; font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+        .pda-filter-row{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px; font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-sort-controls{ display:flex; gap:16px; }
         .pda-sort-controls button{ background:none; border:none; color:var(--pda-muted); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; padding:2px 0 4px; border-bottom:1px solid transparent; transition:color .15s var(--pda-ease), border-color .15s var(--pda-ease); }
         .pda-sort-controls button.pda-active, .pda-sort-controls button:hover{ color:var(--pda-accent); border-color:var(--pda-accent); }
-        .pda-divider{ display:inline-block; width:1px; height:12px; background:var(--pda-line); margin:0 6px; align-self:center; }
+        .pda-view-toggle{ display:flex; border:1px solid var(--pda-line); border-radius:14px; overflow:hidden; }
+        .pda-view-toggle button{ background:transparent; border:none; color:var(--pda-fg); font-family:var(--pda-font-mono); font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.03em; padding:6px 14px; cursor:pointer; transition:background .15s var(--pda-ease), color .15s var(--pda-ease); }
+        .pda-view-toggle button.pda-active{ background:var(--pda-accent); color:#fff; }
 
         .pda-row{ box-shadow:0 1px 0 var(--pda-line); transition:box-shadow .45s var(--pda-ease); }
         .pda-row.pda-open{ box-shadow:0 4px 0 var(--pda-accent); }
@@ -189,33 +172,41 @@ export default function ParksDirectoryAccordion() {
         ${PARK_CARD_CSS}
       `}</style>
 
-      <div className="pda-wrap">
-        <header className="pda-bar">
-          <div className="pda-search-row">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <input
-              type="text" placeholder="SEARCH" value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="pda-filter-row">
-            <div className="pda-sort-controls">
-              {view === "list" && <>
+      <div className={`pda-wrap${!isMobile ? " pda-wrap-wide" : ""}`}>
+        {/* Mobile map view collapses this into ParksMap's own floating List/Map
+            strip so the map can run full-bleed — see NavOverlay + ParksMap. */}
+        {!(isMobile && view === "map") && (
+          <header className="pda-bar">
+            <div className="pda-search-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              <input
+                type="text" placeholder="SEARCH" value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="pda-filter-row">
+              <div className="pda-sort-controls">
                 <button className={sortMode === "az" ? "pda-active" : ""} onClick={() => handleSort("az")}>A–Z</button>
                 <button className={sortMode === "date" ? "pda-active" : ""} onClick={() => handleSort("date")}>Date</button>
                 <button className={sortMode === "nearest" ? "pda-active" : ""} onClick={() => handleSort("nearest")}>Nearest</button>
-                <span className="pda-divider" />
-              </>}
-              <button className={view === "list" ? "pda-active" : ""} onClick={() => setView("list")}>List</button>
-              <button className={view === "map" ? "pda-active" : ""} onClick={() => setView("map")}>Map</button>
+              </div>
+              {isMobile && (
+                <div className="pda-view-toggle">
+                  <button className={view === "list" ? "pda-active" : ""} onClick={() => setView("list")}>List</button>
+                  <button className={view === "map" ? "pda-active" : ""} onClick={() => setView("map")}>Map</button>
+                </div>
+              )}
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
-        {view === "map" ? (
+        {showMap ? (
           <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
-            <div style={{ height: "calc(100dvh - 170px)", margin: "0 -24px" }}>
-              <ParksMap search={search} />
+            <div style={isMobile ? { height: "100dvh", margin: "-44px -24px 0" } : { height: "calc(100dvh - 170px)", margin: "0 -24px" }}>
+              <ParksMap
+                search={search} onSearchChange={setSearch} onBackToList={() => setView("list")}
+                sortMode={sortMode} userCoords={userCoords}
+              />
             </div>
           </Suspense>
         ) : (

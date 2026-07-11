@@ -3,6 +3,7 @@ import { Geist, Rubik, DM_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import ThemeProvider from "@/components/ThemeProvider";
+import NavOverlayProvider from "@/components/NavOverlay";
 import Grain from "@/components/Grain";
 
 const headingFont = Rubik({ subsets: ["latin"], weight: ["300"], variable: "--font-heading" });
@@ -28,6 +29,7 @@ export default function RootLayout({
       </head>
       <body className={`${headingFont.variable} ${monoFont.variable} ${bodyFont.variable}`} style={{ fontFamily: "var(--font-body), sans-serif", margin: 0, background: "var(--background)", color: "var(--foreground)" }}>
         <ThemeProvider>
+          <NavOverlayProvider>
           <Grain />
           <Nav />
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", padding: "44px clamp(16px, 4vw, 56px) 0" }}>
@@ -61,6 +63,7 @@ export default function RootLayout({
               </footer>
             </div>
           </div>
+          </NavOverlayProvider>
         </ThemeProvider>
       </body>
     </html>
