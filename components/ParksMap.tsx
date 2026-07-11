@@ -80,6 +80,7 @@ export default function ParksMap({
   const [slideDir,     setSlideDir]     = useState<"left"|"right"|null>(null);
   const [searchOpen,   setSearchOpen]   = useState(() => search.length > 0);
   const [locateTip,    setLocateTip]    = useState(false);
+  const [locateError,  setLocateError]  = useState("");
   const didDragRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const zoomControlRef = useRef<any>(null);
@@ -285,12 +286,23 @@ export default function ParksMap({
 
   const nearMe = useCallback(() => {
     dismissLocateTip();
-    if (!navigator.geolocation || !mapRef.current) return;
+    setLocateError("");
+    if (!navigator.geolocation || !mapRef.current) {
+      setLocateError("Location isn't available in this browser");
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       pos => mapRef.current?.flyTo([pos.coords.latitude, pos.coords.longitude], 12, { animate: true, duration: 1 }),
-      () => {}
+      err => setLocateError(err.code === err.PERMISSION_DENIED ? "Location access denied" : "Couldn't get your location"),
+      { timeout: 10000 }
     );
   }, [dismissLocateTip]);
+
+  useEffect(() => {
+    if (!locateError) return;
+    const id = setTimeout(() => setLocateError(""), 4000);
+    return () => clearTimeout(id);
+  }, [locateError]);
 
   // ── Touch: swipe down = dismiss, left/right = navigate between parks ──
   const onCardTouchStart = (e: React.TouchEvent) => {
@@ -501,9 +513,9 @@ export default function ParksMap({
 
               {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
               <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:16, zIndex:21, transition:"bottom 0.3s" }}>
-                {locateTip && (
-                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background:"#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
-                    Recenter map
+                {(locateTip || locateError) && (
+                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #ff5841)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                    {locateError || "Recenter map"}
                   </div>
                 )}
                 <button onClick={nearMe} title="Recenter map" style={{ width:44, height:44, borderRadius:"50%", background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff", border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
@@ -522,9 +534,9 @@ export default function ParksMap({
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 </button>
                 <div style={{ position:"relative" }}>
-                  {locateTip && (
-                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background:"#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
-                      Recenter map
+                  {(locateTip || locateError) && (
+                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #ff5841)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                      {locateError || "Recenter map"}
                     </div>
                   )}
                   <button onClick={nearMe} title="Recenter map" style={{ width:38, height:38, borderRadius:4, background:"var(--card)", border:"1px solid var(--border)", boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--foreground)" }}>
