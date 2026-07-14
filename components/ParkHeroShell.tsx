@@ -193,21 +193,21 @@ export default function ParkHeroShell({
         zIndex: 5,
         color: "#fff",
       }}>
-        {/* Eyebrow */}
+        {/* Eyebrow — bare catalogue number, matching the home hero treatment */}
         {idNumber && (
           <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 13,
-            color: "#fff", textTransform: "uppercase",
+            fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 400,
+            color: "var(--accent)", textTransform: "uppercase",
             marginBottom: 6, lineHeight: 1, letterSpacing: "0.04em",
           }}>
-            <span style={{ fontWeight: 400 }}>SCN/</span>
-            <span style={{ fontWeight: 700 }}>{idNumber}</span>
+            {idNumber}
           </div>
         )}
 
         {/* Park name */}
         <div style={{
-          fontFamily: "var(--font-heading)", fontWeight: 300,
+          fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 300,
+          fontStyle: "italic",
           fontSize: "clamp(34px, 5.5vw, 60px)",
           lineHeight: 0.88, color: "#fff",
           textShadow: "0 2px 24px rgba(0,0,0,0.25)",
@@ -225,7 +225,7 @@ export default function ParkHeroShell({
             {locationChain && (
               <div style={{
                 fontFamily: "var(--font-mono)", fontSize: 13,
-                color: "rgba(255,255,255,0.92)",
+                color: "rgba(255,255,255,0.55)",
                 textTransform: "uppercase", letterSpacing: "0.02em",
                 marginBottom: 14,
               }}>
@@ -354,12 +354,12 @@ export default function ParkHeroShell({
         .fbs-field-value {
           font-family: var(--font-mono);
           font-size: 13px;
-          color: #fff;
+          color: rgba(255,255,255,0.55);
         }
         .fbs-coord {
           font-family: var(--font-mono);
           font-size: 13px;
-          color: #fff;
+          color: rgba(255,255,255,0.55);
           text-decoration: none;
           border-bottom: 1px solid rgba(255,255,255,0.3);
           display: inline-flex;

@@ -39,21 +39,21 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
 
   return (
     <div>
-      {/* Eyebrow */}
+      {/* Eyebrow — bare catalogue number, coral to match the brand accent */}
       {idNumber && (
         <div style={{
-          fontFamily: "var(--font-mono)", fontSize: 19.4,
-          color: "#fff", textTransform: "uppercase",
+          fontFamily: "var(--font-mono)", fontSize: 19.4, fontWeight: 400,
+          color: "var(--accent)", textTransform: "uppercase",
           marginBottom: 6, lineHeight: 1, letterSpacing: "0.04em",
         }}>
-          <span style={{ fontWeight: 400 }}>SCN/</span>
-          <span style={{ fontWeight: 400 }}>{idNumber}</span>
+          {idNumber}
         </div>
       )}
 
       {/* Park name */}
       <div style={{
-        fontFamily: "var(--font-heading)", fontWeight: 300,
+        fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 300,
+        fontStyle: "italic",
         fontSize: "clamp(3.5rem, 11vw, 9rem)",
         lineHeight: 0.9, color: "#fff",
         textShadow: "0 2px 16px rgba(0,0,0,0.25)",
@@ -67,10 +67,12 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
       <div className="fbs-hp-meta">
         <div className="fbs-hpm-left">
           {/* 3-tier location */}
+          {/* Postcode-in-coral treatment is still an open decision — kept
+              as one muted string until that's resolved. */}
           {locationChain && (
             <div style={{
               fontFamily: "var(--font-mono)", fontSize: 12.5,
-              color: "rgba(255,255,255,0.92)",
+              color: "rgba(255,255,255,0.55)",
               textTransform: "uppercase", letterSpacing: "0.02em",
               marginBottom: 10,
             }}>
@@ -84,13 +86,13 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
               {opened && (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", color: "rgba(255,255,255,0.55)" }}>Opened</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "#fff" }}>{fmtDate(opened)}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "rgba(255,255,255,0.55)" }}>{fmtDate(opened)}</span>
                 </div>
               )}
               {scanned && (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", color: "rgba(255,255,255,0.55)" }}>Scanned</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "#fff" }}>{fmtDate(scanned)}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "rgba(255,255,255,0.55)" }}>{fmtDate(scanned)}</span>
                 </div>
               )}
             </div>
@@ -118,7 +120,7 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
           flex-shrink: 0;
           padding: 5px 10px;
           font-size: 10px;
-          font-family: var(--font-mono);
+          font-family: var(--font-heading);
           font-weight: 400;
           text-transform: uppercase;
           letter-spacing: .06em;
@@ -129,6 +131,7 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
         .fbs-hero-cta:hover { opacity: 0.88; }
         @media (max-width: 767px) {
           .fbs-hp-meta { flex-direction: column; align-items: stretch; gap: 10px; }
+          .fbs-hero-cta { align-self: flex-start; }
         }
       `}</style>
     </div>

@@ -151,7 +151,7 @@ export default function ParksDirectory() {
       const el = marker.getElement?.()?.querySelector("div");
       if (!el) return;
       const sel = selectedPark?.id === id;
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ff5841";
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#EF4343";
       el.style.background    = sel ? accent : "#888";
       el.style.transform     = sel ? "scale(1.8)" : "scale(1)";
       el.style.boxShadow     = sel ? `0 0 0 5px ${accent}44` : "none";

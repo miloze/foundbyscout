@@ -117,7 +117,7 @@ export default async function Home() {
         {/* Full-width heading + description */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "clamp(2rem, 6vw, 6rem)", marginBottom: "3rem", flexWrap: "wrap" }}>
           <h2 style={{
-            fontFamily: "var(--font-heading)",
+            fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif",
             fontSize: "clamp(3rem, 7vw, 6rem)",
             lineHeight: 0.9,
             letterSpacing: "-0.03em",
@@ -125,7 +125,7 @@ export default async function Home() {
             textTransform: "uppercase",
             flexShrink: 0,
           }}>
-            Find a park
+            Parks
           </h2>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1.25rem", maxWidth: "44ch" }}>
             <p style={{ color: "var(--muted)", lineHeight: 1.65, fontSize: 15 }}>

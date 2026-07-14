@@ -4,12 +4,28 @@
    Loaded via next/font/google in app/layout.tsx — no @import needed here.
    ============================================================ */
 
+/* MSCHN — display font used for park names (home hero, directory). Not
+   licensed for production yet; wired up for whenever the licensed file
+   lands at public/fonts/MSCHN.<ext> (any of the formats below is enough).
+   Falls back to Rubik if the file isn't present — see --font-heading in
+   usages like `'MSCHN', var(--font-heading), Arial, sans-serif`. */
+@font-face {
+  font-family: 'MSCHN';
+  src: url('/fonts/MSCHN.woff2') format('woff2'),
+       url('/fonts/MSCHN.woff') format('woff'),
+       url('/fonts/MSCHN.otf') format('opentype'),
+       url('/fonts/MSCHN.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Base Color Tokens ─────────────────────────────── */
 :root {
   /* Dark mode (default) */
   --background:    #202020;
   --foreground:    #f0f0eb;
-  --accent:        #ff5841;
+  --accent:        #EF4343;
   --accent-hover:  #ff3d24;
   --muted:         #888888;
   --border:        #333333;
@@ -28,14 +44,14 @@
   --color-light-border: #dddad4;
   --color-light-muted:  #777777;
 
-  --color-accent:       #ff5841;
+  --color-accent:       #EF4343;
   --color-accent-hover: #ff3d24;
 }
 
 [data-theme="light"] {
   --background:   #f4f2ee;
   --foreground:   #1a1a1a;
-  --accent:       #ff5841;
+  --accent:       #EF4343;
   --accent-hover: #ff3d24;
   --muted:        #777777;
   --border:       #dddad4;
