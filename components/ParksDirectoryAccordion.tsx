@@ -3,8 +3,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ParkCard, ParkCardThumbnail, PARK_CARD_CSS, getParkAddressChain, getParkTags } from "./ParkCard";
-import { useNavOverlay } from "./NavOverlay";
-import { type SortMode, sortParks } from "./parkSort";
 
 const ParksMap = lazy(() => import("./ParksMap"));
 
@@ -18,10 +16,9 @@ const ParksMap = lazy(() => import("./ParksMap"));
 //  - conditions (ParkWeather) tag omitted, as in the prototype
 //  - coordinates omitted from the title line
 //  - colours below are prototype approximations, not confirmed brand tokens
-//  - MSCHN isn't licensed for production; it's wired up here for LOCAL
-//    TESTING ONLY via a @font-face pointing at public/fonts/MSCHN.* — do
-//    not commit/push an actual MSCHN font file. Falls back to bold italic
-//    Rubik (--pda-font-display) if the file isn't present.
+//  - MSCHN isn't licensed for production yet — the @font-face lives in
+//    app/colors_and_type.css and falls back to Rubik (--pda-font-display)
+//    until public/fonts/MSCHN.* actually exists.
 
 type ParkRow = {
   id: string;
@@ -47,11 +44,9 @@ export default function ParksDirectoryAccordion() {
   const [parks, setParks] = useState<ParkRow[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("az");
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [view, setView] = useState<"list" | "map">("list");
   const [isMobile, setIsMobile] = useState(true);
-  const { setOverlay } = useNavOverlay();
+  const barRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900);
@@ -60,11 +55,19 @@ export default function ParksDirectoryAccordion() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Mobile map view runs full-bleed behind a translucent Nav — see NavOverlay.
+  // Publish the header's real rendered height so the mobile map view (which
+  // fills the remaining viewport below it) can size itself to match — the
+  // header stays mounted and in the same place in both list and map view,
+  // so search + the List/Map toggle never move or change behaviour.
   useEffect(() => {
-    setOverlay(isMobile && view === "map");
-    return () => setOverlay(false);
-  }, [isMobile, view, setOverlay]);
+    const el = barRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      document.documentElement.style.setProperty("--pda-bar-height", `${entry.contentRect.height}px`);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     import("@supabase/supabase-js").then(({ createClient }) => {
@@ -80,27 +83,16 @@ export default function ParksDirectoryAccordion() {
     });
   }, []);
 
-  const handleSort = (mode: SortMode) => {
-    setSortMode(mode);
-    if (mode === "nearest" && !userCoords && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {}
-      );
-    }
-  };
-
   const displayedParks = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = !q ? parks : parks.filter(p =>
+    if (!q) return parks;
+    return parks.filter(p =>
       p.name.toLowerCase().includes(q) ||
       (p.location ?? "").toLowerCase().includes(q) ||
       (p.postcode ?? "").toLowerCase().includes(q) ||
       (p.address ?? []).some(a => a.toLowerCase().includes(q))
     );
-
-    return sortParks(filtered, sortMode, userCoords);
-  }, [parks, search, sortMode, userCoords]);
+  }, [parks, search]);
 
   const goToPark = (slug: string) => router.push(`/parks/${slug}`);
 
@@ -111,24 +103,10 @@ export default function ParksDirectoryAccordion() {
   return (
     <div className="pda-root">
       <style>{`
-        /* MSCHN — local testing only, not licensed for production.
-           Drop the file at public/fonts/MSCHN.<ext> (whichever format you
-           have); the multiple src formats below let the browser pick
-           whichever one actually exists. Falls back to Rubik if absent. */
-        @font-face{
-          font-family:'MSCHN';
-          src: url('/fonts/MSCHN.woff2') format('woff2'),
-               url('/fonts/MSCHN.woff') format('woff'),
-               url('/fonts/MSCHN.otf') format('opentype'),
-               url('/fonts/MSCHN.ttf') format('truetype');
-          font-weight:300 700;
-          font-style:normal;
-          font-display:swap;
-        }
         .pda-root{
           --pda-bg:var(--background); --pda-panel:var(--card); --pda-fg:var(--foreground);
           --pda-address:var(--muted); --pda-muted:var(--muted); --pda-line:var(--border);
-          --pda-accent:var(--accent, #ff5841); --pda-ink:#0a0a0a;
+          --pda-accent:var(--accent, #EF4343); --pda-ink:#0a0a0a;
           --pda-ease: cubic-bezier(0.16, 1, 0.3, 1);
           --pda-font-mono: 'DM Mono', ui-monospace, monospace;
           --pda-font-ui: 'Rubik', Arial, sans-serif;
@@ -138,17 +116,20 @@ export default function ParksDirectoryAccordion() {
         }
         .pda-wrap{ max-width:860px; margin:0 auto; padding:0 24px 100px; }
         .pda-wrap-wide{ max-width:none; }
-        .pda-bar{ position:sticky; top:44px; z-index:5; background:var(--pda-bg); padding:24px 0 16px; }
+        .pda-bar{ position:sticky; top:var(--nav-height, 44px); z-index:5; background:var(--pda-bg); padding:24px 0 16px; }
         .pda-search-row{ display:flex; align-items:center; gap:10px; border:1px solid var(--pda-line); background:var(--pda-panel); padding:12px 16px; }
         .pda-search-row svg{ width:15px; height:15px; opacity:.6; flex-shrink:0; }
         .pda-search-row input{ flex:1; width:100%; background:none; border:none; outline:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:16px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-search-row input::placeholder{ color:var(--pda-accent); opacity:.5; }
-        .pda-filter-row{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px; font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
-        .pda-sort-controls{ display:flex; gap:16px; }
-        .pda-sort-controls button{ background:none; border:none; color:var(--pda-muted); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; padding:2px 0 4px; border-bottom:1px solid transparent; transition:color .15s var(--pda-ease), border-color .15s var(--pda-ease); }
-        .pda-sort-controls button.pda-active, .pda-sort-controls button:hover{ color:var(--pda-accent); border-color:var(--pda-accent); }
-        .pda-view-toggle{ display:flex; border:1px solid var(--pda-line); border-radius:14px; overflow:hidden; }
-        .pda-view-toggle button{ background:transparent; border:none; color:var(--pda-fg); font-family:var(--pda-font-mono); font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.03em; padding:6px 14px; cursor:pointer; transition:background .15s var(--pda-ease), color .15s var(--pda-ease); }
+
+        .pda-mobile-bar-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        .pda-search-compact{ display:flex; align-items:center; gap:8px; height:30px; flex:1 1 auto; min-width:0; border-radius:15px; background:var(--pda-panel); border:1px solid var(--pda-line); padding:0 12px; }
+        .pda-search-compact svg{ width:13px; height:13px; opacity:.6; flex-shrink:0; }
+        .pda-search-compact input{ flex:1; min-width:0; height:30px; background:none; border:none; outline:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+        .pda-search-compact input::placeholder{ color:var(--pda-accent); opacity:.5; }
+
+        .pda-view-toggle{ display:flex; align-items:center; flex-shrink:0; height:30px; border:1px solid var(--pda-line); border-radius:15px; overflow:hidden; }
+        .pda-view-toggle button{ height:100%; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--pda-fg); font-family:var(--pda-font-mono); font-size:11px; line-height:1; text-transform:uppercase; letter-spacing:.03em; padding:0 14px; cursor:pointer; transition:background .15s var(--pda-ease), color .15s var(--pda-ease); }
         .pda-view-toggle button.pda-active{ background:var(--pda-accent); color:#fff; }
 
         .pda-row{ box-shadow:0 1px 0 var(--pda-line); transition:box-shadow .45s var(--pda-ease); }
@@ -173,10 +154,25 @@ export default function ParksDirectoryAccordion() {
       `}</style>
 
       <div className={`pda-wrap${!isMobile ? " pda-wrap-wide" : ""}`}>
-        {/* Mobile map view collapses this into ParksMap's own floating List/Map
-            strip so the map can run full-bleed — see NavOverlay + ParksMap. */}
-        {!(isMobile && view === "map") && (
-          <header className="pda-bar">
+        {/* Always mounted in the same place for list and map view alike —
+            search and the List/Map toggle must never move or change
+            behaviour when switching views. */}
+        <header className="pda-bar" ref={barRef}>
+          {isMobile ? (
+            <div className="pda-mobile-bar-row">
+              <div className="pda-search-compact">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input
+                  type="text" placeholder="SEARCH" value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="pda-view-toggle">
+                <button className={view === "list" ? "pda-active" : ""} onClick={() => setView("list")}>List</button>
+                <button className={view === "map" ? "pda-active" : ""} onClick={() => setView("map")}>Map</button>
+              </div>
+            </div>
+          ) : (
             <div className="pda-search-row">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               <input
@@ -184,29 +180,13 @@ export default function ParksDirectoryAccordion() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div className="pda-filter-row">
-              <div className="pda-sort-controls">
-                <button className={sortMode === "az" ? "pda-active" : ""} onClick={() => handleSort("az")}>A–Z</button>
-                <button className={sortMode === "date" ? "pda-active" : ""} onClick={() => handleSort("date")}>Date</button>
-                <button className={sortMode === "nearest" ? "pda-active" : ""} onClick={() => handleSort("nearest")}>Nearest</button>
-              </div>
-              {isMobile && (
-                <div className="pda-view-toggle">
-                  <button className={view === "list" ? "pda-active" : ""} onClick={() => setView("list")}>List</button>
-                  <button className={view === "map" ? "pda-active" : ""} onClick={() => setView("map")}>Map</button>
-                </div>
-              )}
-            </div>
-          </header>
-        )}
+          )}
+        </header>
 
         {showMap ? (
           <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
-            <div style={isMobile ? { height: "100dvh", margin: "-44px -24px 0" } : { height: "calc(100dvh - 170px)", margin: "0 -24px" }}>
-              <ParksMap
-                search={search} onSearchChange={setSearch} onBackToList={() => setView("list")}
-                sortMode={sortMode} userCoords={userCoords}
-              />
+            <div style={isMobile ? { height: "calc(100dvh - var(--nav-height, 44px) - var(--pda-bar-height, 132px))", margin: "0 -24px" } : { height: "calc(100dvh - 170px)", margin: "0 -24px" }}>
+              <ParksMap search={search} />
             </div>
           </Suspense>
         ) : (

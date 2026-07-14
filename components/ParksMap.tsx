@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "./ThemeProvider";
 import { ParkCard, ParkCardThumbnail } from "./ParkCard";
-import { type SortMode, sortParks } from "./parkSort";
 
 type Park = {
   id: string; slug: string; name: string; postcode: string; location: string;
@@ -44,13 +43,9 @@ function getDotWindow(total: number, active: number, max: number): number[] {
 }
 
 export default function ParksMap({
-  search, onSearchChange, onBackToList, sortMode, userCoords,
+  search,
 }: {
   search: string;
-  onSearchChange?: (v: string) => void;
-  onBackToList?: () => void;
-  sortMode?: SortMode;
-  userCoords?: { lat: number; lng: number } | null;
 }) {
   const router = useRouter();
   const [parks, setParks] = useState<Park[]>([]);
@@ -78,7 +73,6 @@ export default function ParksMap({
   const [carouselIdx,  setCarouselIdx]  = useState(0);
   const [cardState,    setCardState]    = useState<CardState>("hidden");
   const [slideDir,     setSlideDir]     = useState<"left"|"right"|null>(null);
-  const [searchOpen,   setSearchOpen]   = useState(() => search.length > 0);
   const [locateTip,    setLocateTip]    = useState(false);
   const [locateError,  setLocateError]  = useState("");
   const didDragRef = useRef(false);
@@ -236,15 +230,11 @@ export default function ParksMap({
     mapRef.current.fitBounds(bounds, { animate:true, duration:0.6, paddingTopLeft:[24,24], paddingBottomRight:[24, pad] });
   }, [activeFilter, cardState]);
 
-  const filteredParks = sortParks(
-    parks.filter(p => {
-      const mF = activeFilter === "All" || p.location.includes(activeFilter) || p.borough.includes(activeFilter);
-      const mS = p.name.toLowerCase().includes(search.toLowerCase()) || p.location.toLowerCase().includes(search.toLowerCase());
-      return mF && mS;
-    }),
-    sortMode ?? "az",
-    userCoords ?? null
-  );
+  const filteredParks = parks.filter(p => {
+    const mF = activeFilter === "All" || p.location.includes(activeFilter) || p.borough.includes(activeFilter);
+    const mS = p.name.toLowerCase().includes(search.toLowerCase()) || p.location.toLowerCase().includes(search.toLowerCase());
+    return mF && mS;
+  });
 
   useEffect(() => {
     Object.entries(markerRefs.current).forEach(([id, marker]) => {
@@ -252,7 +242,7 @@ export default function ParksMap({
       const el = marker.getElement?.()?.querySelector("div");
       if (!el) return;
       const sel = selectedPark?.id === id;
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ff5841";
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#EF4343";
       el.style.background    = sel ? accent : "#888";
       el.style.transform     = sel ? "scale(1.8)" : "scale(1)";
       el.style.boxShadow     = sel ? `0 0 0 5px ${accent}44` : "none";
@@ -456,7 +446,7 @@ export default function ParksMap({
           </div>
         )}
 
-        <div style={{ position:"relative", flex:1, height:"100%", minHeight:0 }}>
+        <div style={{ position:"relative", flex:1, height:"100%", minHeight:0, touchAction:"none" }}>
           <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
 
           {mapStatus === "loading" && (
@@ -474,38 +464,9 @@ export default function ParksMap({
 
           {isMobile ? (
             <>
-              {/* List / Map strip — thin, translucent, always visible */}
-              <div style={{ position:"absolute", top:60, left:0, right:0, zIndex:22, height:34, display:"flex", alignItems:"center", justifyContent:"center", background: theme === "dark" ? "rgba(20,20,20,0.55)" : "rgba(255,255,255,0.55)", WebkitBackdropFilter:"blur(8px)", backdropFilter:"blur(8px)" }}>
-                <div style={{ display:"flex", border:"1px solid var(--border)", borderRadius:14, overflow:"hidden" }}>
-                  <button onClick={onBackToList} style={{ padding:"4px 14px", fontSize:10, fontWeight:"bold", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:"0.1em", background:"transparent", color:"var(--foreground)", border:"none", cursor:"pointer" }}>List</button>
-                  <button style={{ padding:"4px 14px", fontSize:10, fontWeight:"bold", fontFamily:"var(--font-mono)", textTransform:"uppercase", letterSpacing:"0.1em", background:"var(--accent)", color:"#fff", border:"none", cursor:"default" }}>Map</button>
-                </div>
-              </div>
-
-              {/* Search — collapsible icon */}
-              <div style={{
-                position:"absolute", top:104, left:16, zIndex:21, display:"flex", alignItems:"center",
-                height:44, borderRadius:22, overflow:"hidden",
-                background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff",
-                boxShadow:"0 4px 14px rgba(0,0,0,0.15)",
-                width: searchOpen ? 230 : 44,
-                transition:"width 0.25s cubic-bezier(0.32,0.72,0,1)",
-              }}>
-                <button onClick={() => setSearchOpen(v => !v)} style={{ width:44, height:44, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background:"none", border:"none", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                </button>
-                {searchOpen && (
-                  <input
-                    autoFocus
-                    type="text" placeholder="Search…" value={search}
-                    onChange={e => onSearchChange?.(e.target.value)}
-                    style={{ flex:1, minWidth:0, height:44, border:"none", outline:"none", background:"transparent", fontFamily:"var(--font-mono)", fontSize:12, letterSpacing:"0.04em", color:"var(--foreground)", paddingRight:14 }}
-                  />
-                )}
-              </div>
-
-              {/* Satellite — its own spot, no longer stacked with locate */}
-              <div style={{ position:"absolute", top:104, right:16, zIndex:21 }}>
+              {/* Satellite — search and the List/Map toggle now live in the
+                  always-visible header above the map, not floating here. */}
+              <div style={{ position:"absolute", top:16, right:16, zIndex:21 }}>
                 <button onClick={() => setSatellite(v => !v)} title="Satellite" style={{ width:44, height:44, borderRadius:"50%", background: satellite ? "#141414" : (theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff"), border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : (theme === "dark" ? "#fff" : "#141414") }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 </button>
@@ -514,7 +475,7 @@ export default function ParksMap({
               {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
               <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:16, zIndex:21, transition:"bottom 0.3s" }}>
                 {(locateTip || locateError) && (
-                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #ff5841)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #EF4343)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                     {locateError || "Recenter map"}
                   </div>
                 )}
@@ -535,7 +496,7 @@ export default function ParksMap({
                 </button>
                 <div style={{ position:"relative" }}>
                   {(locateTip || locateError) && (
-                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #ff5841)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #EF4343)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                       {locateError || "Recenter map"}
                     </div>
                   )}
