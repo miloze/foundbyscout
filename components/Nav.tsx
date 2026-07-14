@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useNavOverlay } from "./NavOverlay";
 
@@ -16,9 +16,24 @@ export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const { overlay } = useNavOverlay();
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Publish the header's real rendered height as a CSS var so anything
+  // meant to sit flush below it (e.g. the sticky search bar on /parks)
+  // tracks the actual height instead of a hardcoded guess that drifts
+  // whenever the nav's content/padding changes across breakpoints.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      document.documentElement.style.setProperty("--nav-height", `${entry.contentRect.height}px`);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <header style={{ borderBottom: "none" }} className="fixed top-0 left-0 right-0 w-full z-50">
+    <header ref={headerRef} style={{ borderBottom: "none" }} className="fixed top-0 left-0 right-0 w-full z-50">
       <nav
         className="flex items-center justify-between"
         style={{

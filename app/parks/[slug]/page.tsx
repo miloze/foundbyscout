@@ -120,7 +120,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
       <div style={{ paddingTop: 40, paddingBottom: 40, borderBottom: "1px solid var(--border)", maxWidth: 680 }}>
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>About</p>
         <div style={{ fontSize: 15, lineHeight: 1.75, color: "var(--foreground)", marginBottom: 20 }}>
-          {park.description.map((p: string, i: number) => <p key={i} style={{ marginTop: i > 0 ? 14 : 0 }}>{p}</p>)}
+          {(park.description ?? []).map((p: string, i: number) => <p key={i} style={{ marginTop: i > 0 ? 14 : 0 }}>{p}</p>)}
         </div>
         <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em" }}>
           Opened {park.opened}
@@ -146,7 +146,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           <div>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>At a glance</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-              {park.glance.map((item: GlanceItem) => (
+              {(park.glance ?? []).map((item: GlanceItem) => (
                 <div key={item.label} style={{ background: "var(--card)", padding: "12px 10px", display: "flex", flexDirection: "column", gap: 8, opacity: item.available ? 1 : 0.38 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 18, color: item.available ? "var(--accent)" : "var(--muted)" }}>{item.icon}</span>
                   <div>
@@ -162,11 +162,11 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           <div style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Getting there</p>
             <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--foreground)", marginBottom: 14 }}>
-              {park.address.map((l: string, i: number) => <span key={i}>{l}<br /></span>)}
+              {(park.address ?? []).map((l: string, i: number) => <span key={i}>{l}<br /></span>)}
               <span style={{ color: "var(--muted)" }}>{park.postcode}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {park.transport.map((t: Transport, i: number) => (
+              {(park.transport ?? []).map((t: Transport, i: number) => (
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <TransportBadge type={t.type} />
                   <div>
@@ -181,8 +181,8 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           {/* Opening times */}
           <div style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Opening times</p>
-            {park.hours.map((row: HoursRow, i: number) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: i < park.hours.length - 1 ? "1px solid var(--border)" : "none" }}>
+            {(park.hours ?? []).map((row: HoursRow, i: number, hours: HoursRow[]) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: i < hours.length - 1 ? "1px solid var(--border)" : "none" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted)" }}>{row.days}</span>
                 <span style={{ fontSize: 12.5, fontWeight: 500 }}>{row.time}</span>
               </div>
