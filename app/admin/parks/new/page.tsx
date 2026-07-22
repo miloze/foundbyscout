@@ -53,9 +53,10 @@ export default function NewParkPage() {
 
   const [form, setForm] = useState({
     slug: "", name: "", postcode: "", borough: "", location: "",
+    address: [] as string[],
     type: "Bowl", surface: "", surface_note: "",
     is_free: true, is_covered: false,
-    opened: "", builder: "", managed_by: "",
+    opened: "", builder: "",
     lat: "", lng: "",
     brief: "",
     description: "",
@@ -64,7 +65,7 @@ export default function NewParkPage() {
   });
 
   function field(key: keyof typeof form) {
-    return (v: string | boolean) => setForm(f => ({ ...f, [key]: v }));
+    return (v: string | boolean | string[]) => setForm(f => ({ ...f, [key]: v }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -72,10 +73,24 @@ export default function NewParkPage() {
     setSaving(true);
     setError("");
 
+    const latNum = form.lat ? parseFloat(form.lat as string) : null;
+    const lngNum = form.lng ? parseFloat(form.lng as string) : null;
+
+    if (latNum !== null && (latNum < 49 || latNum > 61)) {
+      setError("Latitude looks out of range for the UK — check for a missing decimal point.");
+      setSaving(false);
+      return;
+    }
+    if (lngNum !== null && (lngNum < -8 || lngNum > 2)) {
+      setError("Longitude looks out of range for the UK — check for a missing decimal point.");
+      setSaving(false);
+      return;
+    }
+
     const body = {
       ...form,
-      lat: form.lat ? parseFloat(form.lat as string) : null,
-      lng: form.lng ? parseFloat(form.lng as string) : null,
+      lat: latNum,
+      lng: lngNum,
       description: form.description ? form.description.split("\n\n").filter(Boolean) : [],
       glance: [], transport: [], hours: [], facilities: [], gallery: [], spots: [], socials: [],
     };
@@ -113,6 +128,27 @@ export default function NewParkPage() {
             <FieldLabel required>Slug</FieldLabel>
             <Input value={form.slug} onChange={field("slug")} placeholder="crystal-palace" />
           </div>
+        </div>
+
+        <div>
+          <FieldLabel>Address</FieldLabel>
+          {form.address.map((line, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <Input
+                value={line}
+                onChange={v => { const a = [...form.address]; a[i] = v; field("address")(a); }}
+                placeholder="e.g. Crystal Palace Park, Thicket Road"
+              />
+              <button type="button" onClick={() => field("address")(form.address.filter((_, j) => j !== i))}
+                style={{ flexShrink: 0, width: 30, height: 30, background: "none", border: "1px solid var(--border)", color: "var(--muted)", cursor: "pointer", fontSize: 16 }}>
+                ×
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={() => field("address")([...form.address, ""])}
+            style={{ width: "100%", marginTop: 6, padding: "9px 16px", fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--accent)", background: "none", border: "1px dashed var(--accent)", cursor: "pointer" }}>
+            + Add address line
+          </button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
@@ -188,11 +224,6 @@ export default function NewParkPage() {
             <FieldLabel>Builder</FieldLabel>
             <Input value={form.builder} onChange={field("builder")} placeholder="Canvas Skateparks" />
           </div>
-        </div>
-
-        <div>
-          <FieldLabel>Managed by</FieldLabel>
-          <Input value={form.managed_by} onChange={field("managed_by")} placeholder="GLL / London Borough of Bromley" />
         </div>
 
         <div>

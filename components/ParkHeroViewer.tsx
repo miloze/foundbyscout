@@ -69,7 +69,7 @@ export default function ParkHeroViewer({
     return () => clearTimeout(timeout);
   }, [modelLoaded, activeDesktopModel, modelFile, modelFileLow]);
 
-  const preloadSrc = preloadImageUrl ?? modelFile.replace(/\/[^/]+$/, "/glb-preload.png");
+  const preloadSrc = preloadImageUrl;
 
   // ── Mobile: static image + tap-to-expand modal ───────────────────────────
   if (isMobile && !forceViewer) {

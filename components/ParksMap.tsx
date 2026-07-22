@@ -377,27 +377,29 @@ export default function ParksMap({
     </div>
   );
 
-  // Desktop split view — compact card anchored bottom-left of the map panel,
-  // synced with the list column instead of a swipeable full-width bottom sheet.
+  // Desktop split view — large image-led card anchored bottom-left of the map
+  // panel, synced with the list column instead of a swipeable bottom sheet.
   const splitCard = selectedPark && (
     <div
       ref={cardRef}
       onClick={() => router.push(`/parks/${selectedPark.slug}`)}
       style={{
         position:"absolute", left:12, bottom:12, zIndex:25,
-        width:"26%", minWidth:140,
+        width:"clamp(280px, 24vw, 380px)",
         background: theme === "dark" ? "rgba(22,22,22,0.97)" : "rgba(248,246,242,0.97)",
         WebkitBackdropFilter:"blur(16px)",
         backdropFilter:"blur(16px)",
         borderRadius:12,
-        padding:"14px 14px 16px",
+        overflow:"hidden",
         boxShadow:"0 8px 32px rgba(0,0,0,0.28)",
         cursor:"pointer", userSelect:"none",
         animation:"fbs-split-in 0.32s cubic-bezier(0.32,0.72,0,1) both",
       }}
     >
-      <ParkCard park={selectedPark} idx={carouselIdx} variant="map" showLocation={false} showAddress />
-      <ParkCardThumbnail park={selectedPark} variant="map" />
+      <ParkCardThumbnail park={selectedPark} variant="feature" />
+      <div style={{ padding:"12px 14px 14px" }}>
+        <ParkCard park={selectedPark} idx={carouselIdx} variant="feature" showTags={false} showLocation showAddress={false} />
+      </div>
     </div>
   );
 

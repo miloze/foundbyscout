@@ -78,7 +78,7 @@ export default async function Home() {
           {/* Postcode badge */}
           {featured.postcode && (
             <div style={{
-              position: "absolute", top: "clamp(64px,8vw,80px)", left: "clamp(16px,4vw,56px)",
+              position: "absolute", top: "clamp(64px,8vw,80px)", right: "clamp(16px,4vw,56px)",
               width: 80, height: 80, borderRadius: "50%", background: "var(--accent)",
               display: "flex", alignItems: "center", justifyContent: "center",
               zIndex: 2, pointerEvents: "none",

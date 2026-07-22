@@ -94,7 +94,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         modelFileLow={park.model_file_low ?? undefined}
         modelFileMobile={modelFileMobile}
         heroImage={park.hero_image}
-        preloadImageUrl={park.preload_image_url ?? undefined}
+        preloadImageUrl={park.preload_image_url ?? `/images/parks/${slug}/glb-preload.png`}
         cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
         cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
         modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
@@ -193,8 +193,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           <div style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Built by</p>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--foreground)", lineHeight: 1.8, letterSpacing: "0.04em" }}>
-              {park.builder}<br />
-              <span style={{ color: "var(--muted)" }}>{park.managed_by}</span>
+              {park.builder}
             </p>
             {park.socials && park.socials.length > 0 && (
               <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>

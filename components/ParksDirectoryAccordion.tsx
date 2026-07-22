@@ -119,14 +119,16 @@ export default function ParksDirectoryAccordion() {
         .pda-bar{ position:sticky; top:var(--nav-height, 44px); z-index:5; background:var(--pda-bg); padding:24px 0 16px; }
         .pda-search-row{ display:flex; align-items:center; gap:10px; border:1px solid var(--pda-line); background:var(--pda-panel); padding:12px 16px; }
         .pda-search-row svg{ width:15px; height:15px; opacity:.6; flex-shrink:0; }
-        .pda-search-row input{ flex:1; width:100%; background:none; border:none; outline:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:16px; text-transform:uppercase; letter-spacing:.03em; }
+        .pda-search-row input{ flex:1; width:100%; background:none; border:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:16px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-search-row input::placeholder{ color:var(--pda-accent); opacity:.5; }
+        .pda-search-row input:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:2px; }
 
         .pda-mobile-bar-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
         .pda-search-compact{ display:flex; align-items:center; gap:8px; height:30px; flex:1 1 auto; min-width:0; border-radius:15px; background:var(--pda-panel); border:1px solid var(--pda-line); padding:0 12px; }
         .pda-search-compact svg{ width:13px; height:13px; opacity:.6; flex-shrink:0; }
-        .pda-search-compact input{ flex:1; min-width:0; height:30px; background:none; border:none; outline:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+        .pda-search-compact input{ flex:1; min-width:0; height:30px; background:none; border:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-search-compact input::placeholder{ color:var(--pda-accent); opacity:.5; }
+        .pda-search-compact input:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:2px; }
 
         .pda-view-toggle{ display:flex; align-items:center; flex-shrink:0; height:30px; border:1px solid var(--pda-line); border-radius:15px; overflow:hidden; }
         .pda-view-toggle button{ height:100%; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--pda-fg); font-family:var(--pda-font-mono); font-size:11px; line-height:1; text-transform:uppercase; letter-spacing:.03em; padding:0 14px; cursor:pointer; transition:background .15s var(--pda-ease), color .15s var(--pda-ease); }

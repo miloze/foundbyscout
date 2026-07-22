@@ -25,8 +25,12 @@
   /* Dark mode (default) */
   --background:    #202020;
   --foreground:    #f0f0eb;
-  --accent:        #EF4343;
-  --accent-hover:  #ff3d24;
+  /* Accent darkened from #EF4343 — white text on the old value only hit
+     3.78:1 (fails WCAG AA's 4.5:1 for normal text) on every filled button/
+     badge. #D23B3B holds the same hue at 4.74:1. Hover darkens further
+     instead of brightening (old #ff3d24 was even further below AA). */
+  --accent:        #D23B3B;
+  --accent-hover:  #B33232;
   --muted:         #888888;
   --border:        #333333;
   --card:          #2a2a2a;
@@ -42,18 +46,19 @@
   --color-light-fg:     #1a1a1a;
   --color-light-card:   #ebe8e3;
   --color-light-border: #dddad4;
-  --color-light-muted:  #777777;
+  /* #777777 on the light background is 4.0:1, under AA's 4.5:1. #6D6D6D clears it at 4.6:1. */
+  --color-light-muted:  #6D6D6D;
 
-  --color-accent:       #EF4343;
-  --color-accent-hover: #ff3d24;
+  --color-accent:       #D23B3B;
+  --color-accent-hover: #B33232;
 }
 
 [data-theme="light"] {
   --background:   #f4f2ee;
   --foreground:   #1a1a1a;
-  --accent:       #EF4343;
-  --accent-hover: #ff3d24;
-  --muted:        #777777;
+  --accent:       #D23B3B;
+  --accent-hover: #B33232;
+  --muted:        #6D6D6D;
   --border:       #dddad4;
   --card:         #ebe8e3;
 }

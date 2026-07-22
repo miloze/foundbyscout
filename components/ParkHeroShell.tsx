@@ -11,10 +11,10 @@ function fmtDate(val: string): string {
   const parts = val.trim().split(/\s+/);
   if (parts.length === 2) {
     const m = MONTHS[parts[0].toLowerCase()];
-    const y = parts[1].slice(-2);
+    const y = parts[1];
     if (m) return `${m}/${y}`;
   }
-  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0].slice(-2);
+  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0];
   return val;
 }
 import ParkHeroViewer from "./ParkHeroViewer";
@@ -90,9 +90,11 @@ export default function ParkHeroShell({
   const postcodePrefix = postcode?.split(" ")[0];
   const idNumber = catalogueId?.replace(/^SCN\//i, "");
 
-  const locationChain = [address?.[0], "London", postcodePrefix]
+  // Area name (not street) + full postcode — matches the homepage hero treatment.
+  const areaName = address && address.length > 1 ? address[1] : address?.[0];
+  const locationChain = [areaName, "London", postcode]
     .filter(Boolean)
-    .join(" / ")
+    .join(", ")
     .toUpperCase();
 
   const hasCoords = lat != null && lng != null;
@@ -163,7 +165,7 @@ export default function ParkHeroShell({
         <div style={{
           position: "absolute",
           top: "clamp(64px, 8vw, 80px)",
-          left: "clamp(16px, 4vw, 56px)",
+          right: "clamp(16px, 4vw, 56px)",
           width: 80, height: 80, borderRadius: "50%",
           background: "var(--accent)",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -193,26 +195,14 @@ export default function ParkHeroShell({
         zIndex: 5,
         color: "#fff",
       }}>
-        {/* Eyebrow — bare catalogue number, matching the home hero treatment */}
-        {idNumber && (
-          <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 400,
-            color: "var(--accent)", textTransform: "uppercase",
-            marginBottom: 6, lineHeight: 1, letterSpacing: "0.04em",
-          }}>
-            {idNumber}
-          </div>
-        )}
-
         {/* Park name */}
         <div style={{
-          fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 300,
-          fontStyle: "italic",
+          fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 500,
           fontSize: "clamp(34px, 5.5vw, 60px)",
           lineHeight: 0.88, color: "#fff",
           textShadow: "0 2px 24px rgba(0,0,0,0.25)",
-          marginBottom: 14,
-          textTransform: "uppercase", letterSpacing: "-0.01em",
+          marginBottom: 20,
+          textTransform: "uppercase", letterSpacing: "0em",
         }}>
           {name}
         </div>
@@ -220,53 +210,38 @@ export default function ParkHeroShell({
         {/* hero-meta row: field list (left) + cluster (right) */}
         <div className="fbs-hero-meta">
 
-          {/* Left: field rows */}
+          {/* Left: field pills */}
           <div className="fbs-hm-left">
-            {locationChain && (
-              <div style={{
-                fontFamily: "var(--font-mono)", fontSize: 13,
-                color: "rgba(255,255,255,0.55)",
-                textTransform: "uppercase", letterSpacing: "0.02em",
-                marginBottom: 14,
-              }}>
-                {locationChain}
-              </div>
-            )}
+            <div className="fbs-field-row">
+              {locationChain && (
+                <span className="fbs-field-tag fbs-field-tag--plain">{locationChain}</span>
+              )}
 
-            {hasCoords && (
-              <div className="fbs-field-row">
-                <div className="fbs-field-label">Coordinates</div>
+              {hasCoords && (
                 <a
                   href={`https://maps.google.com/?q=${lat},${lng}`}
                   target="_blank" rel="noopener noreferrer"
-                  className="fbs-coord"
+                  className="fbs-field-tag fbs-coord-tag"
                 >
                   {Math.abs(lat!).toFixed(4)}° {lat! >= 0 ? "N" : "S"}, {Math.abs(lng!).toFixed(4)}° {lng! >= 0 ? "E" : "W"}
                 </a>
-              </div>
-            )}
+              )}
 
-            {opened && (
-              <div className="fbs-field-row">
-                <div className="fbs-field-label">Opened</div>
-                <div className="fbs-field-value">{fmtDate(opened)}</div>
-              </div>
-            )}
+              {/* Catalogue no. + Scanned — paired inline, matches the homepage hero */}
+              {(idNumber || scanned) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {idNumber && <span className="fbs-field-tag">{idNumber}</span>}
+                  {scanned && <span className="fbs-field-tag">Scanned: {fmtDate(scanned)}</span>}
+                </div>
+              )}
 
-            {scanned && (
-              <div className="fbs-field-row">
-                <div className="fbs-field-label">Scanned</div>
-                <div className="fbs-field-value">{fmtDate(scanned)}</div>
-              </div>
-            )}
-
-            {/* Conditions — desktop only, moves to bottom row on mobile */}
-            {hasCoords && (
-              <div className="fbs-field-row fbs-cond-desktop">
-                <div className="fbs-field-label">Conditions</div>
-                <ParkWeather lat={lat!} lng={lng!} />
-              </div>
-            )}
+              {/* Conditions — desktop only, moves next to the cluster on mobile */}
+              {hasCoords && (
+                <div className="fbs-cond-desktop">
+                  <ParkWeather lat={lat!} lng={lng!} />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right: conditions (mobile only) + cluster */}
@@ -337,43 +312,35 @@ export default function ParkHeroShell({
         }
         .fbs-field-row {
           display: flex;
-          align-items: baseline;
-          gap: 10px;
-          margin-bottom: 5px;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
         }
-        .fbs-field-row:last-child { margin-bottom: 0; }
-        .fbs-field-label {
-          font-family: var(--font-mono);
-          font-size: 10.5px;
-          text-transform: uppercase;
-          letter-spacing: .08em;
-          color: rgba(255,255,255,0.55);
-          width: 88px;
-          flex-shrink: 0;
-        }
-        .fbs-field-value {
-          font-family: var(--font-mono);
-          font-size: 13px;
-          color: rgba(255,255,255,0.55);
-        }
-        .fbs-coord {
-          font-family: var(--font-mono);
-          font-size: 13px;
-          color: rgba(255,255,255,0.55);
-          text-decoration: none;
-          border-bottom: 1px solid rgba(255,255,255,0.3);
+        .fbs-field-tag {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+          color: rgba(255,255,255,0.7);
+          border: 1px solid rgba(255,255,255,0.25);
+          padding: 5px 9px;
+          text-decoration: none;
         }
-        .fbs-coord::after { content: "↗"; font-size: 11px; opacity: .6; }
-        .fbs-coord:hover { color: var(--accent); border-color: var(--accent); }
-        .fbs-coord:hover::after { opacity: 1; }
+        .fbs-field-tag--plain {
+          border: none;
+          padding: 0;
+        }
+        .fbs-coord-tag { gap: 5px; }
+        .fbs-coord-tag::after { content: "↗"; font-size: 10px; opacity: .7; }
+        .fbs-coord-tag:hover { color: #fff; border-color: var(--accent); }
+        .fbs-coord-tag:hover::after { opacity: 1; }
         .fbs-cond-mobile { display: none; }
         @media (max-width: 767px) {
           .fbs-hero-meta { flex-direction: column; align-items: stretch; gap: 14px; }
           .fbs-hm-right { flex-direction: row; align-items: center; justify-content: space-between; }
-          .fbs-field-label { width: 78px; }
           .fbs-cond-desktop { display: none; }
           .fbs-cond-mobile { display: flex; }
           .fbs-cluster-btn { width: 44px !important; height: 44px !important; }

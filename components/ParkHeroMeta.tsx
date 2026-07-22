@@ -11,10 +11,10 @@ function fmtDate(val: string): string {
   const parts = val.trim().split(/\s+/);
   if (parts.length === 2) {
     const m = MONTHS[parts[0].toLowerCase()];
-    const y = parts[1].slice(-2);
+    const y = parts[1];
     if (m) return `${m}/${y}`;
   }
-  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0].slice(-2);
+  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0];
   return val;
 }
 
@@ -29,36 +29,25 @@ type Props = {
 };
 
 export default function ParkHeroMeta({ catalogueId, name, address, postcode, opened, scanned, slug }: Props) {
-  const postcodePrefix = postcode?.split(" ")[0];
-  const locationChain = [address?.[0], "London", postcodePrefix]
-    .filter(Boolean)
-    .join(" / ")
-    .toUpperCase();
-
   const idNumber = catalogueId?.replace(/^SCN\//i, "");
+  // Area name (not street) reads better at hero scale — street-level detail
+  // lives in the park page's "Getting there" section.
+  const areaName = address && address.length > 1 ? address[1] : address?.[0];
+  const locationChain = [areaName, "London", postcode]
+    .filter(Boolean)
+    .join(", ")
+    .toUpperCase();
 
   return (
     <div>
-      {/* Eyebrow — bare catalogue number, coral to match the brand accent */}
-      {idNumber && (
-        <div style={{
-          fontFamily: "var(--font-mono)", fontSize: 19.4, fontWeight: 400,
-          color: "var(--accent)", textTransform: "uppercase",
-          marginBottom: 6, lineHeight: 1, letterSpacing: "0.04em",
-        }}>
-          {idNumber}
-        </div>
-      )}
-
       {/* Park name */}
       <div style={{
-        fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 300,
-        fontStyle: "italic",
+        fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 500,
         fontSize: "clamp(3.5rem, 11vw, 9rem)",
         lineHeight: 0.9, color: "#fff",
         textShadow: "0 2px 16px rgba(0,0,0,0.25)",
-        marginBottom: 12,
-        textTransform: "uppercase", letterSpacing: "-0.01em",
+        marginBottom: 18,
+        textTransform: "uppercase", letterSpacing: "0em",
       }}>
         {name}
       </div>
@@ -71,30 +60,20 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
               as one muted string until that's resolved. */}
           {locationChain && (
             <div style={{
-              fontFamily: "var(--font-mono)", fontSize: 12.5,
+              fontFamily: "var(--font-mono)", fontSize: 10.5,
               color: "rgba(255,255,255,0.55)",
               textTransform: "uppercase", letterSpacing: "0.02em",
-              marginBottom: 10,
+              marginBottom: 8,
             }}>
               {locationChain}
             </div>
           )}
 
-          {/* Opened + Scanned on one row */}
-          {(opened || scanned) && (
-            <div style={{ display: "flex", gap: 18 }}>
-              {opened && (
-                <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", color: "rgba(255,255,255,0.55)" }}>Opened</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "rgba(255,255,255,0.55)" }}>{fmtDate(opened)}</span>
-                </div>
-              )}
-              {scanned && (
-                <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", color: "rgba(255,255,255,0.55)" }}>Scanned</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "rgba(255,255,255,0.55)" }}>{fmtDate(scanned)}</span>
-                </div>
-              )}
+          {/* Catalogue no. + Scanned — cat. no. inline in front of the pill */}
+          {(idNumber || scanned) && (
+            <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
+              {idNumber && <span className="fbs-hp-tag">{idNumber}</span>}
+              {scanned && <span className="fbs-hp-tag">Scanned: {fmtDate(scanned)}</span>}
             </div>
           )}
         </div>
@@ -115,6 +94,17 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
           gap: 24px;
         }
         .fbs-hpm-left { flex: 1; min-width: 0; }
+        .fbs-hp-tag {
+          display: inline-block;
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+          color: rgba(255,255,255,0.7);
+          border: 1px solid rgba(255,255,255,0.25);
+          padding: 5px 9px;
+        }
         .fbs-hero-cta {
           display: inline-block;
           flex-shrink: 0;

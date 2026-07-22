@@ -46,8 +46,8 @@ export const PARK_CARD_CSS = `
   .pcard-map .pcard-address{ margin:2px 0 8px; padding:0; }
   .pcard-title{
     font-family:var(--pda-font-display); text-transform:uppercase; line-height:0.85;
-    letter-spacing:.005em; font-style:italic; font-weight:700;
-    font-variation-settings:'wght' 700, 'ital' 1;
+    letter-spacing:.005em; font-weight:700;
+    font-variation-settings:'wght' 700;
     display:block; padding:10px 12px 8px; margin:0;
   }
   .pcard-title .pcard-name{ color:var(--pda-fg); }
@@ -90,7 +90,7 @@ export const PARK_CARD_CSS = `
   .pcard-thumb-map{ height:130px; margin-top:12px; }
   .pcard-thumb-arrow{
     position:absolute; z-index:2;
-    font-family:var(--pda-font-display); font-style:italic; font-weight:900; font-variation-settings:'wght' 700;
+    font-family:var(--pda-font-display); font-weight:900; font-variation-settings:'wght' 700;
     color:var(--pda-fg); line-height:1;
     filter:drop-shadow(0 2px 8px rgba(0,0,0,0.45));
     transition:transform .25s var(--pda-ease), color .2s var(--pda-ease);
@@ -98,6 +98,25 @@ export const PARK_CARD_CSS = `
   .pcard-thumb:hover .pcard-thumb-arrow{ transform:translateX(18px); color:var(--pda-accent); }
   .pcard-thumb-row .pcard-thumb-arrow{ right:20px; bottom:6px; font-size:clamp(70px, 11vw, 130px); }
   .pcard-thumb-map .pcard-thumb-arrow{ right:12px; bottom:0px; font-size:clamp(36px, 8vw, 48px); }
+
+  /* Feature: large image-led card — desktop map split view. Image flush to
+     the card edges (55–60% of card height via aspect-ratio), on-photo
+     circular CTA button rather than the row/map variants' giant text arrow. */
+  .pcard-thumb-feature{ aspect-ratio: 16 / 9; margin-top:0; }
+  .pcard-cta{
+    position:absolute; z-index:2; bottom:12px; right:12px;
+    width:36px; height:36px; border-radius:50%;
+    background:var(--pda-accent); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 14px rgba(0,0,0,0.35);
+    transition:transform .2s var(--pda-ease);
+  }
+  .pcard-thumb:hover .pcard-cta{ transform:scale(1.08); }
+  .pcard-feature .pcard-id{ color:var(--pda-accent); font-size:11px; padding:0; margin-bottom:2px; }
+  .pcard-feature .pcard-title{ padding:0; margin:0 0 4px; }
+  .pcard-feature .pcard-title .pcard-name{ font-size:clamp(20px, 2.2vw, 26px); font-weight:500; }
+  .pcard-feature .pcard-title .pcard-postcode{ font-size:clamp(20px, 2.2vw, 26px); font-weight:500; }
+  .pcard-feature .pcard-location{ padding:0; margin:0; font-size:10px; }
 `;
 
 export function ParkCard({
@@ -105,7 +124,7 @@ export function ParkCard({
 }: {
   park: ParkCardPark;
   idx: number;
-  variant: "row" | "map" | "index";
+  variant: "row" | "map" | "index" | "feature";
   showTags?: boolean;
   showLocation?: boolean;
   showAddress?: boolean;
@@ -140,7 +159,7 @@ export function ParkCardThumbnail({
   park, variant, onClick,
 }: {
   park: Pick<ParkCardPark, "directory_image_url" | "hero_image">;
-  variant: "row" | "map";
+  variant: "row" | "map" | "feature";
   onClick?: (e: React.MouseEvent) => void;
 }) {
   const image = park.directory_image_url || park.hero_image;
@@ -151,7 +170,15 @@ export function ParkCardThumbnail({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image} alt="" loading="lazy" />
       )}
-      <span className="pcard-thumb-arrow">&#8594;</span>
+      {variant === "feature" ? (
+        <span className="pcard-cta" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </span>
+      ) : (
+        <span className="pcard-thumb-arrow">&#8594;</span>
+      )}
     </div>
   );
 }

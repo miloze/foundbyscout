@@ -125,7 +125,7 @@ type FormState = {
   type: string; surface: string; surface_note: string;
   is_free: boolean; is_covered: boolean; published: boolean; use_contour_model: boolean;
   sort_order: number;
-  opened: string; builder: string; managed_by: string;
+  opened: string; builder: string;
   lat: string; lng: string;
   address: string[];
   transport: TransportItem[];
@@ -143,7 +143,7 @@ const EMPTY: FormState = {
   name: "", postcode: "", borough: "", location: "",
   type: "Bowl", surface: "", surface_note: "",
   is_free: true, is_covered: false, published: false, use_contour_model: false, sort_order: 0,
-  opened: "", builder: "", managed_by: "",
+  opened: "", builder: "",
   lat: "", lng: "",
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
   brief: "", description: "",
@@ -219,7 +219,6 @@ export default function EditParkPage() {
           use_contour_model: park.use_contour_model ?? false,
           opened:            park.opened ?? "",
           builder:           park.builder ?? "",
-          managed_by:        park.managed_by ?? "",
           lat:  park.lat  != null ? String(park.lat)  : "",
           lng:  park.lng  != null ? String(park.lng)  : "",
           address:   Array.isArray(park.address)   ? park.address   : [],
@@ -300,10 +299,24 @@ export default function EditParkPage() {
     setSaving(true);
     setError("");
 
+    const latNum = form.lat ? parseFloat(form.lat) : null;
+    const lngNum = form.lng ? parseFloat(form.lng) : null;
+
+    if (latNum !== null && (latNum < 49 || latNum > 61)) {
+      setError("Latitude looks out of range for the UK — check for a missing decimal point.");
+      setSaving(false);
+      return;
+    }
+    if (lngNum !== null && (lngNum < -8 || lngNum > 2)) {
+      setError("Longitude looks out of range for the UK — check for a missing decimal point.");
+      setSaving(false);
+      return;
+    }
+
     const body = {
       ...form,
-      lat: form.lat ? parseFloat(form.lat) : null,
-      lng: form.lng ? parseFloat(form.lng) : null,
+      lat: latNum,
+      lng: lngNum,
       description:    form.description ? form.description.split("\n\n").filter(Boolean) : [],
       camera_pos:     strToNumArr(form.camera_pos),
       camera_target:  strToNumArr(form.camera_target),
@@ -735,10 +748,6 @@ export default function EditParkPage() {
                 <FieldLabel>Builder</FieldLabel>
                 <Input value={form.builder} onChange={v => upd("builder", v)} placeholder="Canvas Skateparks" />
               </div>
-              <div>
-                <FieldLabel>Managed by</FieldLabel>
-                <Input value={form.managed_by} onChange={v => upd("managed_by", v)} placeholder="GLL / London Borough of Bromley" />
-              </div>
             </div>
           </div>
         </section>
@@ -1040,7 +1049,7 @@ export default function EditParkPage() {
                   placeholder="/images/parks/crystal-palace/model-500k.glb" />
               </div>
               <div>
-                <FieldLabel hint="shown while GLB loads — leave blank to auto-derive from model path">Preload image URL</FieldLabel>
+                <FieldLabel hint="shown while GLB loads — leave blank to auto-derive from the park's local image folder">Preload image URL</FieldLabel>
                 <Input value={form.preload_image_url} onChange={v => upd("preload_image_url", v)}
                   placeholder="/images/parks/crystal-palace/glb-preload.png" />
               </div>

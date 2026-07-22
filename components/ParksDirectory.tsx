@@ -386,11 +386,12 @@ export default function ParksDirectory() {
           <input
             type="text" placeholder={isMobile ? "Search…" : "Search parks or areas…"} value={search}
             onChange={e => setSearch(e.target.value)}
+            className="fbs-search-input"
             style={{
               width: isMobile ? 120 : 220, height: 44, padding: "0 12px 0 34px",
               fontSize: 12, background: "transparent",
               border: "none", color: "var(--foreground)",
-              outline: "none", fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-mono)",
               letterSpacing: "0.04em",
             }}
           />
@@ -437,6 +438,7 @@ export default function ParksDirectory() {
         @keyframes fbs-card-in { from { transform:translateY(220px); opacity:0; } to { transform:translateY(0); opacity:1; } }
         @keyframes fbs-slide-l { from { opacity:0; transform:translateX(28px);  } to { opacity:1; transform:translateX(0); } }
         @keyframes fbs-slide-r { from { opacity:0; transform:translateX(-28px); } to { opacity:1; transform:translateX(0); } }
+        .fbs-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
         .leaflet-container { background:var(--background) !important; }
         .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.4) !important; color:#888 !important; }
         .leaflet-control-attribution a { color:#aaa !important; }
