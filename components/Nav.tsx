@@ -17,6 +17,7 @@ export default function Nav() {
   const { theme, toggle } = useTheme();
   const { overlay } = useNavOverlay();
   const headerRef = useRef<HTMLElement>(null);
+  const logoRef = useRef<HTMLAnchorElement>(null);
 
   // Publish the header's real rendered height as a CSS var so anything
   // meant to sit flush below it (e.g. the sticky search bar on /parks)
@@ -28,9 +29,36 @@ export default function Nav() {
   useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      document.documentElement.style.setProperty("--nav-height", `${entry.contentRect.height}px`);
-    });
+    const publish = () => {
+      document.documentElement.style.setProperty("--nav-height", `${el.getBoundingClientRect().height}px`);
+    };
+    publish(); // before first paint — otherwise the 44px fallback is used for a
+               // frame and everything below the bar jumps once the observer fires
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ...and the logo's real bottom edge as --logo-bottom. The logo is sized to
+  // hang *below* the bar, so --nav-height alone isn't enough for a page that
+  // needs to sit clear of it rather than scroll under it (see /parks, where
+  // the sticky search bar pads itself down to this value). Measured rather
+  // than recomputed from the clamp() so it can't drift if the logo resizes.
+  useEffect(() => {
+    const el = logoRef.current;
+    if (!el) return;
+    const publish = () => {
+      const r = el.getBoundingClientRect();
+      document.documentElement.style.setProperty("--logo-bottom", `${r.bottom}px`);
+      // Centre and size drive the scrim's gradient below, so it stays locked to
+      // the logo across breakpoints instead of re-deriving the clamp() by hand.
+      document.documentElement.style.setProperty("--logo-w",  `${r.width}px`);
+      document.documentElement.style.setProperty("--logo-h",  `${r.height}px`);
+      document.documentElement.style.setProperty("--logo-cx", `${r.left + r.width / 2}px`);
+      document.documentElement.style.setProperty("--logo-cy", `${r.top + r.height / 2}px`);
+    };
+    publish();
+    const ro = new ResizeObserver(publish);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -41,8 +69,11 @@ export default function Nav() {
         <nav
           className="flex items-center justify-end"
           style={{
-            background: overlay ? "linear-gradient(180deg, rgba(0,0,0,0.35), transparent)" : "var(--background)",
-            paddingTop: "12px", paddingBottom: overlay ? "24px" : "12px",
+            background: overlay ? "transparent" : "var(--background)",
+            // Deliberately constant: --nav-height feeds the layout's top padding
+            // and the hero's negative margin, so letting overlay change the bar's
+            // height would jog the whole page when the nav flips solid on scroll.
+            paddingTop: "12px", paddingBottom: "12px",
             paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)",
             borderBottom: "none",
             transition: "background 0.2s, border-color 0.2s",
@@ -151,12 +182,46 @@ export default function Nav() {
         )}
       </header>
 
+      {/* Scrim — a full-width band of the page background across the top, so
+          any content scrolling beneath it is knocked back rather than colliding
+          with the logo and nav links. Spans the site width instead of pooling
+          around the mark, so text is treated the same wherever it passes.
+
+          Only while the nav is solid. `overlay` is true exactly when a
+          full-bleed hero sits behind the nav, and over a hero the logo is meant
+          to sit directly on the photograph — so the scrim fades out there and
+          the image stays clean.
+
+          zIndex 10 puts it under the header bar (20) as well as the logo (30):
+          the bar paints its own solid background on top, so the scrim is only
+          ever visible in the strip below the bar where the logo overhangs.
+          Colour is var(--background), which is the white in light mode and the
+          black in dark. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "calc(var(--logo-h, 68px) * 2.1)",
+          zIndex: 10,
+          pointerEvents: "none",
+          // Solid down to the logo's baseline (55% of the height lands there),
+          // then a short fade so there is no visible edge where it ends.
+          background: `linear-gradient(to bottom, var(--background) 0%, var(--background) 55%, transparent 100%)`,
+          opacity: overlay ? 0 : 1,
+          transition: "opacity 0.25s ease",
+        }}
+      />
+
       {/* Logo — a sibling of the header bar, not a child, so it isn't clipped
           by anything the header does. Sized taller than the bar itself so it
           hangs below the header's bottom edge and reads as floating over
           scrolling content rather than being boxed inside the nav. */}
       <Link
         href="/"
+        ref={logoRef}
         aria-label="Scout — home"
         className="logo-overhang"
         style={{
@@ -165,7 +230,6 @@ export default function Nav() {
           left: "clamp(16px, 4vw, 56px)",
           zIndex: 30,
           display: "block",
-          filter: overlay ? "drop-shadow(0 2px 10px rgba(0,0,0,0.4))" : "drop-shadow(0 1px 3px rgba(0,0,0,0.08))",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}

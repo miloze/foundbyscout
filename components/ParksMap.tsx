@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "./ThemeProvider";
-import { ParkCard, ParkCardThumbnail } from "./ParkCard";
+import { ParkCard, ParkCardThumbnail, ParkCardCTA } from "./ParkCard";
 
 type Park = {
   id: string; slug: string; name: string; postcode: string; location: string;
@@ -373,6 +373,7 @@ export default function ParksMap({
 
         <ParkCard park={selectedPark} idx={carouselIdx} variant="map" showLocation={false} showAddress />
         <ParkCardThumbnail park={selectedPark} variant="map" />
+        <ParkCardCTA slug={selectedPark.slug} />
       </div>
     </div>
   );
@@ -398,7 +399,8 @@ export default function ParksMap({
     >
       <ParkCardThumbnail park={selectedPark} variant="feature" />
       <div style={{ padding:"12px 14px 14px" }}>
-        <ParkCard park={selectedPark} idx={carouselIdx} variant="feature" showTags={false} showLocation showAddress={false} />
+        <ParkCard park={selectedPark} idx={carouselIdx} variant="feature" showTags={false} showLocation showAddress={false} showBrief />
+        <ParkCardCTA slug={selectedPark.slug} />
       </div>
     </div>
   );
@@ -419,12 +421,33 @@ export default function ParksMap({
         .fbs-card { transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
 
         /* Desktop split view — list column stays synced with the map beside it */
-        .pms-index-list{ width:280px; flex-shrink:0; min-height:0; height:100%; overflow-y:auto; border-right:1px solid var(--pda-line); }
-        .pms-index-row{ display:block; width:100%; text-align:left; background:none; border:none; padding:0; cursor:pointer; box-shadow:0 1px 0 var(--pda-line); transition:background .15s var(--pda-ease); }
-        .pms-index-row:hover{ background:var(--pda-panel); }
-        .pms-index-row.pms-active{ background:var(--pda-panel); }
-        .pms-index-row.pms-active .pcard-id{ background:var(--pda-accent); color:var(--pda-ink); }
-        .pms-index-row.pms-active .pcard-name{ color:var(--pda-accent); }
+        /* Desktop split view — list column stays synced with the map beside it.
+           Deliberately the same row as the mobile accordion trigger: same
+           .pcard-archive content, same 20px/16px + 12px inset, same quiet grey
+           plate on hover, and the same coral rule along the bottom edge when
+           selected as the accordion shows when open. No chevron here (nothing
+           expands — a row selects its pin), and no filled coral box: coral is
+           reserved for the postcode and that bottom rule. 300px so the longest
+           name clears 18px without wrapping. */
+        .pms-index-list{ width:var(--pda-list-col, 300px); flex-shrink:0; min-height:0; height:100%; overflow-y:auto; border-right:1px solid var(--pda-line); }
+        .pms-index-row{
+          position:relative;
+          display:block; width:100%; text-align:left; background:none; border:none;
+          padding:20px 16px; cursor:pointer;
+          border-bottom:1px solid var(--pda-line);
+          transition:background-color .18s ease;
+        }
+        /* Selected rule rides over the divider rather than replacing it, so the
+           row's height is identical selected or not — nothing nudges the list. */
+        .pms-index-row::after{
+          content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+          background:var(--pda-accent); opacity:0;
+          transition:opacity .18s ease; pointer-events:none;
+        }
+        .pms-index-row.pms-active::after{ opacity:1; }
+        .pms-index-row .pcard-archive{ padding-left:12px; }
+        .pms-index-row:hover{ background-color:var(--pda-hover-bg); }
+        .pms-index-row.pms-active{ background-color:var(--pda-hover-bg); }
       `}</style>
 
       {/* List column and map canvas are always both mounted — only the
@@ -442,7 +465,7 @@ export default function ParksMap({
                 className={`pms-index-row${selectedPark?.id === park.id ? " pms-active" : ""}`}
                 onClick={() => { if (park.lat && park.lng) openPark(park); }}
               >
-                <ParkCard park={park} idx={idx} variant="index" showTags={false} showLocation showAddress={false} />
+                <ParkCard park={park} idx={idx} variant="archive" showTags={false} showLocation showAddress={false} />
               </button>
             ))}
           </div>

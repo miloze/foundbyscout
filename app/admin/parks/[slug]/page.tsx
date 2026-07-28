@@ -3,14 +3,71 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import { modelUrl } from "@/lib/assets";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-type GalleryRowItem = { slot: number; ratio: string; type: "image" | "video" | "gif" | "glb"; glbFile?: string };
+type GalleryRowItem = { slot: number; ratio: string; type: "image" | "video" | "gif" | "glb"; glbFile?: string; label?: string; caption?: string };
 type GalleryColumn = { slots: GalleryRowItem[] };
+
+// Editorial layer — stored as one jsonb column, see migrations/004_editorial.sql
+type EditorialState = {
+  featureTitle: string;
+  featureBody:  string;   // blank line = new paragraph, same as Description
+  notes:        string[];
+  originsTeaser: string;
+  originsBody:   string;
+  local:         string[];
+};
+
+const EMPTY_EDITORIAL: EditorialState = {
+  featureTitle: "", featureBody: "", notes: [], originsTeaser: "", originsBody: "", local: [],
+};
+
+/** Form state → the jsonb shape the park page reads. Empty strings are
+ *  stripped rather than stored: the render guards key off absence, and ""
+ *  is not the same as absent. */
+function toEditorialJson(e: EditorialState) {
+  const paras = (s: string) => s.split("\n\n").map(p => p.trim()).filter(Boolean);
+  const list  = (a: string[]) => a.map(s => s.trim()).filter(Boolean);
+
+  const out: Record<string, unknown> = {};
+  const featureBody = paras(e.featureBody);
+  if (e.featureTitle.trim() || featureBody.length) {
+    out.feature = { title: e.featureTitle.trim(), body: featureBody };
+  }
+  const notes = list(e.notes);
+  if (notes.length) out.notes = notes;
+
+  const originsBody = paras(e.originsBody);
+  if (e.originsTeaser.trim() || originsBody.length) {
+    out.origins = { teaser: e.originsTeaser.trim(), body: originsBody };
+  }
+  const local = list(e.local);
+  if (local.length) out.local = local;
+
+  return out;
+}
+
+function fromEditorialJson(j: unknown): EditorialState {
+  const e = (j ?? {}) as {
+    feature?: { title?: string; body?: string[] };
+    notes?: string[];
+    origins?: { teaser?: string; body?: string[] };
+    local?: string[];
+  };
+  return {
+    featureTitle:  e.feature?.title ?? "",
+    featureBody:   (e.feature?.body ?? []).join("\n\n"),
+    notes:         Array.isArray(e.notes) ? e.notes : [],
+    originsTeaser: e.origins?.teaser ?? "",
+    originsBody:   (e.origins?.body ?? []).join("\n\n"),
+    local:         Array.isArray(e.local) ? e.local : [],
+  };
+}
 
 const btnStyle: React.CSSProperties = {
   fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.06em",
@@ -188,6 +245,7 @@ export default function EditParkPage() {
   const [dragSlot,      setDragSlot]      = useState<number | null>(null);
 
   const [galleryRows, setGalleryRows] = useState<GalleryColumn[][]>([])
+  const [editorial,   setEditorial]   = useState<EditorialState>(EMPTY_EDITORIAL);
 
   const [viewerSettings, setViewerSettings] = useState({
     ambientIntensity:     0.9,
@@ -236,14 +294,15 @@ export default function EditParkPage() {
           hero_image:         park.hero_image        || "",
           thumbnail:          park.thumbnail         || `/images/parks/${slug}/thumb.webp`,
           directory_image_url: park.directory_image_url || `/images/parks/${slug}/directory.webp`,
-          model_file:         park.model_file        || `/images/parks/${slug}/model.glb`,
-          model_file_low:     park.model_file_low    || `/images/parks/${slug}/model-500k.glb`,
+          model_file:         park.model_file        || modelUrl(slug, "high") || "",
+          model_file_low:     park.model_file_low    || modelUrl(slug, "low")  || "",
           preload_image_url:  park.preload_image_url || `/images/parks/${slug}/glb-preload.png`,
           camera_pos:     numArrToStr(park.camera_pos),
           camera_target:  numArrToStr(park.camera_target),
           model_rotation: numArrToStr(park.model_rotation),
         });
         if (park.viewer_settings) setViewerSettings(vs => ({ ...vs, ...park.viewer_settings }));
+        setEditorial(fromEditorialJson(park.editorial));
         if (Array.isArray(park.slot_ratios)) setSlotRatios(park.slot_ratios);
         if (Array.isArray(park.slot_order))  setSlotOrder(park.slot_order);
         if (Array.isArray(park.gallery_rows)) {
@@ -325,6 +384,9 @@ export default function EditParkPage() {
       slot_order:      slotOrder,
       gallery_rows:    galleryRows,
       viewer_settings: viewerSettings,
+      // Assembled into one object here — the PATCH route forwards the raw body
+      // into .update(), so loose keys that aren't columns would 400 the save.
+      editorial:       toEditorialJson(editorial),
     };
 
     const res = await fetch(`/api/admin/parks/${slug}`, {
@@ -909,7 +971,7 @@ export default function EditParkPage() {
                           next[rowIdx][colIdx].slots[slotIdx] = { ...slot, glbFile: e.target.value };
                           return next;
                         })}
-                        placeholder="/images/parks/crystal-palace/model.glb"
+                        placeholder="https://cdn.foundbyscout.fyi/parks/crystal-palace/model-high.glb"
                         style={{ width: "100%", background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 8, padding: "5px 7px", outline: "none", boxSizing: "border-box" }}
                       />
                     )}
@@ -946,6 +1008,33 @@ export default function EditParkPage() {
                           style={{ ...btnStyle, color: "var(--accent)" }}>×</button>
                       </div>
                     )}
+
+                    {/* Image callout — optional label + one sentence. Stored on
+                        the slot inside gallery_rows, so no schema change. */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <input
+                        type="text"
+                        value={slot.label ?? ""}
+                        onChange={e => setGalleryRows(prev => {
+                          const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                          next[rowIdx][colIdx].slots[slotIdx] = { ...slot, label: e.target.value };
+                          return next;
+                        })}
+                        placeholder="Callout label — e.g. LANDMARK"
+                        style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", padding: "5px 7px", outline: "none" }}
+                      />
+                      <input
+                        type="text"
+                        value={slot.caption ?? ""}
+                        onChange={e => setGalleryRows(prev => {
+                          const next = prev.map(r => r.map(c => ({ ...c, slots: [...c.slots] })));
+                          next[rowIdx][colIdx].slots[slotIdx] = { ...slot, caption: e.target.value };
+                          return next;
+                        })}
+                        placeholder="Callout copy — add meaning, don't describe the obvious"
+                        style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)", fontFamily: "var(--font-body)", fontSize: 10, padding: "5px 7px", outline: "none" }}
+                      />
+                    </div>
 
                     {/* Remove slot from column (only when column has multiple slots) */}
                     {col.slots.length > 1 && (
@@ -1038,15 +1127,15 @@ export default function EditParkPage() {
               }
             </div>
             <div>
-              <FieldLabel hint="/images/parks/{slug}/model.glb">3D model file path</FieldLabel>
+              <FieldLabel hint="https://cdn.foundbyscout.fyi/parks/{slug}/model-high.glb">3D model file URL</FieldLabel>
               <Input value={form.model_file} onChange={v => upd("model_file", v)}
-                placeholder="/images/parks/crystal-palace/model.glb" />
+                placeholder="https://cdn.foundbyscout.fyi/parks/crystal-palace/model-high.glb" />
             </div>
             <div style={G2}>
               <div>
                 <FieldLabel hint="served to phones — leave blank to use main model on all devices">Model (low / mobile)</FieldLabel>
                 <Input value={form.model_file_low} onChange={v => upd("model_file_low", v)}
-                  placeholder="/images/parks/crystal-palace/model-500k.glb" />
+                  placeholder="https://cdn.foundbyscout.fyi/parks/crystal-palace/model-low.glb" />
               </div>
               <div>
                 <FieldLabel hint="shown while GLB loads — leave blank to auto-derive from the park's local image folder">Preload image URL</FieldLabel>
@@ -1127,6 +1216,78 @@ export default function EditParkPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* 11. EDITORIAL */}
+        <section>
+          <SectionHead>Editorial</SectionHead>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 20, lineHeight: 1.8 }}>
+            All optional — anything left empty simply doesn&apos;t render on the park page.
+            The introduction is the <span style={{ color: "var(--foreground)" }}>Description</span> field in section 2.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+
+            {/* Feature story */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <FieldLabel hint="one defining narrative — e.g. The Volcano">Feature story — title</FieldLabel>
+                <Input value={editorial.featureTitle}
+                  onChange={v => setEditorial(e => ({ ...e, featureTitle: v }))}
+                  placeholder="The Volcano" />
+              </div>
+              <div>
+                <FieldLabel hint="separate paragraphs with a blank line">Feature story — body</FieldLabel>
+                <Textarea value={editorial.featureBody} rows={6}
+                  onChange={v => setEditorial(e => ({ ...e, featureBody: v }))}
+                  placeholder={"First paragraph.\n\nSecond paragraph."} />
+              </div>
+            </div>
+
+            {/* Scout notes */}
+            <div>
+              <FieldLabel hint="3–5 observations, not specifications">Scout notes</FieldLabel>
+              {editorial.notes.map((n, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                  <Input value={n}
+                    onChange={v => setEditorial(e => { const a = [...e.notes]; a[i] = v; return { ...e, notes: a }; })}
+                    placeholder="The lower areas stay damp after rain." />
+                  <RemoveBtn onClick={() => setEditorial(e => ({ ...e, notes: e.notes.filter((_, j) => j !== i) }))} />
+                </div>
+              ))}
+              <AddRowBtn onClick={() => setEditorial(e => ({ ...e, notes: [...e.notes, ""] }))} label="+ Add note" />
+            </div>
+
+            {/* Origins */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <FieldLabel hint="the line shown before the accordion opens">Origins — teaser</FieldLabel>
+                <Input value={editorial.originsTeaser}
+                  onChange={v => setEditorial(e => ({ ...e, originsTeaser: v }))}
+                  placeholder="A paddling pool became one of the UK's most distinctive local skateparks." />
+              </div>
+              <div>
+                <FieldLabel hint="separate paragraphs with a blank line">Origins — full story</FieldLabel>
+                <Textarea value={editorial.originsBody} rows={6}
+                  onChange={v => setEditorial(e => ({ ...e, originsBody: v }))} />
+              </div>
+            </div>
+
+            {/* Local knowledge */}
+            <div>
+              <FieldLabel hint="busy times, drainage, etiquette, photography">Local knowledge</FieldLabel>
+              {editorial.local.map((l, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                  <Input value={l}
+                    onChange={v => setEditorial(e => { const a = [...e.local]; a[i] = v; return { ...e, local: a }; })}
+                    placeholder="Weekday mornings offer the quietest sessions." />
+                  <RemoveBtn onClick={() => setEditorial(e => ({ ...e, local: e.local.filter((_, j) => j !== i) }))} />
+                </div>
+              ))}
+              <AddRowBtn onClick={() => setEditorial(e => ({ ...e, local: [...e.local, ""] }))} label="+ Add line" />
+            </div>
+
           </div>
         </section>
 

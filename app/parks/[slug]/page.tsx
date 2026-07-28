@@ -1,10 +1,15 @@
 import EditorialGallery, { GalleryRow } from "@/components/EditorialGallery";
+import EditorialSection from "@/components/editorial/EditorialSection";
+import ScoutNotes from "@/components/editorial/ScoutNotes";
+import EditorialAccordion from "@/components/editorial/EditorialAccordion";
+import FooterWordmark from "@/components/FooterWordmark";
 import OpenScanButton from "@/components/OpenScanButton";
 import FloatingAsset from "@/components/FloatingAsset";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ParkHeroShell from "@/components/ParkHeroShell";
 import { createServerClient } from "@/lib/supabase-server";
+import { modelUrl, resolveModelUrl } from "@/lib/assets";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Transport  = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: string };
@@ -12,6 +17,15 @@ type GlanceItem = { icon: string; value: string; label: string; available: boole
 type Facility   = { icon: string; name: string; status: string; available: boolean };
 type HoursRow   = { days: string; time: string };
 type Social     = { platform: "instagram"|"facebook"|"youtube"|"tiktok"|"website"|"builder"; url: string; label?: string };
+
+// The editorial layer — see supabase/migrations/004_editorial.sql.
+// Every key is optional; an absent key means the section does not render.
+type Editorial = {
+  feature?: { title?: string; body?: string[] };
+  notes?:   string[];
+  origins?: { teaser?: string; body?: string[] };
+  local?:   string[];
+};
 
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -82,8 +96,15 @@ const galleryImages = park.gallery_images?.length
 
 const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
 
-  const modelFile = park.model_file || (slug === "bloblands" ? "/images/parks/bloblands/model.glb" : null);
-  const modelFileMobile = park.model_file_mobile ?? undefined;
+  // Tolerates the column not existing yet (pre-migration) — every section
+  // below guards on its own content and renders nothing when absent.
+  const editorial: Editorial = park.editorial ?? {};
+
+  const modelFile = resolveModelUrl(park.model_file, slug, "high")
+    ?? (slug === "bloblands" ? modelUrl("bloblands", "high") : null);
+  // Low/mobile fall back to the high-res model when no low export exists.
+  const modelFileLow = resolveModelUrl(park.model_file_low, slug, "low") ?? undefined;
+  const modelFileMobile = resolveModelUrl(park.model_file_mobile, slug, "low") ?? undefined;
 
   return (
     <article>
@@ -91,7 +112,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <ParkHeroShell
         modelFile={modelFile}
-        modelFileLow={park.model_file_low ?? undefined}
+        modelFileLow={modelFileLow}
         modelFileMobile={modelFileMobile}
         heroImage={park.hero_image}
         preloadImageUrl={park.preload_image_url ?? `/images/parks/${slug}/glb-preload.png`}
@@ -116,30 +137,27 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         scanned={park.scanned}
       />
 
-      {/* ── ABOUT ────────────────────────────────────────────────────── */}
-      <div style={{ paddingTop: 40, paddingBottom: 40, borderBottom: "1px solid var(--border)", maxWidth: 680 }}>
-        <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>About</p>
-        <div style={{ fontSize: 15, lineHeight: 1.75, color: "var(--foreground)", marginBottom: 20 }}>
-          {(park.description ?? []).map((p: string, i: number) => <p key={i} style={{ marginTop: i > 0 ? 14 : 0 }}>{p}</p>)}
-        </div>
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em" }}>
-          Opened {park.opened}
-        </div>
-      </div>
-
-      {/* ── PHOTOS + INFO SIDEBAR ────────────────────────────────────── */}
-      <div className="park-photos-grid" style={{ paddingTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
-
-        {/* Photos */}
+      {/* ── EDITORIAL BAND — editorial left, practical facts right ─────
+          The facts sidebar sits beside the editorial rather than beside the
+          photos: it puts the practical answers next to the copy that provokes
+          them, and it frees the gallery to take the full width below. */}
+      <div className="park-editorial-band">
         <div>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Photos</p>
-          {galleryRows.length > 0
-            ? <EditorialGallery rows={galleryRows} images={galleryImages} modelFile={modelFile} debug={isDebug} />
-            : <div style={{ background: "var(--card)", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>No photos yet</span></div>
-          }
+          {/* Introduction — the existing description[], unchanged data */}
+          <EditorialSection label="Introduction" body={park.description} />
+
+          {/* Feature story */}
+          <EditorialSection
+            label="Feature story"
+            title={editorial.feature?.title}
+            body={editorial.feature?.body}
+          />
+
+          {/* Scout notes */}
+          <ScoutNotes notes={editorial.notes} />
         </div>
 
-        {/* Sticky sidebar */}
+        {/* Facts sidebar */}
         <div className="park-photos-sidebar">
 
           {/* At a glance */}
@@ -195,6 +213,13 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--foreground)", lineHeight: 1.8, letterSpacing: "0.04em" }}>
               {park.builder}
             </p>
+            {/* "Opened" used to sit under the About block, which the editorial
+                band replaces. It is a practical fact, so it belongs here. */}
+            {park.opened && (
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", marginTop: 10 }}>
+                Opened {park.opened}
+              </p>
+            )}
             {park.socials && park.socials.length > 0 && (
               <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                 {park.socials.map((s: Social, i: number) => (
@@ -212,8 +237,61 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         </div>
       </div>
 
+      {/* ── PHOTOS — full width ──────────────────────────────────────── */}
+      <section style={{ paddingTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Photos</p>
+        {galleryRows.length > 0
+          ? <EditorialGallery rows={galleryRows} images={galleryImages} modelFile={modelFile} debug={isDebug} />
+          : <div style={{ background: "var(--card)", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>No photos yet</span></div>
+        }
+      </section>
+
+      {/* ── ORIGINS / LOCAL KNOWLEDGE ────────────────────────────────── */}
+      {(editorial.origins || editorial.local?.length) && (
+        <div style={{ paddingTop: 40 }}>
+          <EditorialAccordion
+            label="Origins"
+            teaser={editorial.origins?.teaser}
+            body={editorial.origins?.body}
+          />
+          <EditorialAccordion
+            label="Local knowledge"
+            teaser="Busy times, drainage and what to bring."
+            items={editorial.local}
+          />
+        </div>
+      )}
+
+      <FooterWordmark />
+
       <style>{`
         .fbs-social-link:hover { color: var(--foreground) !important; border-color: var(--foreground) !important; }
+
+        /* Editorial left at a readable measure, facts right at the sidebar's
+           established 280px, slack absorbed by the gutter between them.
+           Collapses at the same 768px breakpoint as .park-photos-grid so the
+           page keeps one responsive rhythm. */
+        .park-editorial-band{
+          display:grid;
+          grid-template-columns:minmax(0, 680px) 280px;
+          justify-content:space-between;
+          gap:40px;
+          align-items:start;
+          padding-top:40px;
+          padding-bottom:8px;
+          border-bottom:1px solid var(--border);
+        }
+        /* Sticky is right beside a long gallery, but not beside a short
+           editorial column — it would visibly detach and drift against the
+           copy opposite. The 40px matches EditorialSection's top padding so
+           the AT A GLANCE and INTRODUCTION eyebrows share a baseline. */
+        .park-editorial-band .park-photos-sidebar{
+          position:static; top:auto; padding-top:40px;
+        }
+        @media (max-width: 768px){
+          .park-editorial-band{ grid-template-columns:1fr; gap:48px; }
+          .park-editorial-band .park-photos-sidebar{ padding-top:0; }
+        }
       `}</style>
 
     </article>

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
 import ParkHeroMeta from "@/components/ParkHeroMeta";
+import HeroNavOverlay from "@/components/HeroNavOverlay";
+import FooterWordmark from "@/components/FooterWordmark";
 
 export default async function Home() {
   const db = createServerClient();
@@ -42,13 +44,19 @@ export default async function Home() {
             flexDirection: "column",
             justifyContent: "flex-end",
             padding: "8rem clamp(16px,4vw,56px) 3rem",
-            marginTop: "-44px",
+            // Pull up by the nav's real height so the image reaches the very top
+            // of the viewport behind the transparent nav. Was a hardcoded -44px,
+            // which left a strip of page background once the bar measured 50px.
+            marginTop: "calc(-1 * var(--nav-height, 44px))",
             marginLeft: "calc(-1 * clamp(16px, 4vw, 56px))",
             marginRight: "calc(-1 * clamp(16px, 4vw, 56px))",
             overflow: "hidden",
             userSelect: "none",
           }}
         >
+          {/* Makes the nav transparent while this hero is behind it */}
+          <HeroNavOverlay />
+
           {/* Hero background */}
           {featured.hero_image ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -79,11 +87,11 @@ export default async function Home() {
           {featured.postcode && (
             <div style={{
               position: "absolute", top: "clamp(64px,8vw,80px)", right: "clamp(16px,4vw,56px)",
-              width: 80, height: 80, borderRadius: "50%", background: "var(--accent)",
+              width: 96, height: 96, borderRadius: "50%", background: "var(--accent)",
               display: "flex", alignItems: "center", justifyContent: "center",
               zIndex: 2, pointerEvents: "none",
             }}>
-              <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              <span style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 400, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                 {featured.postcode.split(" ")[0]}
               </span>
             </div>
@@ -104,20 +112,41 @@ export default async function Home() {
         </section>
       )}
 
+      {/* SITE INTRO — the one-line pitch for the whole site, sitting between
+          the hero and the first section. Rubik 300 rather than MSCHN: it's a
+          statement to read, not a display word, so it stays sentence case and
+          sits below the section headings in the hierarchy. The second sentence
+          is muted so the claim leads and the detail follows. */}
+      <section style={{ paddingTop: "clamp(3rem, 7vw, 5rem)", paddingBottom: "clamp(2rem, 5vw, 3rem)" }}>
+        <p style={{
+          fontFamily: "var(--font-heading)",
+          fontSize: "clamp(1.25rem, 2.6vw, 2rem)",
+          lineHeight: 1.35,
+          fontWeight: 300,
+          letterSpacing: "-0.01em",
+          maxWidth: "34ch",
+        }}>
+          A curated guide to skateparks.{" "}
+          <span style={{ color: "var(--muted)" }}>
+            Photography, interactive 3D models, maps and detailed park profiles.
+          </span>
+        </p>
+      </section>
+
       {/* DIRECTORY CTA + FEATURED PARKS */}
       <section style={{ paddingTop: "5rem", paddingBottom: "6rem", borderBottom: "1px solid var(--border)" }}>
 
         {/* Header row — label */}
         <div style={{ marginBottom: 24 }}>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)" }}>
-            The Directory
+            Explore
           </p>
         </div>
 
         {/* Full-width heading + description */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "clamp(2rem, 6vw, 6rem)", marginBottom: "3rem", flexWrap: "wrap" }}>
           <h2 style={{
-            fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif",
+            fontFamily: "var(--font-display), Arial, sans-serif",
             fontSize: "clamp(3rem, 7vw, 6rem)",
             lineHeight: 0.9,
             letterSpacing: "-0.03em",
@@ -129,19 +158,24 @@ export default async function Home() {
           </h2>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1.25rem", maxWidth: "44ch" }}>
             <p style={{ color: "var(--muted)", lineHeight: 1.65, fontSize: 15 }}>
-              Every skatepark in the UK, documented and mapped. Filter by type, amenities, or find what&apos;s near you.
+              Discover our growing collection of carefully documented skateparks.
             </p>
             <Link
               href="/parks"
               style={{
-                display: "inline-block",
+                display: "inline-flex", alignItems: "center", gap: 7,
                 padding: "7px 16px", fontWeight: 400, fontSize: 10,
                 textTransform: "uppercase", letterSpacing: "0.14em",
                 background: "var(--accent)", color: "#fff",
                 fontFamily: "var(--font-mono)",
               }}
             >
-              Browse Parks →
+              Explore Parks
+              {/* Same chevron as the park-card CTA, rather than a text arrow */}
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
             </Link>
           </div>
         </div>
@@ -195,6 +229,10 @@ export default async function Home() {
           [data-park-thumbs] { grid-template-columns: 1fr 1fr !important; }
         }
       `}</style>
+
+      {/* Full height here, as on the park page — the home page scrolls far
+          enough to give the reveal room. */}
+      <FooterWordmark />
     </div>
   );
 }

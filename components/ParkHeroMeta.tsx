@@ -42,7 +42,7 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
     <div>
       {/* Park name */}
       <div style={{
-        fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 500,
+        fontFamily: "var(--font-display), Arial, sans-serif", fontWeight: 300,
         fontSize: "clamp(3.5rem, 11vw, 9rem)",
         lineHeight: 0.9, color: "#fff",
         textShadow: "0 2px 16px rgba(0,0,0,0.25)",

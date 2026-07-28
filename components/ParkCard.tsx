@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 // Shared content model for the Parks Directory accordion row and the map
 // preview card, per the "Map View Card" handover — same component renders
 // in both contexts so they can't drift apart over time.
@@ -9,6 +11,7 @@ export type ParkCardPark = {
   name: string;
   catalogue_id?: string | null;
   sort_order?: number | null;
+  brief?: string | null;
   postcode?: string | null;
   address?: string[] | null;
   location: string | null;
@@ -36,82 +39,85 @@ export function getParkAddressChain(park: ParkCardPark): string {
 // Relies on --pda-* custom properties defined on .pda-root (ParksDirectoryAccordion)
 // which cascade to ParksMap since it only ever renders nested inside that tree.
 export const PARK_CARD_CSS = `
+  /* ── One type scale for every surface ──────────────────────────────────
+     The base rules below ARE the "Scout Archive Accordion" treatment: mono
+     catalogue no. on top, display name, Rubik location under it, no filled
+     boxes. The mobile accordion trigger, the desktop split-list row and the
+     cards over the map all render from these; variants only override size
+     and colour, never the family or the rhythm. Nothing here owns outer
+     padding — wrappers (.pda-trigger-content, .pms-index-row, the map card)
+     do, so one scale can serve differently-spaced containers. */
+  /* Mono metadata tier — catalogue no., tags, address. One size for all three
+     so they read as the same rank beneath the name. 11px is the top of the
+     spec's 10–11px band; 10px sat too quiet next to an 18px name. */
   .pcard-id{
-    font-family:var(--pda-font-mono); font-size:12px; color:var(--pda-muted);
-    letter-spacing:.02em; font-weight:500;
-    display:block; width:fit-content; padding:2px 7px;
+    font-family:var(--pda-font-mono); font-size:11px; font-weight:500;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--pda-muted);
+    display:block; padding:0;
   }
-  /* Map card: catalogue no. sized to match the address line below it, coral like the postcode */
-  .pcard-map .pcard-id{ color:var(--pda-accent); font-size:10px; }
-  .pcard-map .pcard-address{ margin:2px 0 8px; padding:0; }
   .pcard-title{
-    font-family:var(--pda-font-display); text-transform:uppercase; line-height:0.85;
-    letter-spacing:.005em; font-weight:700;
-    font-variation-settings:'wght' 700;
-    display:block; padding:10px 12px 8px; margin:0;
+    font-family:var(--pda-font-display); text-transform:uppercase;
+    font-size:18px; line-height:1.15; letter-spacing:.005em;
+    font-weight:700; font-variation-settings:'wght' 700;
+    display:block; padding:0; margin:5px 0 0;
   }
   .pcard-title .pcard-name{ color:var(--pda-fg); }
   .pcard-title .pcard-postcode{ color:var(--pda-accent); }
-  .pcard-row .pcard-title{ font-size:clamp(28px, 6.6vw, 58px); }
-  .pcard-map .pcard-title{ font-size:clamp(20px, 5vw, 26px); padding:6px 0 4px; }
-  /* Index: compact desktop split-list row — scan-and-pick, not sell-the-park.
-     Stacked: cat. no. above name, shortened area below — full address lives
-     in the map's detail card instead, per the split-list spec. */
-  .pcard-index{ display:block; padding:12px 14px; }
-  .pcard-index .pcard-id{ padding:0; margin-bottom:4px; font-size:10px; }
-  .pcard-index .pcard-title{ padding:0; margin:0; display:block; }
-  .pcard-index .pcard-title .pcard-name{ font-size:16px; line-height:1.2; }
-  .pcard-index .pcard-title .pcard-postcode{ font-size:16px; line-height:1.2; }
-  .pcard-index .pcard-location{ padding:0; margin-top:3px; font-size:9px; }
-  .pcard-tags{ display:flex; gap:6px; flex-wrap:wrap; }
-  .pcard-row .pcard-tags{ padding:0 12px; margin:4px 0 2px; }
-  .pcard-map .pcard-tags{ margin:0 0 8px; }
-  .pcard-tag{
-    font-family:var(--pda-font-mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase;
-    color:var(--pda-muted); border:1px solid var(--pda-line); padding:2px 7px;
-  }
   .pcard-location{
-    font-family:var(--pda-font-mono); font-size:10px; letter-spacing:.03em; text-transform:uppercase;
-    color:var(--pda-address); display:block; width:fit-content;
+    font-family:var(--pda-font-ui); font-size:12px; line-height:1.4;
+    color:var(--pda-muted); display:block; padding:0; margin-top:4px;
   }
-  .pcard-row .pcard-location{ padding:3px 12px; margin-top:2px; }
-  .pcard-map .pcard-location{ padding:0; margin-bottom:10px; }
   .pcard-address{
-    font-family:var(--pda-font-mono); font-size:10px; letter-spacing:.03em; text-transform:uppercase;
-    color:var(--pda-address); display:block; width:fit-content; padding:3px 7px; margin-top:8px;
-    transition:background .3s var(--pda-ease), color .3s var(--pda-ease);
+    font-family:var(--pda-font-mono); font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--pda-muted);
+    display:block; padding:0; margin-top:6px;
   }
-  .pcard-address-inline{ margin-top:0; }
-  .pcard-tags-preimage{ margin:0 0 10px; }
+  /* The park's one-line brief. Same rule serves the accordion drawer and the
+     desktop map card, so the two read as the same piece of copy. */
+  .pcard-brief{
+    font-family:var(--pda-font-ui); font-size:13px; line-height:1.6;
+    color:var(--pda-muted); margin:10px 0 0;
+  }
+  .pcard-tags{ display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  .pcard-tag{
+    font-family:var(--pda-font-mono); font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--pda-muted); line-height:1;
+    background:var(--pda-panel); border:1px solid var(--pda-line); padding:5px 9px;
+  }
+
+  /* Archive row — mobile accordion trigger and desktop split-list row.
+     Identical markup and type on both; only the wrapper differs. */
+  .pcard-archive{ display:block; }
+
+  /* Cards over the map — same scale, tightened for an overlay. */
+  .pcard-map .pcard-id{ color:var(--pda-accent); }
+  .pcard-map .pcard-title{ font-size:clamp(18px, 4.5vw, 22px); }
+  .pcard-map .pcard-tags{ margin:12px 0 4px; }
+
   .pcard-thumb{ position:relative; overflow:hidden; cursor:pointer; background:var(--pda-bg); }
   .pcard-thumb img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:grayscale(1) contrast(1.05) brightness(0.88); transition:filter .2s var(--pda-ease); }
   .pcard-thumb:hover img{ filter:brightness(1.15) grayscale(1) contrast(1.05); }
-  .pcard-thumb-row{ height:230px; margin-top:16px; }
-  .pcard-thumb-map{ height:130px; margin-top:12px; }
-  .pcard-thumb-arrow{
-    position:absolute; z-index:2;
-    font-family:var(--pda-font-display); font-weight:900; font-variation-settings:'wght' 700;
-    color:var(--pda-fg); line-height:1;
-    filter:drop-shadow(0 2px 8px rgba(0,0,0,0.45));
-    transition:transform .25s var(--pda-ease), color .2s var(--pda-ease);
-  }
-  .pcard-thumb:hover .pcard-thumb-arrow{ transform:translateX(18px); color:var(--pda-accent); }
-  .pcard-thumb-row .pcard-thumb-arrow{ right:20px; bottom:6px; font-size:clamp(70px, 11vw, 130px); }
-  .pcard-thumb-map .pcard-thumb-arrow{ right:12px; bottom:0px; font-size:clamp(36px, 8vw, 48px); }
-
+  .pcard-thumb-map{ aspect-ratio:16 / 10; margin-top:12px; }
   /* Feature: large image-led card — desktop map split view. Image flush to
-     the card edges (55–60% of card height via aspect-ratio), on-photo
-     circular CTA button rather than the row/map variants' giant text arrow. */
+     the card edges. Nothing overlays the photo: navigation is the explicit
+     VIEW PARK button below it, same as the accordion drawer. */
   .pcard-thumb-feature{ aspect-ratio: 16 / 9; margin-top:0; }
+
+  /* The one CTA. Rendered identically by the accordion drawer, the mobile map
+     card and the desktop split card — same label, font, case and colour, so
+     "go to this park" looks the same wherever it appears. */
   .pcard-cta{
-    position:absolute; z-index:2; bottom:12px; right:12px;
-    width:36px; height:36px; border-radius:50%;
+    display:inline-flex; align-items:center; gap:7px; align-self:flex-start;
+    width:fit-content;
     background:var(--pda-accent); color:#fff;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow:0 4px 14px rgba(0,0,0,0.35);
-    transition:transform .2s var(--pda-ease);
+    font-family:var(--pda-font-ui); font-size:12px; font-weight:500;
+    letter-spacing:.08em; text-transform:uppercase; line-height:1;
+    padding:10px 14px; margin-top:14px;
+    transition:background .18s ease, transform .18s ease;
   }
-  .pcard-thumb:hover .pcard-cta{ transform:scale(1.08); }
+  .pcard-cta:hover{ background:var(--pda-accent-hover); transform:translateY(-1px); }
+  .pcard-cta:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:3px; }
+  .pcard-cta svg{ flex-shrink:0; }
   .pcard-feature .pcard-id{ color:var(--pda-accent); font-size:11px; padding:0; margin-bottom:2px; }
   .pcard-feature .pcard-title{ padding:0; margin:0 0 4px; }
   .pcard-feature .pcard-title .pcard-name{ font-size:clamp(20px, 2.2vw, 26px); font-weight:500; }
@@ -120,14 +126,15 @@ export const PARK_CARD_CSS = `
 `;
 
 export function ParkCard({
-  park, idx, variant, showTags = true, showLocation = true, showAddress = false,
+  park, idx, variant, showTags = true, showLocation = true, showAddress = false, showBrief = false,
 }: {
   park: ParkCardPark;
   idx: number;
-  variant: "row" | "map" | "index" | "feature";
+  variant: "archive" | "map" | "feature";
   showTags?: boolean;
   showLocation?: boolean;
   showAddress?: boolean;
+  showBrief?: boolean;
 }) {
   const idNumber = getCatalogueIdLabel(park, idx);
   const tags = getParkTags(park);
@@ -148,18 +155,18 @@ export function ParkCard({
         </div>
       )}
       {showLocation && park.location && <div className="pcard-location">{park.location}</div>}
+      {showBrief && park.brief && <p className="pcard-brief">{park.brief}</p>}
     </div>
   );
 }
 
-// Full-span directory/hero image with the nav-to-park-page arrow overlaid in
-// the corner, instead of pushed below as a separate element. Image and arrow
-// are one click target, independent of whatever toggles the row/card itself.
+// Full-span directory/hero image. Nothing is overlaid on the photo — every
+// surface navigates through the explicit ParkCardCTA button instead.
 export function ParkCardThumbnail({
   park, variant, onClick,
 }: {
   park: Pick<ParkCardPark, "directory_image_url" | "hero_image">;
-  variant: "row" | "map" | "feature";
+  variant: "map" | "feature";
   onClick?: (e: React.MouseEvent) => void;
 }) {
   const image = park.directory_image_url || park.hero_image;
@@ -170,15 +177,21 @@ export function ParkCardThumbnail({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image} alt="" loading="lazy" />
       )}
-      {variant === "feature" ? (
-        <span className="pcard-cta" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </span>
-      ) : (
-        <span className="pcard-thumb-arrow">&#8594;</span>
-      )}
     </div>
+  );
+}
+
+// The single "go to this park" control, shared by the accordion drawer and
+// both map cards. stopPropagation because the map cards are themselves
+// click-to-navigate — without it the parent handler fires the same push twice.
+export function ParkCardCTA({ slug }: { slug: string }) {
+  return (
+    <Link href={`/parks/${slug}`} className="pcard-cta" onClick={e => e.stopPropagation()}>
+      View park
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M9 5l7 7-7 7" />
+      </svg>
+    </Link>
   );
 }

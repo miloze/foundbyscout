@@ -1,6 +1,7 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ParkHeroViewer from "./ParkHeroViewer";
+import { BwIcon, ArExitIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton } from "./ViewerControls";
 
 type Props = {
   modelFile: string;
@@ -19,6 +20,11 @@ type Props = {
 };
 
 export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: Props) {
+  // Owned here so the modal drives the viewer's grayscale externally — that
+  // suppresses ParkModel's own fallback toggle, leaving exactly one B&W
+  // control on screen, in the same cluster the inline hero uses.
+  const [bw, setBw] = useState(true);
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -40,13 +46,11 @@ export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: P
       display: "flex",
       flexDirection: "column",
     }}>
-      {/* Header */}
+      {/* Header — label only; the exit control lives in the bottom-right
+          cluster, in the same spot the "explore in 3D" button was tapped. */}
       <div style={{
         position: "absolute",
         top: 0, left: 0, right: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
         padding: "12px 16px",
         zIndex: 2,
         pointerEvents: "none",
@@ -60,30 +64,6 @@ export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: P
         }}>
           {parkName}
         </span>
-
-        <button
-          onClick={onClose}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 12px",
-            background: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            color: "#fff",
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            cursor: "pointer",
-            pointerEvents: "auto",
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
-          Close
-        </button>
       </div>
 
       {/* Viewer */}
@@ -102,36 +82,32 @@ export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: P
           environmentIntensity={viewerProps.environmentIntensity}
           heroImage=""
           debug={false}
+          grayscale={bw}
           forceViewer
         />
       </div>
 
-      {/* Drag hint */}
+      {/* Control cluster — same component, same corner as the inline hero */}
       <div style={{
         position: "absolute",
-        bottom: 24,
-        left: 0, right: 0,
-        display: "flex",
-        justifyContent: "center",
-        pointerEvents: "none",
-        zIndex: 2,
-        animation: "fadeOut 3s ease 2s forwards",
+        bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+        right: 12,
+        zIndex: 3,
       }}>
-        <span style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 9,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "rgba(255,255,255,0.4)",
-          background: "rgba(0,0,0,0.4)",
-          padding: "6px 12px",
-          backdropFilter: "blur(4px)",
-        }}>
-          Drag to explore
-        </span>
+        <ViewerCluster>
+          <ViewerClusterButton
+            onClick={() => setBw(b => !b)}
+            title={bw ? "Show colour" : "Show B&W"}
+            active={bw}
+          >
+            <BwIcon active={bw} />
+          </ViewerClusterButton>
+          <ViewerClusterDivider />
+          <ViewerClusterButton onClick={onClose} title="Exit 3D view">
+            <ArExitIcon />
+          </ViewerClusterButton>
+        </ViewerCluster>
       </div>
-
-      <style>{`@keyframes fadeOut { to { opacity: 0; } }`}</style>
     </div>
   );
 }

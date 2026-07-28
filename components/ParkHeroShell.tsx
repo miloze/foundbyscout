@@ -17,9 +17,11 @@ function fmtDate(val: string): string {
   if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0];
   return val;
 }
+import HeroNavOverlay from "./HeroNavOverlay";
 import ParkHeroViewer from "./ParkHeroViewer";
 import ParkWeather from "./ParkWeather";
 import ParkViewerModal from "./ParkViewerModal";
+import { BwIcon, ArIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton } from "./ViewerControls";
 
 type Props = {
   // Viewer
@@ -49,24 +51,6 @@ type Props = {
   opened?: string;
   scanned?: string;
 };
-
-function BwIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.4" />
-      {active && <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />}
-    </svg>
-  );
-}
-
-function ArIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 2l8 4.5v9L12 22l-8-6.5V6.5z"/>
-      <path d="M12 2v20M4 6.5l8 5.5 8-5.5"/>
-    </svg>
-  );
-}
 
 export default function ParkHeroShell({
   modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
@@ -118,6 +102,12 @@ export default function ParkHeroShell({
         environmentIntensity={environmentIntensity}
       />
     )}
+    {/* Positioning context for anything that must escape the hero's
+        `overflow: hidden` — the holographic sticker overhangs the bottom edge,
+        and the hero has to keep clipping for the viewer and the scrim. The
+        wrapper carries no border or padding, so the hero's -44px top margin
+        still collapses through it and the pull-up under the nav is unchanged. */}
+    <div style={{ position: "relative" }} data-hero-root>
     <div
       ref={heroRef}
       style={{
@@ -131,6 +121,11 @@ export default function ParkHeroShell({
         marginRight: bleed,
       }}
     >
+      {/* The hero already pulls itself up under the nav (marginTop -44px), so
+          it was written expecting a transparent bar. This supplies it, and it
+          is also what keeps the logo scrim off while the hero is behind the
+          nav — the mark sits on the image, as on the home page. */}
+      <HeroNavOverlay />
       {/* Viewer — grayscale prop controls ParkModel's filter directly */}
       {modelFile ? (
         <div style={{ position: "absolute", inset: 0 }}>
@@ -160,19 +155,31 @@ export default function ParkHeroShell({
         }} />
       )}
 
-      {/* Top-left postcode badge */}
-      {postcodePrefix && (
+      {/* Catalogue badge — top right. Carries the catalogue number over the
+          postcode, stacked and left-aligned: the number in the mono the rest of
+          the archive metadata uses, the postcode stepping up into the display
+          cut so the size difference reads as hierarchy. */}
+      {(postcodePrefix || idNumber) && (
         <div style={{
           position: "absolute",
           top: "clamp(64px, 8vw, 80px)",
           right: "clamp(16px, 4vw, 56px)",
-          width: 80, height: 80, borderRadius: "50%",
+          width: 96, height: 96, borderRadius: "50%",
           background: "var(--accent)",
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 6, pointerEvents: "none",
         }}>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 300, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            {postcodePrefix}
+          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1, color: "#fff" }}>
+            {idNumber && (
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, letterSpacing: "0.08em", marginBottom: 2 }}>
+                {idNumber}/
+              </span>
+            )}
+            {postcodePrefix && (
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 500, letterSpacing: "0.01em", textTransform: "uppercase" }}>
+                {postcodePrefix}
+              </span>
+            )}
           </span>
         </div>
       )}
@@ -197,7 +204,7 @@ export default function ParkHeroShell({
       }}>
         {/* Park name */}
         <div style={{
-          fontFamily: "'MSCHN', var(--font-heading), Arial, sans-serif", fontWeight: 500,
+          fontFamily: "var(--font-display), Arial, sans-serif", fontWeight: 300,
           fontSize: "clamp(34px, 5.5vw, 60px)",
           lineHeight: 0.88, color: "#fff",
           textShadow: "0 2px 24px rgba(0,0,0,0.25)",
@@ -253,43 +260,23 @@ export default function ParkHeroShell({
             )}
 
             {/* Control cluster pill */}
-            <div style={{
-              display: "flex", alignItems: "center",
-              background: "rgba(20,19,15,0.55)",
-              backdropFilter: "blur(6px)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              overflow: "hidden",
-            }}>
-              <button
+            <ViewerCluster>
+              <ViewerClusterButton
                 onClick={() => setBw(b => !b)}
                 title={bw ? "Show colour" : "Show B&W"}
-                className="fbs-cluster-btn"
-                style={{
-                  width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: bw ? "var(--accent)" : "#fff",
-                }}
+                active={bw}
               >
                 <BwIcon active={bw} />
-              </button>
+              </ViewerClusterButton>
               {isMobile && modelFile && (
                 <>
-                  <div style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.18)" }} />
-                  <button
-                    onClick={() => setOpen3D(true)}
-                    title="Explore in 3D"
-                    className="fbs-cluster-btn"
-                    style={{
-                      width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
-                      background: "none", border: "none", cursor: "pointer",
-                      color: "#fff",
-                    }}
-                  >
+                  <ViewerClusterDivider />
+                  <ViewerClusterButton onClick={() => setOpen3D(true)} title="Explore in 3D">
                     <ArIcon />
-                  </button>
+                  </ViewerClusterButton>
                 </>
               )}
-            </div>
+            </ViewerCluster>
           </div>
         </div>
       </div>
@@ -343,9 +330,10 @@ export default function ParkHeroShell({
           .fbs-hm-right { flex-direction: row; align-items: center; justify-content: space-between; }
           .fbs-cond-desktop { display: none; }
           .fbs-cond-mobile { display: flex; }
-          .fbs-cluster-btn { width: 44px !important; height: 44px !important; }
         }
       `}</style>
+    </div>
+
     </div>
     </>
   );

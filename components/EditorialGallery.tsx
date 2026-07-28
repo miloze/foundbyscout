@@ -10,6 +10,10 @@ export type GallerySlot = {
   ratio: string;
   type: SlotType;
   glbFile?: string;
+  /** Image callout — a short label and one sentence that adds meaning.
+   *  Both optional; slots without them render exactly as before. */
+  label?: string;
+  caption?: string;
 };
 
 export type GalleryColumn = { slots: GallerySlot[] };
@@ -41,23 +45,42 @@ function SlotContent({ slot, src, alt, modelFile, debug }: {
   modelFile?: string | null;
   debug?: boolean;
 }) {
+  const hasCallout = Boolean(slot.label || slot.caption);
+
   return (
-    <div style={{ position: "relative", overflow: "hidden", background: "var(--card)" }}>
-      <div style={{ paddingBottom: aspectToPercent(slot.ratio), position: "relative" }}>
-        <div style={{ position: "absolute", inset: 0 }}>
-          {slot.type === "glb" && (slot.glbFile || modelFile) ? (
-            <GalleryModelSlotClient modelFile={toAbsPath(slot.glbFile || modelFile!)} debug={debug} />
-          ) : slot.type === "video" && src ? (
-            <video autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} src={src} />
-          ) : src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={src} alt={alt} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <div style={{ width: "100%", height: "100%", background: "var(--card)" }} />
-          )}
+    <figure style={{ margin: 0 }}>
+      <div style={{ position: "relative", overflow: "hidden", background: "var(--card)" }}>
+        <div style={{ paddingBottom: aspectToPercent(slot.ratio), position: "relative" }}>
+          <div style={{ position: "absolute", inset: 0 }}>
+            {slot.type === "glb" && (slot.glbFile || modelFile) ? (
+              <GalleryModelSlotClient modelFile={toAbsPath(slot.glbFile || modelFile!)} debug={debug} />
+            ) : slot.type === "video" && src ? (
+              <video autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} src={src} />
+            ) : src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={src} alt={alt || slot.caption || ""} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <div style={{ width: "100%", height: "100%", background: "var(--card)" }} />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {hasCallout && (
+        <figcaption style={{ display: "flex", gap: 10, alignItems: "baseline", paddingTop: 10 }}>
+          {slot.label && (
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--accent)", flexShrink: 0 }}>
+              {slot.label}
+            </span>
+          )}
+          {slot.caption && (
+            <span style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--muted)" }}>
+              {slot.caption}
+            </span>
+          )}
+        </figcaption>
+      )}
+    </figure>
   );
 }
 

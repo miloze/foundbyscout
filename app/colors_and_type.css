@@ -4,17 +4,26 @@
    Loaded via next/font/google in app/layout.tsx — no @import needed here.
    ============================================================ */
 
-/* MSCHN — display font used for park names (home hero, directory). Not
-   licensed for production yet; wired up for whenever the licensed file
-   lands at public/fonts/MSCHN.<ext> (any of the formats below is enough).
-   Falls back to Rubik if the file isn't present — see --font-heading in
-   usages like `'MSCHN', var(--font-heading), Arial, sans-serif`. */
+/* MSCHN — display font used for park names (home hero, directory) and the
+   Scout Notes quote marks.
+
+   Served from the variable font at public/fonts/MSCHNVF.ttf. Its wght axis is
+   300–700, which is what the range below declares, so `font-weight` now works
+   properly across the whole span instead of being faked — the named instances
+   are XS 300 / S 400 / M 500 / L 600 / XL 700. The static cuts (MSCHN-XS…XL,
+   plus italics) sit alongside it unused; the VF covers every weight in one
+   request.
+
+   The file also carries an `ital` 0–1 axis. No italic @font-face is declared
+   because nothing uses MSCHN italic yet — add one rather than letting the
+   browser synthesise a slant if that changes.
+
+   Optimisation left on the table: the file is a 345KB unsubsetted TTF that
+   compresses to ~141KB over the wire. Converting to woff2 and subsetting to
+   latin would take it well below that. */
 @font-face {
   font-family: 'MSCHN';
-  src: url('/fonts/MSCHN.woff2') format('woff2'),
-       url('/fonts/MSCHN.woff') format('woff'),
-       url('/fonts/MSCHN.otf') format('opentype'),
-       url('/fonts/MSCHN.ttf') format('truetype');
+  src: url('/fonts/MSCHNVF.ttf') format('truetype-variations');
   font-weight: 300 700;
   font-style: normal;
   font-display: swap;
@@ -42,7 +51,7 @@
   --color-dark-border: #333333;
   --color-dark-muted:  #888888;
 
-  --color-light-bg:     #f4f2ee;
+  --color-light-bg:     #F5F5F5;
   --color-light-fg:     #1a1a1a;
   --color-light-card:   #ebe8e3;
   --color-light-border: #dddad4;
@@ -54,7 +63,9 @@
 }
 
 [data-theme="light"] {
-  --background:   #f4f2ee;
+  /* Neutral rather than the old warm #f4f2ee, so photography backgrounds
+     blend into the page instead of sitting on a cream card. */
+  --background:   #F5F5F5;
   --foreground:   #1a1a1a;
   --accent:       #D23B3B;
   --accent-hover: #B33232;
@@ -68,6 +79,19 @@
   --font-body:    'Geist', 'Helvetica Neue', Arial, sans-serif;
   --font-heading: 'Rubik', sans-serif;
   --font-mono:    'DM Mono', monospace;
+
+  /* ── Display face — park titles, home hero, directory ──────────────
+     Every park title on the site reads from this one token: the home hero,
+     the park page and the directory rows all change together if it changes.
+
+     MSCHN is now served for everyone from the variable font declared above, so
+     `font-weight` works across 300–700 (XS 300 / S 400 / M 500 / L 600 /
+     XL 700) rather than being faked.
+
+     'MSCHN Medium' is kept first so anyone with the static cuts installed
+     locally still gets them; it matches nothing for everyone else and falls
+     straight through to the webfont. Rubik remains the last resort. */
+  --font-display: 'MSCHN Medium', 'MSCHN', 'Rubik', sans-serif;
 }
 
 /* ── Typography Scale ───────────────────────────────── */

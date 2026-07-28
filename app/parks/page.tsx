@@ -1,4 +1,5 @@
 import ParksDirectoryAccordion from "@/components/ParksDirectoryAccordion";
+import FooterWordmark from "@/components/FooterWordmark";
 
 export const metadata = {
   title: "Parks — Found By Scout",
@@ -14,6 +15,14 @@ export default function ParksPage() {
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <ParksDirectoryAccordion />
+
+      {/* Cropped to a band rather than the mark's full 341px height: this page
+          is sized to the viewport and only scrolls by ~138px, so the full block
+          would push the map out of view and the reveal would have almost no
+          scroll to run on. 100px matches the existing map-to-footer gap, and
+          window={1} shortens the reveal to that band so the scroll there
+          actually drives it. */}
+      <FooterWordmark maxHeight={100} window={1} />
     </div>
   );
 }

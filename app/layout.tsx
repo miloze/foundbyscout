@@ -6,8 +6,17 @@ import ThemeProvider from "@/components/ThemeProvider";
 import NavOverlayProvider from "@/components/NavOverlay";
 import Grain from "@/components/Grain";
 
-const headingFont = Rubik({ subsets: ["latin"], weight: ["300"], variable: "--font-heading" });
-const monoFont    = DM_Mono({ subsets: ["latin"], weight: ["300","400"], variable: "--font-mono" });
+// Rubik carries two additions for the Scout Notes block:
+//   · italic 300 — the notes are set in italic, and that has to come from a
+//     family shipping a real one. Geist has none (next/font: "Unknown style
+//     italic for font Geist. Available styles: normal"), so font-style:italic
+//     on --font-body only synthesises an oblique: identical advance widths to
+//     the upright, and mechanical at reading size.
+//   · weight 500 — the last-resort cut for the quote marks. Those are set in
+//     --font-display, which resolves to the MSCHN webfont; Rubik only catches
+//     them if that fails to load, and a faked weight shows on a 44px glyph.
+const headingFont = Rubik({ subsets: ["latin"], weight: ["300","500"], style: ["normal","italic"], variable: "--font-heading" });
+const monoFont    = DM_Mono({ subsets: ["latin"], weight: ["300","400","500"], variable: "--font-mono" });
 const bodyFont    = Geist({ subsets: ["latin"], weight: ["300","400"], variable: "--font-body" });
 
 export const metadata: Metadata = {

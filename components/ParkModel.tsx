@@ -11,6 +11,10 @@ const n = (v: unknown[]): [number, number, number] => [+v[0]!, +v[1]!, +v[2]!];
 
 useGLTF.setDecoderPath("/draco/");
 
+// Session-scoped (not per-park) — once a visitor engages with any viewer
+// this tab session, the drag hint shouldn't nag them again until a fresh visit.
+const HINT_DISMISSED_KEY = "fbs-viewer-hint-dismissed";
+
 // ── Mesh ───────────────────────────────────────────────────────────────────
 function Model({ onLoad, modelFile, modelRotation }: {
   onLoad: () => void;
@@ -208,10 +212,20 @@ export default function ParkModel({
   const externallyControlled = grayscale !== undefined;
   const [camPos,      setCamPos]      = useState("loading…");
   const [modelLoaded, setModelLoaded] = useState(false);
+  // ssr:false component (dynamic-imported), so reading sessionStorage in the
+  // initializer is safe — this never runs server-side.
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try { return sessionStorage.getItem(HINT_DISMISSED_KEY) === "1"; } catch { return false; }
+  });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef  = useRef<any>(null);
   const preloadRef   = useRef<HTMLImageElement>(null);
   const captureRef   = useRef<(() => void) | undefined>(undefined);
+
+  const dismissHint = useCallback(() => {
+    setHintDismissed(true);
+    try { sessionStorage.setItem(HINT_DISMISSED_KEY, "1"); } catch { /* ignore */ }
+  }, []);
 
   const startPos    = [+cameraPos[0], +cameraPos[1], +cameraPos[2]] as [number, number, number];
   const filter      = externallyControlled
@@ -231,9 +245,10 @@ export default function ParkModel({
 
       {/* ── B&W / CLR toggle — only shown when not controlled by hero shell ── */}
       {!externallyControlled && (
-        <div style={{ position: "absolute", top: 12, right: 12, zIndex: 11, display: "flex", gap: 2 }}>
+        <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 11, display: "flex", gap: 2 }}>
           {(["bw", "colour"] as const).map(mode => (
             <button key={mode} onClick={() => setViewMode(mode)} style={{
+              minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center",
               padding: "5px 12px", border: "none", cursor: "pointer",
               background: viewMode === mode ? "var(--accent)" : "rgba(0,0,0,0.55)",
               color: "#fff", fontFamily: "var(--font-mono)", fontSize: 10,
@@ -298,20 +313,29 @@ export default function ParkModel({
         </div>
       )}
 
-      {/* ── Controls hint ─────────────────────────────────────────────── */}
+      {/* ── Drag hint icon — only once the model is interactive; dismisses on
+          the first pointerdown on the canvas, not a timer; stays dismissed
+          for the rest of the session ────────────────────────────────────── */}
       {!pingPong && !debug && (
-        <div style={{
-          position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-          zIndex: 5, pointerEvents: "none",
-          fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em",
-          textTransform: "uppercase", color: "rgba(255,255,255,0.45)",
-        }}>
-          drag to rotate · scroll to zoom
+        <div
+          aria-hidden
+          style={{
+            position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
+            zIndex: 5, pointerEvents: "none",
+            color: "rgba(255,255,255,0.45)",
+            opacity: modelLoaded && !hintDismissed ? 1 : 0,
+            transition: "opacity 200ms ease",
+          }}
+        >
+          <svg width="40" height="24" viewBox="0 0 40 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 16c6-6 12-9 16-9s10 3 16 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+            <circle className="fbs-hint-dot" cx="12" cy="10" r="4" fill="currentColor" />
+          </svg>
         </div>
       )}
 
       {/* ── Canvas — filter on wrapper div, not on canvas itself ───────── */}
-      <div style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}>
+      <div style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }} onPointerDown={dismissHint}>
       <Canvas
         camera={{ position: canvasStart, fov, near: 0.5, far: 400 }}
         style={{ position: "absolute", inset: 0 }}
@@ -359,6 +383,21 @@ export default function ParkModel({
 
       </Canvas>
       </div>
+
+      <style>{`
+        @keyframes fbs-hint-drag {
+          0%, 100% { transform: translateX(-6px); }
+          50%      { transform: translateX(6px); }
+        }
+        .fbs-hint-dot {
+          animation: fbs-hint-drag 2s ease-in-out infinite;
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fbs-hint-dot { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }
