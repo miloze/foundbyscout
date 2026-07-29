@@ -1,7 +1,6 @@
 import EditorialGallery, { GalleryRow } from "@/components/EditorialGallery";
 import EditorialSection from "@/components/editorial/EditorialSection";
 import ScoutNotes from "@/components/editorial/ScoutNotes";
-import EditorialAccordion from "@/components/editorial/EditorialAccordion";
 import FooterWordmark from "@/components/FooterWordmark";
 import OpenScanButton from "@/components/OpenScanButton";
 import FloatingAsset from "@/components/FloatingAsset";
@@ -152,9 +151,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
             title={editorial.feature?.title}
             body={editorial.feature?.body}
           />
-
-          {/* Scout notes */}
-          <ScoutNotes notes={editorial.notes} />
         </div>
 
         {/* Facts sidebar */}
@@ -246,21 +242,28 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         }
       </section>
 
-      {/* ── ORIGINS / LOCAL KNOWLEDGE ────────────────────────────────── */}
-      {(editorial.origins || editorial.local?.length) && (
-        <div style={{ paddingTop: 40 }}>
-          <EditorialAccordion
-            label="Origins"
-            teaser={editorial.origins?.teaser}
-            body={editorial.origins?.body}
-          />
-          <EditorialAccordion
-            label="Local knowledge"
-            teaser="Busy times, drainage and what to bring."
-            items={editorial.local}
-          />
-        </div>
-      )}
+      {/* ── ORIGINS / LOCAL KNOWLEDGE — flat sections ──────────────────
+          Previously accordions. Nothing here needed hiding: the pieces are
+          short, and collapsing them cost a click to reach the writing the page
+          exists for. Typography carries the hierarchy instead of UI chrome.
+
+          Titles are park-specific rather than taxonomic — "How Bloblands Came
+          to Be" rather than "Origins". The Origins teaser, which used to be the
+          collapsed summary line, now opens the section as a standfirst. */}
+      <EditorialSection
+        scale="section"
+        title={`How ${park.name} Came to Be`}
+        body={[editorial.origins?.teaser, ...(editorial.origins?.body ?? [])].filter(Boolean) as string[]}
+      />
+
+      <EditorialSection
+        scale="section"
+        title="What the Locals Know"
+        items={editorial.local}
+      />
+
+      {/* ── SCOUT NOTES — the editorial closer ─────────────────────────── */}
+      <ScoutNotes notes={editorial.notes} />
 
       <FooterWordmark />
 

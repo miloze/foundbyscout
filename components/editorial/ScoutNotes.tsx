@@ -30,19 +30,14 @@ type Props = {
   notes?: string[] | null;
 };
 
-export default function ScoutNotes({ label = "Scout notes", notes }: Props) {
+export default function ScoutNotes({ label = "Scout Notes", notes }: Props) {
   const items = (notes ?? []).map(n => n?.trim()).filter(Boolean) as string[];
   if (items.length === 0) return null;
 
   return (
-    <section
-      className="fbs-notes"
-      style={{ paddingTop: 64, paddingBottom: 64 }}
-    >
+    <section className="fbs-notes">
       <div style={{ maxWidth: 680 }}>
-        <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 34 }}>
-          {label}
-        </p>
+        <h2 className="fbs-notes-title">{label}</h2>
 
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {items.map((note, i) => (
@@ -58,6 +53,17 @@ export default function ScoutNotes({ label = "Scout notes", notes }: Props) {
       </div>
 
       <style>{`
+        /* The page's closing section, so it gets the same display-scale title
+           as the flat sections above rather than the small mono eyebrow it
+           carried when it sat mid-page in the editorial band. */
+        .fbs-notes{ padding:clamp(56px, 8vw, 90px) 0 clamp(64px, 9vw, 104px); }
+        .fbs-notes-title{
+          font-family:var(--font-display), sans-serif; font-weight:500;
+          font-size:clamp(1.9rem, 4.4vw, 3.1rem);
+          line-height:0.98; letter-spacing:-0.01em;
+          text-transform:uppercase; margin:0 0 34px;
+        }
+
         .fbs-note{
           display:grid; grid-template-columns:48px 1fr; gap:10px;
           align-items:start; margin-top:38px;
