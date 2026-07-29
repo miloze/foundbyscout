@@ -208,7 +208,7 @@ export default function ParkHeroShell({
               {/* Catalogue no. + Scanned — paired inline, matches the homepage hero */}
               {(idNumber || scanned) && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {idNumber && <span className="fbs-field-tag">{idNumber}</span>}
+                  {idNumber && <span className="fbs-field-tag fbs-field-tag--cat">{idNumber}</span>}
                   {scanned && <span className="fbs-field-tag">Scanned: {fmtDate(scanned)}</span>}
                 </div>
               )}
@@ -290,6 +290,14 @@ export default function ParkHeroShell({
         .fbs-field-tag--plain {
           border: none;
           padding: 0;
+        }
+        /* Matches .fbs-hp-tag--cat on the home hero — the catalogue number
+           takes the accent fill on both, so the archive reference reads the
+           same wherever it appears. */
+        .fbs-field-tag--cat {
+          background: var(--accent);
+          border-color: var(--accent);
+          color: #fff;
         }
         .fbs-coord-tag { gap: 5px; }
         .fbs-coord-tag::after { content: "↗"; font-size: 10px; opacity: .7; }
