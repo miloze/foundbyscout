@@ -1,30 +1,24 @@
 "use client";
 
-// Origins / Local Knowledge — a disclosure that behaves exactly like the
-// archive accordion on /parks.
+// Origins / Local Knowledge — an editorial disclosure.
 //
-// The interaction states here are ported verbatim from ParksDirectoryAccordion
-// (.pda-item / .pda-trigger / .pda-chevron / .pda-drawer) so the two accordions
-// on the site feel identical:
+// The row is full width and entirely clickable, but everything visible is
+// capped to the editorial reading column (700px). Previously the caret was
+// pinned to the far right of the row, which on a wide screen put ~600px of
+// nothing between the sentence and the control that opens it — the row read as
+// passive. The caret now trails the summary text inline, so it follows the last
+// line wherever it wraps and stays part of the heading rather than a utility
+// button parked at the edge.
 //
-//   · quiet grey hover plate on the row (real pointers only — on touch a hover
-//     state sticks after tap), with static padding/negative margin so nothing
-//     reflows and only background-color moves
-//   · the circular chevron's border is the only coloured affordance on hover
-//   · 2px coral edge along the bottom when open, riding over the divider so
-//     opening never shifts the row
-//   · drawer opens on grid-template-rows 0fr → 1fr, .42s cubic-bezier(.22,1,.36,1)
-//   · :active scale(.995), :focus-visible 2px coral outline, reduced-motion opt-out
+// Motion: drawer rows, opacity, the body's vertical travel and the caret
+// rotation all run on the same 500ms curve, starting together. Nothing waits
+// for the drawer to finish.
 //
-// Accessibility follows the same shape too: a real <button> trigger carrying
-// aria-expanded / aria-controls, and the drawer as role="region" that is inert
-// while closed, so its content stays out of the tab order and off screen
-// readers until the row is open.
-//
-// (Native <details> was the earlier draft. It is fewer lines, but it cannot
-// reproduce these states — so consistency wins. If a third accordion ever
-// appears, this CSS and ParksDirectoryAccordion's should be extracted into one
-// shared ACCORDION_CSS constant rather than copied a third time.)
+// Accessibility: a real <button> carrying aria-expanded / aria-controls, and
+// the panel as a role="region" that is inert while closed, so its content stays
+// out of the tab order and off screen readers until opened. Keyboard works by
+// virtue of being a button; :focus-visible draws a ring on the capped inner
+// block rather than the full-bleed row.
 
 import { useId, useState } from "react";
 
@@ -34,6 +28,16 @@ type Props = {
   body?: string[] | null;
   items?: string[] | null;
 };
+
+function Caret() {
+  return (
+    <span className="eacc-caret" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </span>
+  );
+}
 
 export default function EditorialAccordion({ label, teaser, body, items }: Props) {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,14 +57,18 @@ export default function EditorialAccordion({ label, teaser, body, items }: Props
         aria-expanded={isOpen} aria-controls={panelId}
         onClick={() => setIsOpen(o => !o)}
       >
-        <span className="eacc-trigger-content">
-          <span className="eacc-label">{label}</span>
-          {teaser && <span className="eacc-teaser">{teaser}</span>}
-        </span>
-        <span className="eacc-chevron" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+        <span className="eacc-inner">
+          <span className="eacc-label">
+            {label}
+            {/* No teaser to trail, so the caret follows the label instead. */}
+            {!teaser && <Caret />}
+          </span>
+          {teaser && (
+            <span className="eacc-summary">
+              {teaser}
+              <Caret />
+            </span>
+          )}
         </span>
       </button>
 
@@ -83,74 +91,91 @@ export default function EditorialAccordion({ label, teaser, body, items }: Props
       </div>
 
       <style>{`
-        /* ── ported from ParksDirectoryAccordion — keep the two in step ── */
-        /* No per-row rule: a divider under every row stacked up into a ladder
-           of repeating lines. Whitespace, the hover plate and the chevron carry
-           the structure instead; the coral edge still marks the open row. The
-           section's own bottom border stays — that is a block divider, a
-           different job. Kept in step with .pda-item in ParksDirectoryAccordion. */
         .eacc-item{
-          --eacc-ease: cubic-bezier(0.16, 1, 0.3, 1);
+          --eacc-dur: .5s;
+          --eacc-ease: cubic-bezier(.22, 1, .36, 1);
+          --eacc-col: 700px;
           position:relative;
-          padding:26px 16px; margin:0 -16px;
-          transition:background-color .18s ease;
         }
-        .eacc-item::after{
-          content:""; position:absolute; left:0; right:0; bottom:0; height:2px;
-          background:var(--accent); opacity:0;
-          transition:opacity .18s ease; pointer-events:none;
-        }
-        .eacc-item.eacc-open::after{ opacity:1; }
-        @media (hover: hover){
-          .eacc-item:not(.eacc-open):hover{ background-color:var(--card); }
-          .eacc-item:not(.eacc-open):hover .eacc-chevron{ border-color:var(--accent); }
-        }
-
+        /* The divider is the interaction surface, not a permanent rule — a line
+           under every row stacked into a ladder, which is why they were removed.
+           It fades in on hover/focus and goes solid in the accent when open. */
+        /* Full-bleed hit area; the visible content is capped by .eacc-inner.
+           The divider lives on the button so :hover and :focus-visible reach it
+           directly, with no :has() dependency. */
         .eacc-trigger{
-          all:unset; box-sizing:border-box;
-          display:grid; grid-template-columns:1fr 28px; gap:16px; align-items:center;
-          width:100%; cursor:pointer;
-          transition:transform .12s var(--eacc-ease);
+          all:unset; box-sizing:border-box; position:relative;
+          display:block; width:100%;
+          padding:22px 0; cursor:pointer;
+          -webkit-tap-highlight-color:transparent;
         }
-        .eacc-trigger:active{ transform:scale(.995); }
-        .eacc-trigger:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; }
-        .eacc-trigger-content{ padding-left:12px; min-width:0; display:block; }
+        .eacc-trigger::after{
+          content:""; position:absolute; left:0; bottom:0;
+          width:min(var(--eacc-col), 100%); height:1px;
+          background:var(--accent); opacity:0;
+          transition:opacity var(--eacc-dur) var(--eacc-ease),
+                     height  var(--eacc-dur) var(--eacc-ease);
+          pointer-events:none;
+        }
+        .eacc-item.eacc-open .eacc-trigger::after{ opacity:1; height:2px; }
+        .eacc-inner{
+          display:block; max-width:var(--eacc-col);
+          /* 44px minimum touch target even if the text is a single short line */
+          min-height:44px;
+        }
+        .eacc-trigger:focus-visible .eacc-inner{
+          outline:2px solid var(--accent); outline-offset:6px;
+        }
 
         .eacc-label{
           display:block;
           font-family:var(--font-mono); font-size:10px; letter-spacing:.15em;
           text-transform:uppercase; color:var(--muted);
+          transition:color var(--eacc-dur) var(--eacc-ease);
         }
-        .eacc-teaser{
+        .eacc-summary{
           display:block; margin-top:8px;
           font-size:15px; line-height:1.6; color:var(--foreground);
+          opacity:.82;
+          transition:opacity var(--eacc-dur) var(--eacc-ease);
         }
 
-        .eacc-chevron{
-          width:28px; height:28px; border-radius:50%;
-          border:0.5px solid var(--border);
-          display:flex; align-items:center; justify-content:center;
+        /* Trails the text inline, so it follows the last line wherever that
+           falls instead of sitting at the row's right edge. */
+        .eacc-caret{
+          display:inline-flex; align-items:center;
+          margin-left:28px; vertical-align:baseline;
           color:var(--muted);
-          transition:border-color .18s ease;
+          transition:transform var(--eacc-dur) var(--eacc-ease),
+                     color     var(--eacc-dur) var(--eacc-ease);
         }
-        .eacc-chevron svg{
-          width:12px; height:12px;
-          transition:transform .28s cubic-bezier(.2,.8,.2,1);
+        .eacc-caret svg{ width:14px; height:14px; display:block; }
+        .eacc-item.eacc-open .eacc-caret{ transform:rotate(180deg); }
+
+        @media (hover: hover){
+          .eacc-trigger:hover .eacc-summary{ opacity:1; }
+          .eacc-trigger:hover .eacc-label{ color:var(--foreground); }
+          .eacc-trigger:hover .eacc-caret{ color:var(--accent); transform:translateY(2px); }
+          .eacc-item.eacc-open .eacc-trigger:hover .eacc-caret{ transform:rotate(180deg) translateY(2px); }
+          .eacc-item:not(.eacc-open) .eacc-trigger:hover::after{ opacity:.45; }
         }
-        .eacc-item.eacc-open .eacc-chevron svg{ transform:rotate(180deg); }
+        /* Keyboard focus gets the same divider cue as hover. */
+        .eacc-item:not(.eacc-open) .eacc-trigger:focus-visible::after{ opacity:.45; }
 
         .eacc-drawer{
           display:grid; grid-template-rows:0fr; opacity:0;
-          transition:grid-template-rows .42s cubic-bezier(.22,1,.36,1), opacity .25s ease;
+          transition:grid-template-rows var(--eacc-dur) var(--eacc-ease),
+                     opacity            var(--eacc-dur) var(--eacc-ease);
         }
         .eacc-item.eacc-open .eacc-drawer{ grid-template-rows:1fr; opacity:1; }
         .eacc-drawer-inner{ overflow:hidden; min-height:0; }
+        /* Flush with the summary — no indent — and capped to the same column. */
         .eacc-drawer-body{
-          padding:18px 12px 4px;
-          transform:translateY(-6px);
-          transition:transform .42s cubic-bezier(.22,1,.36,1);
+          max-width:var(--eacc-col);
+          padding:0 0 26px;
+          transform:translateY(-8px);
+          transition:transform var(--eacc-dur) var(--eacc-ease);
           font-size:15px; line-height:1.75; color:var(--foreground);
-          max-width:62ch;
         }
         .eacc-item.eacc-open .eacc-drawer-body{ transform:none; }
 
@@ -162,10 +187,15 @@ export default function EditorialAccordion({ label, teaser, body, items }: Props
         .eacc-list li:first-child{ margin-top:0; }
         .eacc-list li::before{ content:"—"; color:var(--accent); line-height:1.75; }
 
+        @media (max-width: 640px){
+          .eacc-trigger{ padding:18px 0; }
+          /* Keep the caret with the text rather than at the screen edge. */
+          .eacc-caret{ margin-left:20px; }
+        }
+
         @media (prefers-reduced-motion: reduce){
-          .eacc-item, .eacc-trigger, .eacc-chevron svg,
+          .eacc-item::after, .eacc-label, .eacc-summary, .eacc-caret,
           .eacc-drawer, .eacc-drawer-body{ transition-duration:.01ms; }
-          .eacc-trigger:active{ transform:none; }
         }
       `}</style>
     </div>
