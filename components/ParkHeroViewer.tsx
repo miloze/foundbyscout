@@ -95,7 +95,14 @@ export default function ParkHeroViewer({
   }
 
   // ── Desktop / forced viewer: 3D model ───────────────────────────────────
-  const finalModelFile = (forceViewer && isMobile && modelFileMobile) ? modelFileMobile : activeDesktopModel;
+  // On mobile this is the tap-to-expand viewer, so keep it to the lightest
+  // export available. The old expression only used the mobile file when one
+  // existed and otherwise fell through to the desktop model — and no park
+  // currently has `model_file_mobile` set, so phones were being handed the
+  // high-res export wherever there was no low one (wandle-park, crystal-palace).
+  const finalModelFile = (forceViewer && isMobile)
+    ? (modelFileMobile || modelFileLow || modelFile)
+    : activeDesktopModel;
 
   return (
     <>

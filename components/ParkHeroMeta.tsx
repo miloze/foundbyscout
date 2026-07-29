@@ -72,7 +72,7 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
           {/* Catalogue no. + Scanned — cat. no. inline in front of the pill */}
           {(idNumber || scanned) && (
             <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
-              {idNumber && <span className="fbs-hp-tag">{idNumber}</span>}
+              {idNumber && <span className="fbs-hp-tag fbs-hp-tag--cat">{idNumber}</span>}
               {scanned && <span className="fbs-hp-tag">Scanned: {fmtDate(scanned)}</span>}
             </div>
           )}
@@ -104,6 +104,13 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
           color: rgba(255,255,255,0.7);
           border: 1px solid rgba(255,255,255,0.25);
           padding: 5px 9px;
+        }
+        /* Catalogue number carries the accent fill so it reads as the archive
+           reference rather than another muted field. Stays in place. */
+        .fbs-hp-tag--cat {
+          background: var(--accent);
+          border-color: var(--accent);
+          color: #fff;
         }
         .fbs-hero-cta {
           display: inline-block;

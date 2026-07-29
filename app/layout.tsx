@@ -34,6 +34,11 @@ export default function RootLayout({
     // h-full chains down so flex children can fill the viewport reliably on iOS
     <html lang="en">
       <head>
+        {/* iOS and Android linkify anything that looks like an address, phone
+            number or date, and render it underlined — which is where the
+            underlines under the park name and location chain come from on
+            mobile. Nothing in the app's own CSS draws them. */}
+        <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
       </head>
       <body className={`${headingFont.variable} ${monoFont.variable} ${bodyFont.variable}`} style={{ fontFamily: "var(--font-body), sans-serif", margin: 0, background: "var(--background)", color: "var(--foreground)" }}>
@@ -45,13 +50,12 @@ export default function RootLayout({
             <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
               <main style={{ flex: 1 }}>{children}</main>
               <footer style={{
-                borderTop: "1px solid var(--border)",
                 paddingTop: 24, paddingBottom: 32,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 gap: 24, flexWrap: "wrap",
               }}>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em" }}>
-                  © {new Date().getFullYear()} Found by Scout
+                  © 2016 Scout
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
                   {[["Parks", "/parks"], ["About", "/about"], ["Contact", "/contact"]].map(([label, href]) => (

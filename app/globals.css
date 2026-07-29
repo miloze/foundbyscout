@@ -51,6 +51,19 @@ a {
   text-decoration: none;
 }
 
+/* Belt and braces with the format-detection meta in layout.tsx: where iOS has
+   already wrapped text in its own detector anchor, strip the underline and the
+   blue it applies. Safari ignores a plain `a` rule for these. */
+a[x-apple-data-detectors],
+a[href^="tel:"],
+a[href^="sms:"],
+a[href^="mailto:"] {
+  color: inherit !important;
+  text-decoration: none !important;
+  -webkit-text-decoration: none !important;
+  pointer-events: none;
+}
+
 .mapboxgl-map {
   font-family: inherit !important;
 }

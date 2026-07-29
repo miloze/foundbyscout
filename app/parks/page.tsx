@@ -17,12 +17,11 @@ export default function ParksPage() {
       <ParksDirectoryAccordion />
 
       {/* Cropped to a band rather than the mark's full 341px height: this page
-          is sized to the viewport and only scrolls by ~138px, so the full block
-          would push the map out of view and the reveal would have almost no
-          scroll to run on. 100px matches the existing map-to-footer gap, and
-          window={1} shortens the reveal to that band so the scroll there
-          actually drives it. */}
-      <FooterWordmark maxHeight={100} window={1} />
+          is sized to the viewport, so the full block would push the map out of
+          view and the reveal would have little scroll to run on. Raised from
+          100px so more of the mark reads. window={1} keeps the reveal to that
+          band, so the page's short scroll still drives it. */}
+      <FooterWordmark maxHeight={170} window={1} />
     </div>
   );
 }

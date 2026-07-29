@@ -134,7 +134,7 @@ export default async function Home() {
       </section>
 
       {/* DIRECTORY CTA + FEATURED PARKS */}
-      <section style={{ paddingTop: "5rem", paddingBottom: "6rem", borderBottom: "1px solid var(--border)" }}>
+      <section style={{ paddingTop: "5rem", paddingBottom: "6rem" }}>
 
         {/* Header row — label */}
         <div style={{ marginBottom: 24 }}>

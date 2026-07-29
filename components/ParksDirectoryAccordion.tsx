@@ -353,6 +353,7 @@ function Row({
   park: ParkRow; idx: number; isOpen: boolean; onToggle: () => void; onNavigate: () => void;
 }) {
   const chain = getParkAddressChain(park);
+  const fullAddress = [...(park.address ?? []), park.postcode].filter(Boolean).join(", ");
   const tags = getParkTags(park);
   const image = park.directory_image_url || park.hero_image;
   const panelId = `pda-panel-${park.id}`;
@@ -390,6 +391,13 @@ function Row({
 
             <div className="pda-details">
               {park.brief && <p className="pcard-brief">{park.brief}</p>}
+
+              {/* Full address, not the trigger's abbreviated chain — the row
+                  above already carries street/area/postcode-prefix, and
+                  repeating it told the reader nothing new. This is the whole
+                  thing including the full postcode, so the drawer answers
+                  "where exactly is this?" without opening the park page. */}
+              {fullAddress && <p className="pcard-address">{fullAddress}</p>}
               {tags.length > 0 && (
                 <div className="pcard-tags">
                   {tags.map(t => <span key={t} className="pcard-tag">{t}</span>)}

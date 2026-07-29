@@ -53,7 +53,7 @@ function SlotContent({ slot, src, alt, modelFile, debug }: {
         <div style={{ paddingBottom: aspectToPercent(slot.ratio), position: "relative" }}>
           <div style={{ position: "absolute", inset: 0 }}>
             {slot.type === "glb" && (slot.glbFile || modelFile) ? (
-              <GalleryModelSlotClient modelFile={toAbsPath(slot.glbFile || modelFile!)} debug={debug} />
+              <GalleryModelSlotClient modelFile={toAbsPath(slot.glbFile || modelFile!)} debug={debug} fallbackSrc={src} />
             ) : slot.type === "video" && src ? (
               <video autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} src={src} />
             ) : src ? (

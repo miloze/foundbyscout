@@ -71,7 +71,6 @@ export default function ParkHeroShell({
   }, []);
 
   const bleed = "calc(-1 * clamp(16px, 4vw, 56px))";
-  const postcodePrefix = postcode?.split(" ")[0];
   const idNumber = catalogueId?.replace(/^SCN\//i, "");
 
   // Area name (not street) + full postcode — matches the homepage hero treatment.
@@ -155,34 +154,6 @@ export default function ParkHeroShell({
         }} />
       )}
 
-      {/* Catalogue badge — top right. Carries the catalogue number over the
-          postcode, stacked and left-aligned: the number in the mono the rest of
-          the archive metadata uses, the postcode stepping up into the display
-          cut so the size difference reads as hierarchy. */}
-      {(postcodePrefix || idNumber) && (
-        <div style={{
-          position: "absolute",
-          top: "clamp(64px, 8vw, 80px)",
-          right: "clamp(16px, 4vw, 56px)",
-          width: 96, height: 96, borderRadius: "50%",
-          background: "var(--accent)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 6, pointerEvents: "none",
-        }}>
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1, color: "#fff" }}>
-            {idNumber && (
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500, letterSpacing: "0.08em", marginBottom: 2 }}>
-                {idNumber}/
-              </span>
-            )}
-            {postcodePrefix && (
-              <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 500, letterSpacing: "0.01em", textTransform: "uppercase" }}>
-                {postcodePrefix}
-              </span>
-            )}
-          </span>
-        </div>
-      )}
 
       {/* Scrim */}
       <div style={{
