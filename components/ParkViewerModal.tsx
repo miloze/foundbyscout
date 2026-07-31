@@ -6,6 +6,7 @@ import { BwIcon, ArExitIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterB
 type Props = {
   modelFile: string;
   modelFileMobile?: string;
+  featureFile?: string | null;
   parkName: string;
   onClose: () => void;
   cameraPos?: [number, number, number];
@@ -71,6 +72,7 @@ export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: P
         <ParkHeroViewer
           modelFile={viewerProps.modelFile}
           modelFileMobile={viewerProps.modelFileMobile}
+          featureFile={viewerProps.featureFile}
           cameraPos={viewerProps.cameraPos}
           cameraTarget={viewerProps.cameraTarget}
           modelRotation={viewerProps.modelRotation}

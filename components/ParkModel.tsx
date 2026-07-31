@@ -15,6 +15,26 @@ useGLTF.setDecoderPath("/draco/");
 // this tab session, the drag hint shouldn't nag them again until a fresh visit.
 const HINT_DISMISSED_KEY = "fbs-viewer-hint-dismissed";
 
+// Keep original PBR materials — ambient-only lighting gives a flat
+// baked-texture look. Fixes side/depthWrite so faces don't vanish.
+function fixMaterials(scene: THREE.Object3D) {
+  scene.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      const mesh = obj as THREE.Mesh;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => {
+        const mat = m as THREE.MeshStandardMaterial;
+        mat.side        = THREE.DoubleSide;
+        mat.transparent = false;
+        mat.depthWrite  = true;
+        if (mat.map)         mat.map.colorSpace         = THREE.SRGBColorSpace;
+        if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+        mat.needsUpdate = true;
+      });
+    }
+  });
+}
+
 // ── Mesh ───────────────────────────────────────────────────────────────────
 function Model({ onLoad, modelFile, modelRotation }: {
   onLoad: () => void;
@@ -24,29 +44,72 @@ function Model({ onLoad, modelFile, modelRotation }: {
   const { scene } = useGLTF(modelFile);
 
   useEffect(() => {
-    // Keep original PBR materials — ambient-only lighting gives a flat
-    // baked-texture look. Fixes side/depthWrite so faces don't vanish.
-    scene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        const mesh = obj as THREE.Mesh;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        mats.forEach((m) => {
-          const mat = m as THREE.MeshStandardMaterial;
-          mat.side        = THREE.DoubleSide;
-          mat.transparent = false;
-          mat.depthWrite  = true;
-          if (mat.map)         mat.map.colorSpace         = THREE.SRGBColorSpace;
-          if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-          mat.needsUpdate = true;
-        });
-      }
-    });
+    fixMaterials(scene);
     onLoad();
   }, [scene, onLoad]);
 
   return (
     <group>
       <primitive object={scene} rotation={modelRotation} position={[0, 4, 0]} />
+    </group>
+  );
+}
+
+// ── Feature model — the optional spinning landmark ─────────────────────────
+// Orientation, scale and position are all baked into the GLB, so nothing here
+// transforms it. In particular it does NOT get the main scan's modelRotation:
+// these come out of Blender with the Z-up→Y-up conversion already applied as a
+// +90° X on the root node, so re-applying an up-axis correction would tip the
+// feature onto its side. Verified against parks/bloblands/feature.glb, whose
+// root node carries rotation [0.7071, 0, 0, 0.7071].
+//
+// The one thing that is computed: spinning about the feature's own centre
+// rather than the scene origin. A GLB baked at its real position within the
+// park is not centred on the origin, and rotating the group directly would
+// swing it around the park in a wide arc instead of turning it on the spot.
+// The bounding-box centre is measured once, the mesh is pushed back by it, and
+// the group that spins is placed at it — the object stays exactly where it was
+// baked and turns in place.
+const FEATURE_SPIN_SPEED = 0.4; // radians/sec — frame-rate independent
+
+function FeatureModel({ featureFile }: { featureFile: string }) {
+  const { scene } = useGLTF(featureFile);
+  const spinRef   = useRef<Group>(null);
+
+  useEffect(() => {
+    const spin = spinRef.current;
+    if (!spin) return;
+
+    fixMaterials(scene);
+
+    // Measure with both groups at their origins, then convert. Box3 reports
+    // world space, which at this point still includes the outer [0, 4, 0]
+    // lift — worldToLocal takes that back out, so the offset below is applied
+    // in the frame it is actually read in.
+    scene.position.set(0, 0, 0);
+    spin.position.set(0, 0, 0);
+    spin.updateMatrixWorld(true);
+
+    const centre = new THREE.Box3()
+      .setFromObject(scene)
+      .getCenter(new THREE.Vector3());
+    spin.worldToLocal(centre);
+
+    scene.position.copy(centre).negate();
+    spin.position.copy(centre);
+  }, [scene]);
+
+  useFrame((_, delta) => {
+    if (spinRef.current) spinRef.current.rotation.y += delta * FEATURE_SPIN_SPEED;
+  });
+
+  // Outer group carries the main model's [0, 4, 0] lift so the feature sits in
+  // the same space as the scan it was baked against.
+  return (
+    <group position={[0, 4, 0]}>
+      <group ref={spinRef}>
+        <primitive object={scene} />
+      </group>
     </group>
   );
 }
@@ -176,6 +239,7 @@ function CaptureSetup({ captureRef, filterRef }: {
 // ── Main export ────────────────────────────────────────────────────────────
 export default function ParkModel({
   modelFile,
+  featureFile,
   preloadImage,
   onLoad,
   cameraPos            = [0, 22, 32] as [number, number, number],
@@ -192,6 +256,7 @@ export default function ParkModel({
   grayscale,
 }: {
   modelFile: string;
+  featureFile?: string | null;
   preloadImage?: string;
   onLoad?: () => void;
   cameraPos?: [number, number, number];
@@ -354,6 +419,14 @@ export default function ParkModel({
             modelRotation={modelRotation}
           />
         </Suspense>
+
+        {/* Its own Suspense boundary — a slow or missing feature.glb must not
+            hold back the park itself, which is the thing worth waiting for. */}
+        {featureFile && (
+          <Suspense fallback={null}>
+            <FeatureModel featureFile={featureFile} />
+          </Suspense>
+        )}
 
         {pingPong && !debug && (
           <PingPongCamera

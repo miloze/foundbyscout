@@ -8,7 +8,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ParkHeroShell from "@/components/ParkHeroShell";
 import { createServerClient } from "@/lib/supabase-server";
-import { modelUrl, resolveModelUrl } from "@/lib/assets";
+import { modelUrl, resolveModelUrl, featureUrl } from "@/lib/assets";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Transport  = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: string };
@@ -19,11 +19,13 @@ type Social     = { platform: "instagram"|"facebook"|"youtube"|"tiktok"|"website
 
 // The editorial layer — see supabase/migrations/004_editorial.sql.
 // Every key is optional; an absent key means the section does not render.
+//
+// The narrative sections (feature / origins / local) were retired: the park
+// page now carries one objective Introduction — the `description` column —
+// plus Scout notes. Older rows may still hold the retired keys; they are
+// simply not read, and the next admin save drops them.
 type Editorial = {
-  feature?: { title?: string; body?: string[] };
-  notes?:   string[];
-  origins?: { teaser?: string; body?: string[] };
-  local?:   string[];
+  notes?: string[];
 };
 
 
@@ -105,6 +107,11 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
   const modelFileLow = resolveModelUrl(park.model_file_low, slug, "low") ?? undefined;
   const modelFileMobile = resolveModelUrl(park.model_file_mobile, slug, "low") ?? undefined;
 
+  // Optional spinning landmark beside the scan. `?? false` tolerates the column
+  // not existing yet, the same way `editorial` above does; featureUrl returns
+  // null for parks that aren't on R2, so a stale flag can't 404 the viewer.
+  const featureFile = (park.has_feature_glb ?? false) ? featureUrl(slug) : null;
+
   return (
     <article>
 
@@ -113,6 +120,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         modelFile={modelFile}
         modelFileLow={modelFileLow}
         modelFileMobile={modelFileMobile}
+        featureFile={featureFile}
         heroImage={park.hero_image}
         preloadImageUrl={park.preload_image_url ?? `/images/parks/${slug}/glb-preload.png`}
         cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
@@ -144,13 +152,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         <div>
           {/* Introduction — the existing description[], unchanged data */}
           <EditorialSection label="Introduction" body={park.description} />
-
-          {/* Feature story */}
-          <EditorialSection
-            label="Feature story"
-            title={editorial.feature?.title}
-            body={editorial.feature?.body}
-          />
         </div>
 
         {/* Facts sidebar */}
@@ -241,26 +242,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           : <div style={{ background: "var(--card)", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>No photos yet</span></div>
         }
       </section>
-
-      {/* ── ORIGINS / LOCAL KNOWLEDGE — flat sections ──────────────────
-          Previously accordions. Nothing here needed hiding: the pieces are
-          short, and collapsing them cost a click to reach the writing the page
-          exists for. Typography carries the hierarchy instead of UI chrome.
-
-          Titles are park-specific rather than taxonomic — "How Bloblands Came
-          to Be" rather than "Origins". The Origins teaser, which used to be the
-          collapsed summary line, now opens the section as a standfirst. */}
-      <EditorialSection
-        scale="section"
-        title={`How ${park.name} Came to Be`}
-        body={[editorial.origins?.teaser, ...(editorial.origins?.body ?? [])].filter(Boolean) as string[]}
-      />
-
-      <EditorialSection
-        scale="section"
-        title="What the Locals Know"
-        items={editorial.local}
-      />
 
       {/* ── SCOUT NOTES — the editorial closer ─────────────────────────── */}
       <ScoutNotes notes={editorial.notes} />

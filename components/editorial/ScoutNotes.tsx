@@ -37,7 +37,7 @@ export default function ScoutNotes({ label = "Scout Notes", notes }: Props) {
   return (
     <section className="fbs-notes">
       <div style={{ maxWidth: 680 }}>
-        <h2 className="fbs-notes-title">{label}</h2>
+        <p className="fbs-notes-label">{label}</p>
 
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {items.map((note, i) => (
@@ -53,15 +53,12 @@ export default function ScoutNotes({ label = "Scout Notes", notes }: Props) {
       </div>
 
       <style>{`
-        /* The page's closing section, so it gets the same display-scale title
-           as the flat sections above rather than the small mono eyebrow it
-           carried when it sat mid-page in the editorial band. */
+        /* Closes the page, so it keeps the section spacing — but the same mono
+           eyebrow as every other editorial block, not a display title. */
         .fbs-notes{ padding:clamp(56px, 8vw, 90px) 0 clamp(64px, 9vw, 104px); }
-        .fbs-notes-title{
-          font-family:var(--font-display), sans-serif; font-weight:500;
-          font-size:clamp(1.9rem, 4.4vw, 3.1rem);
-          line-height:0.98; letter-spacing:-0.01em;
-          text-transform:uppercase; margin:0 0 34px;
+        .fbs-notes-label{
+          font-family:var(--font-mono); font-size:10px; letter-spacing:.15em;
+          text-transform:uppercase; color:var(--muted); margin:0 0 28px;
         }
 
         .fbs-note{

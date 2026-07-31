@@ -14,58 +14,37 @@ type GalleryRowItem = { slot: number; ratio: string; type: "image" | "video" | "
 type GalleryColumn = { slots: GalleryRowItem[] };
 
 // Editorial layer — stored as one jsonb column, see migrations/004_editorial.sql
+//
+// The narrative sections (feature / origins / local) were retired in favour of
+// a single objective Introduction, which is the `description` column and lives
+// in `form`, not here. What remains in the jsonb blob is Scout notes.
 type EditorialState = {
-  featureTitle: string;
-  featureBody:  string;   // blank line = new paragraph, same as Description
-  notes:        string[];
-  originsTeaser: string;
-  originsBody:   string;
-  local:         string[];
+  notes: string[];
 };
 
-const EMPTY_EDITORIAL: EditorialState = {
-  featureTitle: "", featureBody: "", notes: [], originsTeaser: "", originsBody: "", local: [],
-};
+const EMPTY_EDITORIAL: EditorialState = { notes: [] };
 
 /** Form state → the jsonb shape the park page reads. Empty strings are
  *  stripped rather than stored: the render guards key off absence, and ""
  *  is not the same as absent. */
+//  Note: this returns the whole blob, so the first save of any park drops the
+//  retired feature/origins/local keys it still holds. That is the intended
+//  cleanup — the copy lives in supabase/seed_editorial_bloblands.sql and the
+//  Editorial Bible if it is ever wanted back.
 function toEditorialJson(e: EditorialState) {
-  const paras = (s: string) => s.split("\n\n").map(p => p.trim()).filter(Boolean);
-  const list  = (a: string[]) => a.map(s => s.trim()).filter(Boolean);
+  const list = (a: string[]) => a.map(s => s.trim()).filter(Boolean);
 
   const out: Record<string, unknown> = {};
-  const featureBody = paras(e.featureBody);
-  if (e.featureTitle.trim() || featureBody.length) {
-    out.feature = { title: e.featureTitle.trim(), body: featureBody };
-  }
   const notes = list(e.notes);
   if (notes.length) out.notes = notes;
-
-  const originsBody = paras(e.originsBody);
-  if (e.originsTeaser.trim() || originsBody.length) {
-    out.origins = { teaser: e.originsTeaser.trim(), body: originsBody };
-  }
-  const local = list(e.local);
-  if (local.length) out.local = local;
 
   return out;
 }
 
 function fromEditorialJson(j: unknown): EditorialState {
-  const e = (j ?? {}) as {
-    feature?: { title?: string; body?: string[] };
-    notes?: string[];
-    origins?: { teaser?: string; body?: string[] };
-    local?: string[];
-  };
+  const e = (j ?? {}) as { notes?: string[] };
   return {
-    featureTitle:  e.feature?.title ?? "",
-    featureBody:   (e.feature?.body ?? []).join("\n\n"),
-    notes:         Array.isArray(e.notes) ? e.notes : [],
-    originsTeaser: e.origins?.teaser ?? "",
-    originsBody:   (e.origins?.body ?? []).join("\n\n"),
-    local:         Array.isArray(e.local) ? e.local : [],
+    notes: Array.isArray(e.notes) ? e.notes : [],
   };
 }
 
@@ -180,7 +159,8 @@ type SocialItem    = { platform: string; url: string; label: string };
 type FormState = {
   name: string; postcode: string; borough: string; location: string;
   type: string; surface: string; surface_note: string;
-  is_free: boolean; is_covered: boolean; published: boolean; use_contour_model: boolean;
+  is_free: boolean; is_covered: boolean; published: boolean;
+  has_feature_glb: boolean;
   sort_order: number;
   opened: string; builder: string;
   lat: string; lng: string;
@@ -199,7 +179,8 @@ type FormState = {
 const EMPTY: FormState = {
   name: "", postcode: "", borough: "", location: "",
   type: "Bowl", surface: "", surface_note: "",
-  is_free: true, is_covered: false, published: false, use_contour_model: false, sort_order: 0,
+  is_free: true, is_covered: false, published: false,
+  has_feature_glb: false, sort_order: 0,
   opened: "", builder: "",
   lat: "", lng: "",
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
@@ -274,7 +255,7 @@ export default function EditParkPage() {
           is_covered:        park.is_covered ?? false,
           published:         park.published ?? false,
           sort_order:        park.sort_order ?? 0,
-          use_contour_model: park.use_contour_model ?? false,
+          has_feature_glb:   park.has_feature_glb ?? false,
           opened:            park.opened ?? "",
           builder:           park.builder ?? "",
           lat:  park.lat  != null ? String(park.lat)  : "",
@@ -657,7 +638,7 @@ export default function EditParkPage() {
                 ["is_free",           "Free entry"],
                 ["is_covered",        "Covered / indoor"],
                 ["published",         "Published"],
-                ["use_contour_model", "Contour (topo) model"],
+                ["has_feature_glb",   "Feature GLB"],
               ] as [keyof FormState, string][]).map(([key, label]) => (
                 <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input type="checkbox" checked={form[key] as boolean}
@@ -684,11 +665,6 @@ export default function EditParkPage() {
               <FieldLabel hint="shown on map cards and in the directory">Brief — one line</FieldLabel>
               <Input value={form.brief} onChange={v => upd("brief", v)}
                 placeholder="South London's concrete icon. World-class cloverleaf pool, built for riders, by riders." />
-            </div>
-            <div>
-              <FieldLabel hint="separate paragraphs with a blank line">Description</FieldLabel>
-              <Textarea value={form.description} onChange={v => upd("description", v)} rows={8}
-                placeholder={"First paragraph.\n\nSecond paragraph.\n\nThird paragraph."} />
             </div>
           </div>
         </section>
@@ -1224,25 +1200,16 @@ export default function EditParkPage() {
           <SectionHead>Editorial</SectionHead>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 20, lineHeight: 1.8 }}>
             All optional — anything left empty simply doesn&apos;t render on the park page.
-            The introduction is the <span style={{ color: "var(--foreground)" }}>Description</span> field in section 2.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
-            {/* Feature story */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <FieldLabel hint="one defining narrative — e.g. The Volcano">Feature story — title</FieldLabel>
-                <Input value={editorial.featureTitle}
-                  onChange={v => setEditorial(e => ({ ...e, featureTitle: v }))}
-                  placeholder="The Volcano" />
-              </div>
-              <div>
-                <FieldLabel hint="separate paragraphs with a blank line">Feature story — body</FieldLabel>
-                <Textarea value={editorial.featureBody} rows={6}
-                  onChange={v => setEditorial(e => ({ ...e, featureBody: v }))}
-                  placeholder={"First paragraph.\n\nSecond paragraph."} />
-              </div>
+            {/* Introduction — the `description` column, kept here rather than in
+                section 2 so the whole editorial layer reads as one thing. */}
+            <div>
+              <FieldLabel hint="objective and matter-of-fact — features, transitions, layout; separate paragraphs with a blank line">Introduction</FieldLabel>
+              <Textarea value={form.description} onChange={v => upd("description", v)} rows={8}
+                placeholder="Bloblands is a compact concrete skatepark centred around a volcano feature. Banks, quarters and transitions connect around the perimeter to create a variety of routes within a relatively small footprint." />
             </div>
 
             {/* Scout notes */}
@@ -1257,35 +1224,6 @@ export default function EditParkPage() {
                 </div>
               ))}
               <AddRowBtn onClick={() => setEditorial(e => ({ ...e, notes: [...e.notes, ""] }))} label="+ Add note" />
-            </div>
-
-            {/* Origins */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <FieldLabel hint="the line shown before the accordion opens">Origins — teaser</FieldLabel>
-                <Input value={editorial.originsTeaser}
-                  onChange={v => setEditorial(e => ({ ...e, originsTeaser: v }))}
-                  placeholder="A paddling pool became one of the UK's most distinctive local skateparks." />
-              </div>
-              <div>
-                <FieldLabel hint="separate paragraphs with a blank line">Origins — full story</FieldLabel>
-                <Textarea value={editorial.originsBody} rows={6}
-                  onChange={v => setEditorial(e => ({ ...e, originsBody: v }))} />
-              </div>
-            </div>
-
-            {/* Local knowledge */}
-            <div>
-              <FieldLabel hint="busy times, drainage, etiquette, photography">Local knowledge</FieldLabel>
-              {editorial.local.map((l, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                  <Input value={l}
-                    onChange={v => setEditorial(e => { const a = [...e.local]; a[i] = v; return { ...e, local: a }; })}
-                    placeholder="Weekday mornings offer the quietest sessions." />
-                  <RemoveBtn onClick={() => setEditorial(e => ({ ...e, local: e.local.filter((_, j) => j !== i) }))} />
-                </div>
-              ))}
-              <AddRowBtn onClick={() => setEditorial(e => ({ ...e, local: [...e.local, ""] }))} label="+ Add line" />
             </div>
 
           </div>

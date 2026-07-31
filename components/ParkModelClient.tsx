@@ -5,12 +5,13 @@ import dynamic from "next/dynamic";
 const ParkModel = dynamic(() => import("./ParkModel"), { ssr: false });
 
 export default function ParkModelClient({
-  modelFile, preloadImage, onLoad, cameraPos, cameraTarget, modelRotation,
+  modelFile, featureFile, preloadImage, onLoad, cameraPos, cameraTarget, modelRotation,
   pingPong, autoRotate, debug,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   grayscale,
 }: {
   modelFile: string;
+  featureFile?: string | null;
   preloadImage?: string;
   onLoad?: () => void;
   cameraPos?: [number, number, number];
@@ -27,7 +28,7 @@ export default function ParkModelClient({
 }) {
   return (
     <ParkModel
-      modelFile={modelFile} preloadImage={preloadImage} onLoad={onLoad}
+      modelFile={modelFile} featureFile={featureFile} preloadImage={preloadImage} onLoad={onLoad}
       cameraPos={cameraPos} cameraTarget={cameraTarget} modelRotation={modelRotation}
       pingPong={pingPong} autoRotate={autoRotate} debug={debug}
       ambientIntensity={ambientIntensity} directionalIntensity={directionalIntensity}
