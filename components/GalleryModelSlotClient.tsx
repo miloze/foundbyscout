@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { isPhone, isMobileViewport } from "@/lib/device";
+import ViewerErrorBoundary from "./ViewerErrorBoundary";
 
 const GalleryModelSlot = dynamic(() => import("./GalleryModelSlot"), { ssr: false });
 
@@ -44,32 +45,36 @@ export default function GalleryModelSlotClient({ modelFile, background, debug, f
     return () => obs.disconnect();
   }, [phone]);
 
+  // The still the slot falls back to — on phones by design, and on any device
+  // when the model fails to render. Same image either way.
+  const still = (
+    <div style={{ position: "absolute", inset: 0, background: background ?? "var(--card)" }}>
+      {fallbackSrc && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={fallbackSrc}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
+    </div>
+  );
+
   // ── Phones: no WebGL ──────────────────────────────────────────────────────
   // Gallery slots mount a full WebGL context each, on top of whatever the hero
   // and the expand-to-3D modal already hold. Bloblands' slot alone is a 4.9MB
   // GLB, which is what was crashing Chrome and Safari on phones. Tablets and
   // desktop are unaffected — isPhone() treats iPads as desktop.
-  if (phone) {
-    return (
-      <div style={{ position: "absolute", inset: 0, background: background ?? "var(--card)" }}>
-        {fallbackSrc && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={fallbackSrc}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        )}
-      </div>
-    );
-  }
+  if (phone) return still;
 
   return (
     <div ref={ref} style={{ position: "absolute", inset: 0 }}>
       {visible && (
-        <GalleryModelSlot modelFile={modelFile} background={background} debug={debug} />
+        <ViewerErrorBoundary fallback={still} resetKey={modelFile}>
+          <GalleryModelSlot modelFile={modelFile} background={background} debug={debug} />
+        </ViewerErrorBoundary>
       )}
     </div>
   );

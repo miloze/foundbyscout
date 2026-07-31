@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import ViewerErrorBoundary from "./ViewerErrorBoundary";
 
 const ParkModel = dynamic(() => import("./ParkModel"), { ssr: false });
 
@@ -26,14 +27,35 @@ export default function ParkModelClient({
   environmentIntensity?: number;
   grayscale?: boolean;
 }) {
+  // If the model can't render, the hero keeps the preload image it was already
+  // showing — the still frame the viewer fades out of. The page loses the
+  // interaction and nothing else.
+  const fallback = (
+    <div style={{ position: "absolute", inset: 0, background: "var(--card)" }}>
+      {preloadImage && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={preloadImage}
+          alt=""
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            objectFit: "cover", filter: grayscale ? "grayscale(1)" : "none",
+          }}
+        />
+      )}
+    </div>
+  );
+
   return (
-    <ParkModel
-      modelFile={modelFile} featureFile={featureFile} preloadImage={preloadImage} onLoad={onLoad}
-      cameraPos={cameraPos} cameraTarget={cameraTarget} modelRotation={modelRotation}
-      pingPong={pingPong} autoRotate={autoRotate} debug={debug}
-      ambientIntensity={ambientIntensity} directionalIntensity={directionalIntensity}
-      environmentPreset={environmentPreset} environmentIntensity={environmentIntensity}
-      grayscale={grayscale}
-    />
+    <ViewerErrorBoundary fallback={fallback} resetKey={modelFile}>
+      <ParkModel
+        modelFile={modelFile} featureFile={featureFile} preloadImage={preloadImage} onLoad={onLoad}
+        cameraPos={cameraPos} cameraTarget={cameraTarget} modelRotation={modelRotation}
+        pingPong={pingPong} autoRotate={autoRotate} debug={debug}
+        ambientIntensity={ambientIntensity} directionalIntensity={directionalIntensity}
+        environmentPreset={environmentPreset} environmentIntensity={environmentIntensity}
+        grayscale={grayscale}
+      />
+    </ViewerErrorBoundary>
   );
 }
