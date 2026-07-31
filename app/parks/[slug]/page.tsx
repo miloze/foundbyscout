@@ -8,7 +8,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ParkHeroShell from "@/components/ParkHeroShell";
 import { createServerClient } from "@/lib/supabase-server";
-import { modelUrl, resolveModelUrl, featureUrl } from "@/lib/assets";
+import { modelUrl, resolveModelUrl } from "@/lib/assets";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Transport  = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: string };
@@ -107,11 +107,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
   const modelFileLow = resolveModelUrl(park.model_file_low, slug, "low") ?? undefined;
   const modelFileMobile = resolveModelUrl(park.model_file_mobile, slug, "low") ?? undefined;
 
-  // Optional spinning landmark beside the scan. `?? false` tolerates the column
-  // not existing yet, the same way `editorial` above does; featureUrl returns
-  // null for parks that aren't on R2, so a stale flag can't 404 the viewer.
-  const featureFile = (park.has_feature_glb ?? false) ? featureUrl(slug) : null;
-
   return (
     <article>
 
@@ -120,7 +115,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         modelFile={modelFile}
         modelFileLow={modelFileLow}
         modelFileMobile={modelFileMobile}
-        featureFile={featureFile}
         heroImage={park.hero_image}
         preloadImageUrl={park.preload_image_url ?? `/images/parks/${slug}/glb-preload.png`}
         cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}

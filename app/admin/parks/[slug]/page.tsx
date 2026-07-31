@@ -160,7 +160,6 @@ type FormState = {
   name: string; postcode: string; borough: string; location: string;
   type: string; surface: string; surface_note: string;
   is_free: boolean; is_covered: boolean; published: boolean;
-  has_feature_glb: boolean;
   sort_order: number;
   opened: string; builder: string;
   lat: string; lng: string;
@@ -180,7 +179,7 @@ const EMPTY: FormState = {
   name: "", postcode: "", borough: "", location: "",
   type: "Bowl", surface: "", surface_note: "",
   is_free: true, is_covered: false, published: false,
-  has_feature_glb: false, sort_order: 0,
+  sort_order: 0,
   opened: "", builder: "",
   lat: "", lng: "",
   address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
@@ -255,7 +254,6 @@ export default function EditParkPage() {
           is_covered:        park.is_covered ?? false,
           published:         park.published ?? false,
           sort_order:        park.sort_order ?? 0,
-          has_feature_glb:   park.has_feature_glb ?? false,
           opened:            park.opened ?? "",
           builder:           park.builder ?? "",
           lat:  park.lat  != null ? String(park.lat)  : "",
@@ -638,7 +636,6 @@ export default function EditParkPage() {
                 ["is_free",           "Free entry"],
                 ["is_covered",        "Covered / indoor"],
                 ["published",         "Published"],
-                ["has_feature_glb",   "Feature GLB"],
               ] as [keyof FormState, string][]).map(([key, label]) => (
                 <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input type="checkbox" checked={form[key] as boolean}

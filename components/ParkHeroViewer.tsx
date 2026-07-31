@@ -9,7 +9,6 @@ type Props = {
   modelFile: string;
   modelFileLow?: string;
   modelFileMobile?: string;
-  featureFile?: string | null;
   heroImage?: string;
   preloadImageUrl?: string;
   cameraPos?: [number, number, number];
@@ -27,7 +26,7 @@ type Props = {
 };
 
 export default function ParkHeroViewer({
-  modelFile, modelFileLow, modelFileMobile, featureFile, heroImage, preloadImageUrl,
+  modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, forceViewer,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   grayscale,
@@ -110,7 +109,6 @@ export default function ParkHeroViewer({
       <div style={{ position: "absolute", inset: 0 }}>
         <ParkModelClient
           modelFile={finalModelFile}
-          featureFile={featureFile}
           preloadImage={preloadSrc}
           onLoad={handleLoad}
           cameraPos={cameraPos}

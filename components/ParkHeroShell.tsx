@@ -28,7 +28,6 @@ type Props = {
   modelFile: string | null;
   modelFileLow?: string;
   modelFileMobile?: string;
-  featureFile?: string | null;
   heroImage?: string;
   preloadImageUrl?: string;
   cameraPos?: [number, number, number];
@@ -54,7 +53,7 @@ type Props = {
 };
 
 export default function ParkHeroShell({
-  modelFile, modelFileLow, modelFileMobile, featureFile, heroImage, preloadImageUrl,
+  modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   catalogueId, name, address, location, postcode, lat, lng, opened, scanned,
@@ -89,7 +88,6 @@ export default function ParkHeroShell({
       <ParkViewerModal
         modelFile={modelFile}
         modelFileMobile={modelFileMobile}
-        featureFile={featureFile}
         parkName={name}
         onClose={() => setOpen3D(false)}
         cameraPos={cameraPos}
@@ -134,7 +132,6 @@ export default function ParkHeroShell({
             modelFile={modelFile}
             modelFileLow={modelFileLow}
             modelFileMobile={modelFileMobile}
-            featureFile={featureFile}
             heroImage={heroImage}
             preloadImageUrl={preloadImageUrl}
             cameraPos={cameraPos}

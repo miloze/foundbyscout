@@ -1,25 +1,24 @@
--- ── Found By Scout — Feature GLB flag ───────────────────────────────────────
--- Run this in the Supabase SQL editor BEFORE deploying the feature-GLB UI.
--- The admin park form PATCHes the whole form object as columns, so until this
--- exists, saving any park returns 400 — the same failure mode as 004.
+-- ── Found By Scout — Feature GLB flag (SUPERSEDED, see below) ──────────────
+-- This column is no longer read by anything. It gated an experiment that put
+-- the feature GLB in the hero alongside the main scan, which turned out to be
+-- the wrong place for it: feature.glb is exported in place from the scan's own
+-- coordinate space, and the scan already contains the feature, so the hero
+-- rendered two copies of the same object in the same spot, one spinning.
 --
--- One boolean, no path column: the asset always lives at a fixed R2 key,
---   parks/{folder}/feature.glb
--- derived from the same CDN_PARKS folder map lib/assets.ts already uses for
--- model-high.glb and model-low.glb (see featureUrl()). A path column would let
--- the two drift apart for no gain — there is only ever one feature per park.
+-- The feature now appears only where it was always going to read properly — a
+-- gallery slot of type 'glb', which gives it an isolated canvas, its own
+-- auto-fitting camera and a background. That is configured per slot in
+-- gallery_rows, so it needs no column and no flag.
 --
--- Scale, position and orientation are baked into the GLB itself. The viewer
--- adds only the main model's Z-up correction and spins it about its own
--- bounding-box centre, so there are no per-park settings to store.
+-- The hero shows model-high.glb or model-low.glb. Nothing else.
+--
+-- The column is left in place rather than dropped, for the same reason `scout`
+-- was in 004: Supabase flags DROP COLUMN as destructive and nothing reads this
+-- one, so leaving it costs nothing. The admin no longer sends it.
+--
+-- To drop it later:
+--   alter table parks drop column if exists has_feature_glb;
 alter table parks add column if not exists has_feature_glb boolean not null default false;
-
--- Turn it on for the reference park once parks/bloblands/feature.glb is on R2.
--- Left commented deliberately: flipping this before the upload lands points the
--- viewer at a 404. It fails soft — the feature sits in its own Suspense
--- boundary, so the park still renders — but it logs a fetch error on every
--- visit, which is noise nobody needs.
---   update parks set has_feature_glb = true where slug = 'bloblands';
 
 -- ── The dead `use_contour_model` column — deliberately NOT dropped ─────────
 -- Added in 001 to route the hero to ContourModel, a second viewer for
@@ -36,4 +35,4 @@ alter table parks add column if not exists has_feature_glb boolean not null defa
 --   alter table parks drop column if exists use_contour_model;
 
 -- Verify:
---   select slug, has_feature_glb from parks order by slug;
+--   select slug from parks order by slug;

@@ -38,21 +38,6 @@ export function modelUrl(slug: string, quality: ModelQuality = "high"): string |
   return `${CDN_BASE}/parks/${park.folder}/model-${quality}.glb`;
 }
 
-/**
- * CDN URL for a park's optional feature GLB — the small landmark object that
- * spins alongside the main scan, e.g. Bloblands' volcano.
- *
- * There is no per-park registry entry for these: the file either exists at
- * parks/{folder}/feature.glb or the park's `has_feature_glb` flag is false and
- * this is never called. Returns null for parks not on R2, so a caller that
- * forgets the flag still can't request a URL that cannot resolve.
- */
-export function featureUrl(slug: string): string | null {
-  const park = CDN_PARKS[slug];
-  if (!park) return null;
-  return `${CDN_BASE}/parks/${park.folder}/feature.glb`;
-}
-
 // Paths written before the R2 migration, e.g. /images/parks/acton/model.glb,
 // .../model-500k.glb, .../bloblands-1m.glb. Nothing serves these any more.
 const LEGACY_MODEL_PATH = /^\/?images\/parks\/[^/]+\/[^/]+\.glb$/i;
