@@ -33,7 +33,14 @@ type Props = {
 // Chip fill under the hero metadata. The catalogue badge always takes the
 // opposite fill, so the pair reads as one inverted set rather than two
 // unrelated tags. Flip this one constant to swap both at once.
-const CHIP_VARIANT: "dark" | "beige" = "dark";
+//
+// The `as` is load-bearing, not decoration: with a plain `const X: ChipVariant
+// = "dark"`, TypeScript narrows the declared type to the initialiser, so both
+// comparisons below read as provably false and `next build` fails the type
+// check on them. `next dev` doesn't type check, so this only ever surfaced in
+// a production build.
+type ChipVariant = "dark" | "beige";
+const CHIP_VARIANT = "dark" as ChipVariant;
 const CHIP_CLASS = CHIP_VARIANT === "beige" ? "fbs-hp-chip fbs-hp-chip--inv" : "fbs-hp-chip";
 const BADGE_CLASS = CHIP_VARIANT === "beige" ? "fbs-hp-chip" : "fbs-hp-chip fbs-hp-chip--inv";
 
