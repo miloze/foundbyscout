@@ -47,6 +47,21 @@ type Props = {
    * slower and the crop lingers.
    */
   window?: number;
+  /**
+   * Mark width as a multiple of the container's. >1 lets the letterforms grow
+   * past the column and get cropped left and right by the clip box, so the
+   * mark scales with the viewport instead of shrinking to fit inside it.
+   * Centred, so the overhang is even on both sides.
+   */
+  scale?: number;
+  /**
+   * Fraction of the mark's height the clip box shows, 0–1. Below 1 the mark is
+   * sliced off at the bottom edge — the letterforms keep their full size and
+   * the block just shows less of them, which is the opposite of what capping
+   * the font size would do. Combines with `scale`: the clip's aspect ratio is
+   * derived from both, so the crop is the same proportion at every width.
+   */
+  slice?: number;
 };
 
 export default function FooterWordmark({
@@ -55,7 +70,16 @@ export default function FooterWordmark({
   colour = "var(--border)",
   maxHeight,
   window: windowFactor = 3.2,
+  scale = 1,
+  slice = 1,
 }: Props) {
+  // Mark height is (containerWidth × scale) / markRatio, and the clip shows
+  // `slice` of that — so the clip's own ratio is markRatio / (scale × slice).
+  // Done numerically rather than as a calc() string so an malformed `ratio`
+  // prop fails here rather than silently producing an invalid aspect-ratio.
+  const [rw, rh] = ratio.split("/").map((n) => parseFloat(n.trim()));
+  const markRatio = rw / rh;
+  const clipRatio = markRatio / (scale * slice);
   const clipRef = useRef<HTMLDivElement>(null);
   const markRef = useRef<HTMLDivElement>(null);
 
@@ -98,12 +122,13 @@ export default function FooterWordmark({
       aria-hidden
       style={{
         width: "100%",
-        // The clip box always takes the asset's ratio, so the mark lands flush
-        // when there is room for it. `maxHeight` is a genuine cap rather than a
-        // fixed height: it crops only once the natural height exceeds it, so a
-        // narrow viewport — where the mark is already shorter than the cap —
-        // gets no crop and no leftover slack.
-        aspectRatio: ratio,
+        // Derived from scale and slice, so at scale/slice 1 this is still the
+        // asset's own ratio and the mark lands flush. `maxHeight` is a genuine
+        // cap rather than a fixed height: it crops only once the natural height
+        // exceeds it, so a narrow viewport — where the mark is already shorter
+        // than the cap — gets no crop and no leftover slack.
+        aspectRatio: `${clipRatio}`,
+        position: "relative",
         ...(maxHeight === undefined
           ? {}
           : { maxHeight: typeof maxHeight === "number" ? `${maxHeight}px` : maxHeight }),
@@ -112,13 +137,17 @@ export default function FooterWordmark({
         pointerEvents: "none",
       }}
     >
-      {/* Masked rather than an <img>: scout.svg is hard-filled #EF4343, and the
+      {/* Masked rather than an <img>: scout.svg is hard-filled (currently the
+          accent, previously #EF4343 — the fill is baked into the asset), and the
           mark needs to take a theme colour. The mask paints `colour` through
           the artwork, so one asset serves both themes. */}
       <div
         ref={markRef}
         style={{
-          width: "100%",
+          width: `${scale * 100}%`,
+          // Centres the overhang when scale > 1, so the mark grows out of both
+          // sides of the column rather than only the right.
+          marginLeft: `${(1 - scale) * 50}%`,
           // The mark always keeps the asset's ratio; the clip box decides how
           // much of it you see.
           aspectRatio: ratio,

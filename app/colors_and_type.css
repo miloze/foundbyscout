@@ -14,9 +14,11 @@
    plus italics) sit alongside it unused; the VF covers every weight in one
    request.
 
-   The file also carries an `ital` 0–1 axis. No italic @font-face is declared
-   because nothing uses MSCHN italic yet — add one rather than letting the
-   browser synthesise a slant if that changes.
+   The file also carries an `ital` 0–1 axis, with named italic instances at
+   every weight (300/400/500/600/700 × ital 1). The italic face below drives
+   that axis directly, so `font-style: italic` on --font-display gets the real
+   drawn italic rather than a synthesised shear. Same file, same request — the
+   browser picks the instance, nothing extra downloads.
 
    Optimisation left on the table: the file is a 345KB unsubsetted TTF that
    compresses to ~141KB over the wire. Converting to woff2 and subsetting to
@@ -29,17 +31,27 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'MSCHN';
+  src: url('/fonts/MSCHNVF.ttf') format('truetype-variations');
+  font-weight: 300 700;
+  font-style: italic;
+  font-variation-settings: 'ital' 1;
+  font-display: swap;
+}
+
 /* ── Base Color Tokens ─────────────────────────────── */
 :root {
   /* Dark mode (default) */
   --background:    #202020;
   --foreground:    #f0f0eb;
-  /* Accent darkened from #EF4343 — white text on the old value only hit
-     3.78:1 (fails WCAG AA's 4.5:1 for normal text) on every filled button/
-     badge. #D23B3B holds the same hue at 4.74:1. Hover darkens further
-     instead of brightening (old #ff3d24 was even further below AA). */
-  --accent:        #D23B3B;
-  --accent-hover:  #B33232;
+  /* Muted coral. Hover darkens rather than brightens, keeping the convention
+     the previous coral set. NOTE: white on #FF7948 is 2.60:1 — well below
+     WCAG AA 4.5:1 for normal text, and below the 3.78:1 that prompted the
+     earlier #EF4343 → #D23B3B darkening. Every filled chip, badge and CTA on
+     the site is white-on-accent. See the report accompanying this change. */
+  --accent:        #FF7948;
+  --accent-hover:  #E65F32;
   --muted:         #888888;
   --border:        #333333;
   --card:          #2a2a2a;
@@ -51,24 +63,24 @@
   --color-dark-border: #333333;
   --color-dark-muted:  #888888;
 
-  --color-light-bg:     #F5F5F5;
+  --color-light-bg:     #F3EFEC;
   --color-light-fg:     #1a1a1a;
   --color-light-card:   #ebe8e3;
   --color-light-border: #dddad4;
   /* #777777 on the light background is 4.0:1, under AA's 4.5:1. #6D6D6D clears it at 4.6:1. */
   --color-light-muted:  #6D6D6D;
 
-  --color-accent:       #D23B3B;
-  --color-accent-hover: #B33232;
+  --color-accent:       #FF7948;
+  --color-accent-hover: #E65F32;
 }
 
 [data-theme="light"] {
-  /* Neutral rather than the old warm #f4f2ee, so photography backgrounds
-     blend into the page instead of sitting on a cream card. */
-  --background:   #F5F5F5;
+  /* Warm off-white. Replaces the neutral #F5F5F5, which had itself replaced
+     the warmer #f4f2ee; this lands between the two. */
+  --background:   #F3EFEC;
   --foreground:   #1a1a1a;
-  --accent:       #D23B3B;
-  --accent-hover: #B33232;
+  --accent:       #FF7948;
+  --accent-hover: #E65F32;
   --muted:        #6D6D6D;
   --border:       #dddad4;
   --card:         #ebe8e3;
@@ -217,8 +229,12 @@ a {
   --space-9:  80px;
   --space-10: 128px;
 
-  /* Layout */
-  --max-width:       1440px;
+  /* Layout — hybrid width system. Imagery and the 3D canvas run edge to
+     edge; text and UI sit in --content-max-width. See .contained /
+     .full-bleed in globals.css. --max-width is kept as an alias so nothing
+     referencing the old name silently falls back to `none`. */
+  --content-max-width: 1400px;
+  --max-width:       var(--content-max-width);
   --content-padding: clamp(16px, 4vw, 56px);
   --section-gap:     clamp(40px, 8vw, 80px);
 

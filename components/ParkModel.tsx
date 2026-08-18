@@ -15,6 +15,12 @@ useGLTF.setDecoderPath("/draco/");
 // this tab session, the drag hint shouldn't nag them again until a fresh visit.
 const HINT_DISMISSED_KEY = "fbs-viewer-hint-dismissed";
 
+// The scans are lifted so their ground plane sits here in world space, not at
+// y=0. Every under-the-floor guard is relative to this — the orbit target is
+// pinned to it and maxPolarAngle stays above horizontal from there, so the
+// camera can't get beneath the deck. Move the mesh and this moves with it.
+const MODEL_FLOOR_Y = 4;
+
 // Keep original PBR materials — ambient-only lighting gives a flat
 // baked-texture look. Fixes side/depthWrite so faces don't vanish.
 function fixMaterials(scene: THREE.Object3D) {
@@ -50,7 +56,7 @@ function Model({ onLoad, modelFile, modelRotation }: {
 
   return (
     <group>
-      <primitive object={scene} rotation={modelRotation} position={[0, 4, 0]} />
+      <primitive object={scene} rotation={modelRotation} position={[0, MODEL_FLOOR_Y, 0]} />
     </group>
   );
 }
@@ -101,6 +107,10 @@ function PingPongCamera({ posA, posB, target }: {
 }
 
 // ── Pan clamp — tightened to keep model centred in frame ──────────────────
+// The vertical range starts at the floor, not at 0. maxPolarAngle keeps the
+// camera above horizontal *relative to the target*, so a target panned below
+// the deck drags the whole orbit cone under it — which is how you used to end
+// up looking at the model from underneath.
 const PAN_LIMIT = 12;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PanClamp({ controlsRef }: { controlsRef: React.RefObject<any> }) {
@@ -109,7 +119,7 @@ function PanClamp({ controlsRef }: { controlsRef: React.RefObject<any> }) {
     if (!ctrl) return;
     const t  = ctrl.target;
     const cx = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.x));
-    const cy = Math.max(0,          Math.min(8,          t.y));
+    const cy = Math.max(MODEL_FLOOR_Y, Math.min(MODEL_FLOOR_Y + 4, t.y));
     const cz = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.z));
     if (cx !== t.x || cy !== t.y || cz !== t.z) {
       const dx = cx - t.x, dy = cy - t.y, dz = cz - t.z;
@@ -183,7 +193,10 @@ export default function ParkModel({
   preloadImage,
   onLoad,
   cameraPos            = [0, 22, 32] as [number, number, number],
-  cameraTarget         = [0, 2, 0]  as [number, number, number],
+  // Floor centre, so the polar clamp lines up with the visible ground rather
+  // than a point 2 units under it. Parks that tune their own target in the DB
+  // (bloblands: y 4.01) already sit here.
+  cameraTarget         = [0, MODEL_FLOOR_Y, 0] as [number, number, number],
   modelRotation        = [-Math.PI / 2, 0, 0] as [number, number, number],
   pingPong,
   autoRotate           = false,
@@ -304,11 +317,16 @@ export default function ParkModel({
         />
       )}
 
-      {/* ── Loading text fallback when no preload image ────────────────── */}
-      {!preloadImage && (
+      {/* ── Loading fallback when no preload image ─────────────────────────
+          Unmounted on load rather than faded: it used to stay mounted at
+          z-index auto, which put it *behind* the later-in-DOM canvas wrapper
+          for the rest of the session. Solid fill + above the canvas while it
+          is up, gone the moment the model resolves. */}
+      {!preloadImage && !modelLoaded && (
         <div style={{
-          position: "absolute", inset: 0, display: "flex",
+          position: "absolute", inset: 0, zIndex: 6, display: "flex",
           alignItems: "center", justifyContent: "center",
+          background: "var(--background)",
           color: "var(--muted)", fontSize: 11,
           textTransform: "uppercase", letterSpacing: "0.12em",
           pointerEvents: "none",
@@ -378,6 +396,10 @@ export default function ParkModel({
           minDistance={debug ? 1 : 10}
           maxDistance={debug ? 500 : 70}
           minPolarAngle={debug ? 0 : Math.PI / 7}
+          // 0.42π ≈ 76°, comfortably above horizontal. Combined with the pan
+          // clamp pinning the target to MODEL_FLOOR_Y, camera.y works out to
+          // floor + distance·cos(76°), so it stays over the deck at every
+          // zoom level. Debug unlocks both to tune camera positions.
           maxPolarAngle={debug ? Math.PI : Math.PI * 0.42}
         />
 

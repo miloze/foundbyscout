@@ -16,9 +16,9 @@ const ParksMap = lazy(() => import("./ParksMap"));
 // (--bg #f5f3ee, --hover-bg #ece8e2, --coral #d97757). Those are wired to the
 // site's theme tokens instead, because /parks renders in both dark and light
 // mode and hardcoding would break dark. The light-theme tokens land within a
-// point or two of the spec anyway (--background #F5F5F5 ≈ #f5f3ee,
+// point or two of the spec anyway (--background #F3EFEC ≈ #f5f3ee,
 // --card #ebe8e3 ≈ #ece8e2, --border #dddad4 ≈ #e8e4db). The accent is the
-// brand coral #D23B3B rather than the spec's #d97757 — see --pda-accent.
+// brand coral #FF7948 rather than the spec's #d97757 — see --pda-accent.
 //
 // Open decisions carried over from the handoff (not resolved here):
 //  - bare catalogue number vs. "SCN/" prefix (see getCatalogueIdLabel)
@@ -116,7 +116,7 @@ export default function ParksDirectoryAccordion() {
         .pda-root{
           --pda-bg:var(--background); --pda-panel:var(--card); --pda-fg:var(--foreground);
           --pda-address:var(--muted); --pda-muted:var(--muted); --pda-line:var(--border);
-          --pda-accent:var(--accent, #D23B3B); --pda-accent-hover:var(--accent-hover, #B33232);
+          --pda-accent:var(--accent); --pda-accent-hover:var(--accent-hover);
           --pda-hover-bg:var(--card); --pda-ink:#0a0a0a;
           /* Shared geometry: the desktop list column width and the wrap gutter.
              The search field and the split-view list column are sized and

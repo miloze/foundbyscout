@@ -95,12 +95,17 @@ export default function ParkViewerModal({ parkName, onClose, ...viewerProps }: P
         zIndex: 3,
       }}>
         <ViewerCluster>
+          {/* The icon reports the current state, not the action the title
+              describes: filled and orange while colour is on, empty outline
+              while it's stripped. Both were bound to `bw` — outline for
+              colour, fill for B&W — which read backwards, since an empty
+              shape suggests nothing applied. */}
           <ViewerClusterButton
             onClick={() => setBw(b => !b)}
             title={bw ? "Show colour" : "Show B&W"}
-            active={bw}
+            active={!bw}
           >
-            <BwIcon active={bw} />
+            <BwIcon filled={!bw} />
           </ViewerClusterButton>
           <ViewerClusterDivider />
           <ViewerClusterButton onClick={onClose} title="Exit 3D view">

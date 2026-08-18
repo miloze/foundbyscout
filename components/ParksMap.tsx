@@ -242,7 +242,7 @@ export default function ParksMap({
       const el = marker.getElement?.()?.querySelector("div");
       if (!el) return;
       const sel = selectedPark?.id === id;
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#EF4343";
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#FF7948";
       el.style.background    = sel ? accent : "#888";
       el.style.transform     = sel ? "scale(1.8)" : "scale(1)";
       el.style.boxShadow     = sel ? `0 0 0 5px ${accent}44` : "none";
@@ -500,7 +500,7 @@ export default function ParksMap({
               {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
               <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:16, zIndex:21, transition:"bottom 0.3s" }}>
                 {(locateTip || locateError) && (
-                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #EF4343)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                  <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                     {locateError || "Recenter map"}
                   </div>
                 )}
@@ -521,7 +521,7 @@ export default function ParksMap({
                 </button>
                 <div style={{ position:"relative" }}>
                   {(locateTip || locateError) && (
-                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent, #EF4343)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
+                    <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                       {locateError || "Recenter map"}
                     </div>
                   )}

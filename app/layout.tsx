@@ -46,16 +46,26 @@ export default function RootLayout({
           <NavOverlayProvider>
           <Grain />
           <Nav />
-          <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", padding: "var(--nav-height, 44px) clamp(16px, 4vw, 56px) 0" }}>
-            <div style={{ maxWidth: "1440px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
+          {/* Full width and unpadded: the gutter and the max-width both live on
+              .contained below, so .full-bleed children can break out of them
+              together. Only the nav offset stays here. */}
+          <div data-page-shell style={{ display: "flex", flexDirection: "column", minHeight: "100vh", paddingTop: "var(--nav-height, 44px)" }}>
+            <div className="contained" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
               <main style={{ flex: 1 }}>{children}</main>
+              {/* No background: the accent band was tried and dropped. Without
+                  one there is nothing to run edge to edge, so the footer stays
+                  a child of .contained and its content sits in the same column
+                  as body copy.
+
+                  position/zIndex keeps it above the wordmark behind it. */}
               <footer style={{
+                position: "relative", zIndex: 1,
                 paddingTop: 24, paddingBottom: 32,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 gap: 24, flexWrap: "wrap",
               }}>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em" }}>
-                  © 2016 Scout
+                  © 2026 Scout
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
                   {[["Parks", "/parks"], ["About", "/about"], ["Contact", "/contact"]].map(([label, href]) => (

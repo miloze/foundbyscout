@@ -79,10 +79,18 @@ export const PARK_CARD_CSS = `
     color:var(--pda-muted); margin:10px 0 0;
   }
   .pcard-tags{ display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  /* Informational register — see .fbs-meta-tag in globals.css. Unfilled and
+     pill-shaped rather than the solid panel box this used to be, so tags read
+     alongside the catalogue no. and address rather than as controls. Scoped
+     --pda-* rather than the global token because this card renders inside the
+     directory's own palette. */
   .pcard-tag{
-    font-family:var(--pda-font-mono); font-size:11px; letter-spacing:.08em;
+    display:inline-flex; align-items:center;
+    font-family:var(--pda-font-mono); font-size:10px; letter-spacing:.1em;
     text-transform:uppercase; color:var(--pda-muted); line-height:1;
-    background:var(--pda-panel); border:1px solid var(--pda-line); padding:5px 9px;
+    white-space:nowrap;
+    background:transparent; border:1px solid var(--pda-line);
+    border-radius:999px; padding:4px 9px;
   }
 
   /* Archive row — mobile accordion trigger and desktop split-list row.

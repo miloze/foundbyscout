@@ -127,6 +127,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         directionalIntensity={park.viewer_settings?.directionalIntensity}
         environmentPreset={park.viewer_settings?.environmentPreset}
         environmentIntensity={park.viewer_settings?.environmentIntensity}
+        slug={slug}
         catalogueId={park.catalogue_id ?? undefined}
         name={park.name}
         address={park.address}
@@ -228,11 +229,15 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         </div>
       </div>
 
-      {/* ── PHOTOS — full width ──────────────────────────────────────── */}
+      {/* ── PHOTOS — imagery runs edge to edge, its label stays in the
+             reading column so the eyebrow keeps the same left edge as every
+             other section heading on the page. ─────────────────────────── */}
       <section style={{ paddingTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Photos</p>
         {galleryRows.length > 0
-          ? <EditorialGallery rows={galleryRows} images={galleryImages} modelFile={modelFile} debug={isDebug} />
+          ? <div className="full-bleed full-bleed--padded">
+              <EditorialGallery rows={galleryRows} images={galleryImages} modelFile={modelFile} debug={isDebug} />
+            </div>
           : <div style={{ background: "var(--card)", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>No photos yet</span></div>
         }
       </section>

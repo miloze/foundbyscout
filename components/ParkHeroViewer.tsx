@@ -106,7 +106,7 @@ export default function ParkHeroViewer({
 
   return (
     <>
-      <div style={{ position: "absolute", inset: 0 }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <ParkModelClient
           modelFile={finalModelFile}
           preloadImage={preloadSrc}
@@ -124,7 +124,7 @@ export default function ParkHeroViewer({
           grayscale={grayscale}
         />
       </div>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />
     </>
   );
 }

@@ -35,7 +35,9 @@ export default function GlitchText({ children, style }: { children: React.ReactN
       <style>{`
         /* ── Chromatic aberration ── */
         .glitch-chroma {
-          text-shadow: -4px 0 var(--accent), 4px 0 #ff9070, 0 0 8px rgba(255,88,65,0.2);
+          /* RGB-split companions to --accent: a peach offset plus an accent
+             glow. The glow tracks the accent's own rgb. */
+          text-shadow: -4px 0 var(--accent), 4px 0 #ff9070, 0 0 8px rgba(255,121,72,0.2);
         }
 
         /* ── Tracking error: sliced horizontal displacement ── */

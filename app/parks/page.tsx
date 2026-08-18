@@ -8,8 +8,13 @@ export const metadata = {
 };
 
 export default function ParksPage() {
+  // The directory owns its own internal width: the map runs edge to edge, the
+  // list column contains itself at .pda-wrap's 860px. The old
+  // `clamp(-16px, -4vw, -56px)` here was malformed — min > max, so it always
+  // resolved to -16px and escaped only 16px of the 56px gutter, on top of
+  // never escaping the max-width at all.
   return (
-    <div style={{ margin: "0 clamp(-16px, -4vw, -56px)", minHeight: "100vh" }}>
+    <div className="full-bleed" style={{ minHeight: "100vh" }}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}

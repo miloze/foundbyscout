@@ -6,11 +6,16 @@
 // module because ParkHeroShell already imports ParkViewerModal; importing icons
 // back the other way would be circular.
 
-export function BwIcon({ active }: { active: boolean }) {
+// The prop is `filled`, not `active`, because "active" was ambiguous about
+// what it referred to — the B&W mode or the icon — and it got bound to the
+// wrong one. It means only: draw the half-fill. Callers decide when, and the
+// answer is "when colour is on": a solid shape reads as something applied, an
+// empty outline as something stripped away.
+export function BwIcon({ filled }: { filled: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.4" />
-      {active && <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />}
+      {filled && <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />}
     </svg>
   );
 }

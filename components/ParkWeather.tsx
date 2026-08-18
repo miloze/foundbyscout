@@ -46,9 +46,14 @@ export default function ParkWeather({ lat, lng }: { lat: number; lng: number }) 
   return (
     <div style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
       {/* Pill */}
+      {/* 2px padding + 1px border on an 11px/16.5px line box = 22.5px, the
+          same height as the field tags beside it and as the home hero's
+          chips. Only the height is shared — the 20px radius stays, because
+          the rounded pill is what marks this as live state rather than
+          catalogue metadata. */}
       <div style={{
         display: "inline-flex", alignItems: "center", gap: 6,
-        padding: "4px 10px",
+        padding: "2px 10px",
         background: "rgba(0,0,0,0.35)",
         backdropFilter: "blur(8px)",
         border: "1px solid rgba(255,255,255,0.12)",
@@ -56,7 +61,7 @@ export default function ParkWeather({ lat, lng }: { lat: number; lng: number }) 
       }}>
         <div style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />
         <span style={{
-          fontFamily: "var(--font-mono)", fontSize: 10,
+          fontFamily: "var(--font-mono)", fontSize: 11,
           letterSpacing: "0.1em", textTransform: "uppercase",
           color: "#fff",
         }}>

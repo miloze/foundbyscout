@@ -1,16 +1,28 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
+import HeroEntrance from "@/components/HeroEntrance";
+import { VISITED_COOKIE } from "@/lib/first-visit";
 import ParkHeroMeta from "@/components/ParkHeroMeta";
+import CTAButton from "@/components/CTAButton";
 import HeroNavOverlay from "@/components/HeroNavOverlay";
 import FooterWordmark from "@/components/FooterWordmark";
 
 export default async function Home() {
   const db = createServerClient();
 
+  // Read on the server so the first painted frame is already right: a returning
+  // visitor gets the finished hero with no clipped state to flash, and a first
+  // visitor gets the clipped state without waiting for hydration. A client hook
+  // can only answer this after paint, which is the one thing the entrance can't
+  // afford. See lib/first-visit.ts. The cookie is written client-side, by
+  // <HeroEntrance>, since a Server Component can't set one.
+  const firstVisit = !(await cookies()).has(VISITED_COOKIE);
+
   const [{ data: featuredParks }, { data: featured }] = await Promise.all([
     db
       .from("parks")
-      .select("slug, name, location, type, hero_image, thumbnail")
+      .select("slug, name, location, type, hero_image, thumbnail, catalogue_id")
       .eq("published", true)
       .gt("sort_order", 0)
       .order("sort_order", { ascending: true })
@@ -37,19 +49,31 @@ export default async function Home() {
       {/* HERO — static single-park feature */}
       {featured && (
         <section
+          className="full-bleed"
+          // Every entrance rule is scoped under this attribute, so on a return
+          // visit the CSS simply doesn't apply and the hero renders as it
+          // always has — nothing to reset, nothing to override.
+          data-hero-entrance={firstVisit ? "" : undefined}
           style={{
             position: "relative",
-            height: "78vh",
+            // Matches hero-01.webp's native 2560×1440. The old `height: 78vh`
+            // made the box 2.29:1 at desktop, so object-fit: cover scaled to
+            // width and clipped ~110px off the top and bottom of every frame.
+            // minHeight only binds below ~750px wide, where 16:9 is too short
+            // to hold the meta block — a crop returns there, see the note.
+            aspectRatio: "16 / 9",
+            minHeight: 420,
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-end",
-            padding: "8rem clamp(16px,4vw,56px) 3rem",
+            // Vertical only — the horizontal inset is now the .contained
+            // layers inside, so the hero's copy lines up with the body column
+            // below it rather than with the narrower gutter.
+            padding: "8rem 0 3rem",
             // Pull up by the nav's real height so the image reaches the very top
             // of the viewport behind the transparent nav. Was a hardcoded -44px,
             // which left a strip of page background once the bar measured 50px.
             marginTop: "calc(-1 * var(--nav-height, 44px))",
-            marginLeft: "calc(-1 * clamp(16px, 4vw, 56px))",
-            marginRight: "calc(-1 * clamp(16px, 4vw, 56px))",
             overflow: "hidden",
             userSelect: "none",
           }}
@@ -57,12 +81,20 @@ export default async function Home() {
           {/* Makes the nav transparent while this hero is behind it */}
           <HeroNavOverlay />
 
+          {/* Carries the entrance's stylesheet and writes the visited cookie.
+              Mounted only on a first visit, so neither exists otherwise. */}
+          {firstVisit && <HeroEntrance />}
+
           {/* Hero background */}
           {featured.hero_image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={featured.hero_image}
               alt=""
+              // Leads the sequence — the curtain the rest of the hero rides in
+              // behind. clip-path makes a stacking context, but the img stays
+              // at z-index auto, so it can't climb over the zIndex:2 copy.
+              className="fbs-he-img"
               style={{
                 position: "absolute", inset: 0, width: "100%", height: "100%",
                 objectFit: "cover", objectPosition: "center center",
@@ -72,33 +104,57 @@ export default async function Home() {
             <div style={{ position: "absolute", inset: 0, background: "#111" }} />
           )}
 
-          {/* Gradient scrim */}
-          <div style={{
-            position: "absolute",
-            bottom: 0, left: 0, right: 0,
-            height: 200,
-            background: "linear-gradient(180deg, rgba(20,19,15,0) 0%, rgba(20,19,15,0.5) 30%, rgba(20,19,15,0.88) 100%)",
-            pointerEvents: "none",
-            zIndex: 1,
-          }} />
+          {/* No overlay treatment behind the hero copy — the blur panel read
+              badly over real photography and the gradient it replaced washed
+              the image out. Plain white type straight on the image for now;
+              legibility over busy frames is a known, accepted gap pending a
+              better approach. The title's drop shadow stays removed — it was
+              never carrying this, and reinstating it would just be the old
+              muddying by another route. */}
 
 
-          {/* Postcode badge */}
+          {/* Postcode badge — anchored to the contained column's right edge,
+              not the viewport's, so it stacks with the meta block below it.
+              The wrapper is inset:0 with .contained's auto margins, which
+              centres it on the hero exactly as the body column is centred. */}
           {featured.postcode && (
+            <div className="contained" aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 2, pointerEvents: "none" }}>
+            {/* A flex row on the logo's own band rather than absolute
+                coordinates of its own. The logo is position:fixed in Nav, so
+                it can't be a flex sibling — the spacer reserves its published
+                width instead, and the row's height is the logo's height. Both
+                come from --logo-w / --logo-h, which Nav measures and
+                publishes, so the badge tracks the logo across every
+                breakpoint instead of being re-tuned against it. */}
             <div style={{
-              position: "absolute", top: "clamp(64px,8vw,80px)", right: "clamp(16px,4vw,56px)",
-              width: 96, height: 96, borderRadius: "50%", background: "var(--accent)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              zIndex: 2, pointerEvents: "none",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              gap: 24, height: "var(--logo-h, 96px)", marginTop: "var(--logo-top, 10px)",
             }}>
-              <span style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 400, color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            <div aria-hidden style={{ width: "var(--logo-w, 262px)", flexShrink: 0 }} />
+            {/* Snaps in with the catalogue badge while the image is still
+                wiping — a circle this size can't carry a wipe of its own
+                without reading as a flicker. */}
+            <div className="fbs-he-badge" style={{
+              width: "calc(var(--logo-h, 96px) * 1.05)", aspectRatio: "1",
+              borderRadius: "50%", background: "var(--accent)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, pointerEvents: "none",
+            }}>
+              {/* Display face, not --font-heading: the badge is a display mark
+                  like the park name beside it, so it takes MSCHN italic rather
+                  than Rubik. Sized off the circle so it holds ~60% of the
+                  diameter as the logo — and so the badge — resizes. */}
+              <span style={{ fontFamily: "var(--font-display), Arial, sans-serif", fontSize: "calc(var(--logo-h, 96px) * 0.3)", fontWeight: 400, fontStyle: "italic", color: "#fff", letterSpacing: "0", textTransform: "uppercase" }}>
                 {featured.postcode.split(" ")[0]}
               </span>
             </div>
+            </div>
+            </div>
           )}
 
-          {/* Hero meta block */}
-          <div style={{ position: "relative", zIndex: 2 }}>
+          {/* Hero meta block — contained, so the park name shares a left edge
+              with the intro paragraph and every section beneath it. */}
+          <div className="contained" style={{ position: "relative", zIndex: 2 }}>
             <ParkHeroMeta
               catalogueId={featured.catalogue_id ?? undefined}
               name={featured.name}
@@ -160,28 +216,18 @@ export default async function Home() {
             <p style={{ color: "var(--muted)", lineHeight: 1.65, fontSize: 15 }}>
               Discover our growing collection of carefully documented skateparks.
             </p>
-            <Link
-              href="/parks"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "7px 16px", fontWeight: 400, fontSize: 10,
-                textTransform: "uppercase", letterSpacing: "0.14em",
-                background: "var(--accent)", color: "#fff",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              Explore Parks
-              {/* Same chevron as the park-card CTA, rather than a text arrow */}
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+            {/* Same component as the hero's View scan — this was a separate
+                inline-styled Link at 10px/400/.14em with no radius, which had
+                drifted from the hero on type, corner and hover. */}
+            <CTAButton label="Explore" href="/parks" />
           </div>
         </div>
 
         {/* Thumbnails — 4 across */}
-        <div data-park-thumbs style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, background: "var(--border)" }}>
+        {/* No gap and no --border backing: the 2px grid gaps were showing the
+            border colour through as vertical rules between the cards. The
+            images now butt directly against each other. */}
+        <div data-park-thumbs style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
           {(featuredParks ?? []).map((park) => (
             <Link key={park.slug} href={`/parks/${park.slug}`} style={{ display: "block", background: "var(--background)", textDecoration: "none", color: "inherit" }}>
               <div style={{ position: "relative", overflow: "hidden", background: "#111", aspectRatio: "3/4" }}>
@@ -194,24 +240,42 @@ export default async function Home() {
                       position: "absolute", inset: 0,
                       width: "100%", height: "100%",
                       objectFit: "cover",
-                      filter: "grayscale(1) contrast(1.05) brightness(0.88)",
+                      // Colour, not grayscale. The b/w treatment read as too
+                      // grungy against the current palette; the interactive
+                      // B&W toggles (hero/3D viewer, gallery) are a separate
+                      // concern and are untouched — see the note in the
+                      // <style> block about .fbs-colour.
                     }}
                     className="fbs-thumb-img"
                   />
                 )}
                 <div className="fbs-thumb-overlay" />
-                <span style={{
+                {/* Informational, not interactive — outline rather than the
+                    accent fill it used to carry. This one sits on photography
+                    rather than a flat page, so it keeps a faint dark backing:
+                    a bare muted outline disappears entirely over a light frame.
+                    Still no accent, still not a filled chip. */}
+                <span className="fbs-meta-tag fbs-meta-tag--on-image" style={{
                   position: "absolute", top: 10, left: 10,
-                  fontSize: 9, padding: "3px 8px",
-                  background: "var(--accent)", color: "#fff",
-                  fontWeight: 400, letterSpacing: "0.1em",
-                  textTransform: "uppercase", fontFamily: "var(--font-mono)",
                 }}>
                   {park.type}
                 </span>
               </div>
               <div style={{ padding: "10px 12px 14px" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em" }}>{park.name}</p>
+                <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                  {/* Catalogue no. leads the name, same line. The SCN/ prefix
+                      is stripped the same way the hero and park page do it, so
+                      the archive reference reads identically everywhere. */}
+                  {park.catalogue_id && (
+                    <span style={{
+                      fontFamily: "var(--font-mono)", color: "var(--accent)",
+                      letterSpacing: "0.04em", marginRight: 7,
+                    }}>
+                      {park.catalogue_id.replace(/^SCN\//i, "")}
+                    </span>
+                  )}
+                  {park.name}
+                </p>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>{park.location}</p>
               </div>
             </Link>
@@ -221,7 +285,12 @@ export default async function Home() {
 
       <style>{`
         .fbs-thumb-img { color: transparent; transition: filter 0.4s ease; }
-        .fbs-colour .fbs-thumb-img { filter: none !important; }
+        /* .fbs-colour was the opt-out from the grayscale default. Nothing in
+           the app ever set that class on an ancestor, so it never fired and
+           the thumbnails were permanently b/w. Colour is now the default and
+           the dead hook is gone. The real B&W toggles — ParkHeroShell's bw
+           state and GalleryColorToggle — are separate and unaffected. */
+
         .fbs-thumb-overlay { position:absolute; inset:0; background:var(--accent); opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
         a:hover .fbs-thumb-overlay { opacity:0.28; }
         a:active .fbs-thumb-overlay { opacity:0.28; }
@@ -230,9 +299,13 @@ export default async function Home() {
         }
       `}</style>
 
-      {/* Full height here, as on the park page — the home page scrolls far
-          enough to give the reveal room. */}
-      <FooterWordmark />
+      {/* Full-bleed so the mark is sized off the viewport rather than the
+          reading column, but at scale/slice 1 — no overhang past the screen
+          edges and no bottom crop, so the whole wordmark reads. Still larger
+          than the contained version it replaced. */}
+      <div className="full-bleed" style={{ position: "relative", zIndex: 0 }}>
+        <FooterWordmark />
+      </div>
     </div>
   );
 }

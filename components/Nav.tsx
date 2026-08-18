@@ -11,6 +11,49 @@ const links = [
   { href: "/about", label: "ABOUT" },
 ];
 
+// Theme switch. The track is a neutral warm grey that inverts between modes —
+// deliberately not --accent, which read as a live "on" state rather than a
+// control. The thumb stays white in both modes and carries state by position:
+// left in light, right in dark. A hairline border plus a soft shadow keep the
+// white thumb legible against the light track.
+const TRACK_W = 40, TRACK_H = 22, THUMB = 16, PAD = 2;
+// Track borders sit inside the 40px box, so the travel is the box minus the
+// thumb, both pads and both 1px borders.
+const THUMB_TRAVEL = TRACK_W - THUMB - PAD - 2;
+
+function ThemeSwitch({ theme, onToggle }: { theme: string; onToggle: () => void }) {
+  const dark = theme === "dark";
+  return (
+    <button
+      onClick={onToggle}
+      title={dark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      style={{
+        width: TRACK_W, height: TRACK_H,
+        borderRadius: TRACK_H / 2,
+        background: dark ? "#3a3733" : "#dcd8d2",
+        border: `1px solid ${dark ? "#4a453f" : "#c7c1b8"}`,
+        position: "relative",
+        cursor: "pointer",
+        transition: "background 0.2s, border-color 0.2s",
+        flexShrink: 0,
+        padding: 0,
+      }}
+    >
+      <span style={{
+        position: "absolute",
+        top: PAD,
+        left: dark ? THUMB_TRAVEL : PAD,
+        width: THUMB, height: THUMB,
+        borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.28)",
+        transition: "left 0.2s",
+      }} />
+    </button>
+  );
+}
+
 export default function Nav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -18,6 +61,35 @@ export default function Nav() {
   const { overlay } = useNavOverlay();
   const headerRef = useRef<HTMLElement>(null);
   const logoRef = useRef<HTMLAnchorElement>(null);
+
+  // Publish the viewport's *inner* width — clientWidth, which excludes the
+  // scrollbar — as --vw, for .full-bleed in globals.css.
+  //
+  // 100vw is the obvious choice there and is wrong: it counts the classic
+  // scrollbar, so on Windows/Linux every full-bleed element renders ~15px
+  // wider than the visible page and, being centred by its negative margins,
+  // overhangs ~7px past each edge. That is exactly enough to knock a
+  // full-bleed hero out of alignment with the nav bar above it, which is
+  // measured in real page pixels. Observing documentElement catches the
+  // scrollbar appearing and disappearing as well as plain resizes.
+  //
+  // Measures the page shell, not <html> or <body>: globals.css pins both of
+  // those to `max-width: 100vw`, so neither box ever narrows when a scrollbar
+  // appears and an observer on either never fires for the one case this
+  // exists to catch. The shell is a plain block in normal flow, so its width
+  // *is* the usable width, scrollbar excluded, and it changes exactly when
+  // that does.
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>("[data-page-shell]");
+    if (!shell) return;
+    const publish = () => {
+      document.documentElement.style.setProperty("--vw", `${shell.getBoundingClientRect().width}px`);
+    };
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(shell);
+    return () => ro.disconnect();
+  }, []);
 
   // Publish the header's real rendered height as a CSS var so anything
   // meant to sit flush below it (e.g. the sticky search bar on /parks)
@@ -50,6 +122,10 @@ export default function Nav() {
     const publish = () => {
       const r = el.getBoundingClientRect();
       document.documentElement.style.setProperty("--logo-bottom", `${r.bottom}px`);
+      // The mark's top edge. Nav is position:fixed, so this is constant in
+      // viewport coordinates and safe for anything that needs to sit on the
+      // logo's band — the homepage postcode badge centres its row on it.
+      document.documentElement.style.setProperty("--logo-top", `${r.top}px`);
       // Centre and size drive the scrim's gradient below, so it stays locked to
       // the logo across breakpoints instead of re-deriving the clamp() by hand.
       document.documentElement.style.setProperty("--logo-w",  `${r.width}px`);
@@ -92,56 +168,13 @@ export default function Nav() {
               </li>
             ))}
             <li>
-              <button
-                onClick={toggle}
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                style={{
-                  width: 36, height: 20,
-                  borderRadius: 10,
-                  background: theme === "dark" ? "var(--border)" : "var(--accent)",
-                  border: "1px solid var(--border)",
-                  position: "relative",
-                  cursor: "pointer",
-                  transition: "background 0.2s",
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{
-                  position: "absolute",
-                  top: 2, left: theme === "dark" ? 2 : 16,
-                  width: 14, height: 14,
-                  borderRadius: "50%",
-                  background: theme === "dark" ? "var(--muted)" : "#fff",
-                  transition: "left 0.2s, background 0.2s",
-                }} />
-              </button>
+              <ThemeSwitch theme={theme} onToggle={toggle} />
             </li>
           </ul>
 
           {/* Mobile: toggle + hamburger */}
           <div className="md:hidden flex items-center gap-4">
-            <button
-              onClick={toggle}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              style={{
-                width: 36, height: 20,
-                borderRadius: 10,
-                background: theme === "dark" ? "var(--border)" : "var(--accent)",
-                border: "1px solid var(--border)",
-                position: "relative",
-                cursor: "pointer",
-                transition: "background 0.2s",
-              }}
-            >
-              <span style={{
-                position: "absolute",
-                top: 2, left: theme === "dark" ? 2 : 16,
-                width: 14, height: 14,
-                borderRadius: "50%",
-                background: theme === "dark" ? "var(--muted)" : "#fff",
-                transition: "left 0.2s, background 0.2s",
-              }} />
-            </button>
+            <ThemeSwitch theme={theme} onToggle={toggle} />
             <button
               className="flex flex-col gap-1.5 p-1"
               onClick={() => setMenuOpen(!menuOpen)}
@@ -226,14 +259,48 @@ export default function Nav() {
         className="logo-overhang"
         style={{
           position: "absolute",
-          top: 10,
+          // Dropped from 10 to open real space above the mark. The postcode
+          // badge centres its row on --logo-top / --logo-h, so it travels
+          // down with the logo and the two keep reading as one lockup
+          // instead of two independently-tuned positions.
+          //
+          // 56 rather than 30 so the badge clears the 50px nav bar entirely.
+          // At 30 the badge's top edge landed at y=28, overlapping the
+          // PARKS/ABOUT row's 12–38 band with only 20px of horizontal gap
+          // between them; the two read as crowded even though their boxes
+          // never actually intersect.
+          top: 56,
           left: "clamp(16px, 4vw, 56px)",
           zIndex: 30,
           display: "block",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/scout.svg" alt="Scout" style={{ display: "block", height: "clamp(44px, 6vw, 68px)", width: "auto" }} />
+        {/* Masked rather than an <img>, the same way FooterWordmark draws it:
+            scout.svg is hard-filled, so an <img> pinned the logo to whatever
+            colour is baked into the artwork and it silently kept the old
+            coral through the accent change. The mask paints var(--accent)
+            through the artwork, so the mark now tracks the token. */}
+        <div
+          aria-hidden
+          style={{
+            display: "block",
+            // Between the original clamp(44px, 6vw, 68px) and the oversized
+            // clamp(56px, 7.5vw, 96px) that replaced it. --logo-h/--logo-w are
+            // published from the measured box, so the homepage postcode badge
+            // follows this without its own tuning.
+            height: "clamp(48px, 6.5vw, 78px)",
+            aspectRatio: "500 / 130",
+            background: "var(--accent)",
+            maskImage: "url(/scout.svg)",
+            WebkitMaskImage: "url(/scout.svg)",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+          }}
+        />
       </Link>
     </div>
   );

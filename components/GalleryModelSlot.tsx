@@ -118,7 +118,7 @@ function SceneContent({ modelFile, debug, onPos, fixedPos }: {
 // ── Export ────────────────────────────────────────────────────────────────
 export default function GalleryModelSlot({
   modelFile,
-  background  = "#EF4343",
+  background  = "var(--accent)",
   debug       = true,
   brightness  = 100,
   contrast    = 140,
@@ -169,7 +169,7 @@ export default function GalleryModelSlot({
             <span style={{ width: 70, color: "#aaa" }}>Brightness</span>
             <input type="range" min={0} max={200} value={localBri}
               onChange={e => setLocalBri(+e.target.value)}
-              style={{ width: 100, accentColor: "#EF4343" }} />
+              style={{ width: 100, accentColor: "var(--accent)" }} />
             <span style={{ width: 32, color: "#fff" }}>{localBri}%</span>
           </label>
 
@@ -177,7 +177,7 @@ export default function GalleryModelSlot({
             <span style={{ width: 70, color: "#aaa" }}>Contrast</span>
             <input type="range" min={0} max={200} value={localCon}
               onChange={e => setLocalCon(+e.target.value)}
-              style={{ width: 100, accentColor: "#EF4343" }} />
+              style={{ width: 100, accentColor: "var(--accent)" }} />
             <span style={{ width: 32, color: "#fff" }}>{localCon}%</span>
           </label>
         </div>

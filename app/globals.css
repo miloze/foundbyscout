@@ -34,6 +34,186 @@ body {
   font-family: var(--font-mono), monospace;
 }
 
+/* ── Primary CTA ─────────────────────────────────────────────────────────
+   One definition for every call to action on the site — see
+   components/CTAButton.tsx. VIEW SCAN and EXPLORE were separate
+   implementations that had drifted on type size, tracking, radius and hover;
+   they are now the same element with a different label.
+
+   Structural properties and the whole interaction live on .fbs-cta. Colours
+   live in the variant class below. A new variant sets the three custom
+   properties and nothing else, which is what makes the hover behaviour
+   impossible to fork by accident. */
+.fbs-cta {
+  /* Arrow travel on hover. 4px is the overlap of the two ranges this has been
+     specified at (2–4px and 4–6px) — far enough to read as intent, close
+     enough that it never looks like the caret is leaving the word. */
+  --cta-nudge: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  /* The 16px right padding is the caret's runway: a 4px translate lands well
+     inside the button, and transform doesn't affect layout, so nothing
+     reflows and nothing clips. */
+  padding: 7px 16px;
+  font-family: var(--font-mono);
+  /* 11px/500 at 0.5px tracking, matched to the hero chips. VIEW SCAN was
+     10px/400 at .14em to pair with EXPLORE, but sitting in the same row as
+     the chips it read as a different font — the loose tracking and lighter
+     weight made it look thin next to "004" and the metadata. The row won over
+     the button it used to pair with, and EXPLORE now follows it. */
+  font-size: 11px;
+  font-weight: 500;
+  /* Explicit rather than inherited: this renders as an <a> for href CTAs and
+     a <button> for onClick ones, and those two disagree on default
+     line-height. Stating it keeps both boxes exactly the same height. */
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--cta-bg);
+  color: var(--cta-fg);
+  border: none;
+  border-radius: 3px;
+  text-decoration: none;
+  cursor: pointer;
+  /* 120ms against the arrow's 170ms, both on the same ease and both starting
+     on the same event: the fill flips and the caret settles into it. Only
+     background-color, never "all", which would drag the radius in too. */
+  transition: background-color 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+.fbs-cta__arrow {
+  transition: transform 170ms cubic-bezier(0.2, 0, 0, 1);
+}
+/* hover-capable pointers only, or a tap leaves the inverted state stuck on
+   the button until something else takes focus. */
+@media (hover: hover) {
+  .fbs-cta:hover { background: var(--cta-hover-bg); }
+  .fbs-cta:hover .fbs-cta__arrow { transform: translateX(var(--cta-nudge)); }
+}
+/* Keyboard gets the same state, so the CTA isn't mute on focus. */
+.fbs-cta:focus-visible { background: var(--cta-hover-bg); }
+.fbs-cta:focus-visible .fbs-cta__arrow { transform: translateX(var(--cta-nudge)); }
+@media (prefers-reduced-motion: reduce) {
+  /* Keep both end states — they're the affordance — drop the travel. */
+  .fbs-cta,
+  .fbs-cta__arrow { transition: none; }
+}
+
+/* Accent fill, white label; hover drops the fill to the same near-black the
+   hero chips use, label and caret staying white. The caret strokes in
+   currentColor, so it follows the label without a rule of its own. */
+.fbs-cta--accent {
+  --cta-bg: var(--accent);
+  --cta-fg: #fff;
+  --cta-hover-bg: #14120f;
+}
+
+/* ── View transitions ────────────────────────────────────────────────────
+   Timing for the hero → park page content continuity (see
+   lib/view-transitions.ts). The same fast ease-out the CTA rollover and the
+   hero entrance use — precise settle, no bounce, no overshoot — applied to
+   every group so the named elements travelling between layouts and the root
+   crossfade underneath them move as one gesture rather than at two speeds.
+
+   260ms rather than the CTA's 170ms: these elements cross most of the
+   viewport, and a distance that long at hover speed reads as a jump.
+
+   The universal selector covers names generated per park slug, which can't
+   be enumerated in a stylesheet. */
+::view-transition-group(*) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Nothing here is load-bearing — the transition is decoration over a
+   navigation that already works — so reduced motion drops it entirely
+   rather than shortening it. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ── Hybrid width system ─────────────────────────────────────────────────
+   Contained is the default: the shared wrapper in layout.tsx holds every
+   page in a --content-max-width column with the side gutter. Imagery, the
+   GLB canvas and the map opt out with .full-bleed.
+
+   The breakout works from inside any horizontally-centred max-width parent:
+   50% is half the parent, 50vw is half the viewport, so the difference is
+   exactly the distance from the parent's edge to the viewport's edge. This
+   escapes the max-width as well as the padding — the earlier
+   `margin-inline: calc(-1 * var(--content-padding))` hack only escaped the
+   padding, which is why full-bleed sections stopped short of the screen
+   edge on viewports wider than the column.
+
+   Nesting a .contained inside a .full-bleed gives an edge-to-edge band whose
+   text still sits in the reading column. */
+.contained {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  padding-inline: var(--content-padding);
+}
+
+/* --vw is the viewport's inner width, published by Nav.tsx. It falls back to
+   100vw for the first paint before hydration; the two differ only by the
+   scrollbar width, and using vw alone would push every full-bleed element
+   ~7px past each screen edge. */
+.full-bleed {
+  width: var(--vw, 100vw);
+  max-width: var(--vw, 100vw);
+  margin-inline: calc(50% - var(--vw, 100vw) / 2);
+}
+
+/* A full-bleed element that still wants the gutter at narrow viewports,
+   where the column is gutter-bound rather than max-width-bound. */
+.full-bleed--padded {
+  padding-inline: var(--content-padding);
+}
+
+/* ── Metadata tags ───────────────────────────────────────────────────────
+   BOWL / STREET / MIXED and friends are information, not controls. They read
+   in the same register as SCANNED: 03/2026 and the address chain — DM Mono,
+   muted, thin outline, no fill — so they stop competing with the things that
+   actually do something. Saturated --accent is reserved for genuinely
+   interactive elements (VIEW SCAN, EXPLORE) and the catalogue number.
+
+   Uniform height whatever the label: fixed line-height, inline-flex centring
+   and no wrapping, so BOWL and CAR PARK are the same pill. */
+.fbs-meta-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+/* Over photography the page's own greys have nothing to sit against, so this
+   variant swaps to light-on-dark with a faint backing. Still unfilled, still
+   no accent — just legible against an arbitrary frame. */
+.fbs-meta-tag--on-image {
+  background: rgba(20, 19, 15, 0.42);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.82);
+}
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
   vertical-align: middle;
