@@ -6,16 +6,13 @@ import OpenScanButton from "@/components/OpenScanButton";
 import FloatingAsset from "@/components/FloatingAsset";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ParkFacts, { type ParkGlance } from "@/components/ParkFacts";
 import ParkHeroShell from "@/components/ParkHeroShell";
 import { createServerClient } from "@/lib/supabase-server";
 import { modelUrl, resolveModelUrl } from "@/lib/assets";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Transport  = { type: "tube"|"rail"|"bus"|"tram"; name: string; detail: string };
-type GlanceItem = { icon: string; value: string; label: string; available: boolean };
-type Facility   = { icon: string; name: string; status: string; available: boolean };
-type HoursRow   = { days: string; time: string };
-type Social     = { platform: "instagram"|"facebook"|"youtube"|"tiktok"|"website"|"builder"; url: string; label?: string };
+type Social = { platform: "instagram"|"facebook"|"youtube"|"tiktok"|"website"|"builder"; url: string; label?: string };
 
 // The editorial layer — see supabase/migrations/004_editorial.sql.
 // Every key is optional; an absent key means the section does not render.
@@ -30,22 +27,6 @@ type Editorial = {
 
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function Icon({ name, size = 20 }: { name: string; size?: number }) {
-  return <span className="material-symbols-outlined" style={{ fontSize: size }}>{name}</span>;
-}
-
-function TransportBadge({ type }: { type: Transport["type"] }) {
-  const bg: Record<string, string> = { tube: "#e32017", rail: "var(--foreground)", bus: "#e32017", tram: "#84b817" };
-  const fg: Record<string, string> = { tube: "#fff", rail: "var(--background)", bus: "#fff", tram: "#fff" };
-  const label: Record<string, string> = { tube: "LU", rail: "RL", bus: "B", tram: "T" };
-  return (
-    <div style={{ background: bg[type], color: fg[type], width: 26, height: 26, borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", flexShrink: 0 }}>
-      {label[type]}
-    </div>
-  );
-}
-
-
 function SocialIcon({ platform }: { platform: Social["platform"] }) {
   const paths: Record<string, string> = {
     instagram: "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z",
@@ -101,6 +82,18 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
   // below guards on its own content and renders nothing when absent.
   const editorial: Editorial = park.editorial ?? {};
 
+  // One object, two possible homes — see GLANCE_PLACEMENT in ParkFacts.
+  const glance: ParkGlance = {
+    setting:       park.setting,
+    entry:         park.entry,
+    cafe:          park.cafe,
+    toilets:       park.toilets,
+    waterFountain: park.water_fountain,
+    carPark:       park.car_park,
+    lighting:      park.lighting,
+    seating:       park.seating,
+  };
+
   const modelFile = resolveModelUrl(park.model_file, slug, "high")
     ?? (slug === "bloblands" ? modelUrl("bloblands", "high") : null);
   // Low/mobile fall back to the high-res model when no low export exists.
@@ -137,6 +130,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         lng={park.lng}
         opened={park.opened}
         scanned={park.scanned}
+        glance={glance}
       />
 
       {/* ── EDITORIAL BAND — editorial left, practical facts right ─────
@@ -149,83 +143,40 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           <EditorialSection label="Introduction" body={park.description} />
         </div>
 
-        {/* Facts sidebar */}
+        {/* Facts sidebar — At a Glance, the two fact rows and Getting
+            there all live in ParkFacts. On mobile the band collapses to one
+            column, so this whole block lands in flow under the introduction
+            and above the photos, which is where the handover wants it. */}
+        {/* builtBy falls back to the older `builder` column so every park
+            keeps its builder on the page before 006 is applied and before the
+            admin has re-saved. */}
         <div className="park-photos-sidebar">
+          <ParkFacts
+            glance={glance}
+            openingTimes={park.opening_times}
+            builtBy={park.built_by ?? park.builder}
+            opened={park.opened}
+            gettingThere={park.getting_there}
+            address={park.address}
+            postcode={park.postcode}
+            transport={park.transport}
+          />
 
-          {/* At a glance */}
-          <div>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>At a glance</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-              {(park.glance ?? []).map((item: GlanceItem) => (
-                <div key={item.label} style={{ background: "var(--card)", padding: "12px 10px", display: "flex", flexDirection: "column", gap: 8, opacity: item.available ? 1 : 0.38 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: item.available ? "var(--accent)" : "var(--muted)" }}>{item.icon}</span>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "var(--foreground)", lineHeight: 1.2 }}>{item.value}</div>
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 8.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", marginTop: 3 }}>{item.label}</div>
-                  </div>
-                </div>
+          {/* Socials sat under "Built by" when that was a whole block rather
+              than a fact row. They are not park facts, so they close the
+              column on their own hairline instead. */}
+          {park.socials && park.socials.length > 0 && (
+            <div style={{ paddingTop: 20, borderTop: "1px solid var(--border)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {park.socials.map((s: Social, i: number) => (
+                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" title={s.label || s.platform} className="fbs-social-link"
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "var(--card)", border: "1px solid var(--border)", color: "var(--muted)", fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: "0.08em", textTransform: "uppercase" }}
+                >
+                  <SocialIcon platform={s.platform} />
+                  {s.label || s.platform}
+                </a>
               ))}
             </div>
-          </div>
-
-          {/* Getting there */}
-          <div style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Getting there</p>
-            <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--foreground)", marginBottom: 14 }}>
-              {(park.address ?? []).map((l: string, i: number) => <span key={i}>{l}<br /></span>)}
-              <span style={{ color: "var(--muted)" }}>{park.postcode}</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {(park.transport ?? []).map((t: Transport, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <TransportBadge type={t.type} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2, color: "var(--foreground)" }}>{t.name}</div>
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 2, letterSpacing: "0.04em" }}>{t.detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Opening times */}
-          <div style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Opening times</p>
-            {(park.hours ?? []).map((row: HoursRow, i: number, hours: HoursRow[]) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: i < hours.length - 1 ? "1px solid var(--border)" : "none" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted)" }}>{row.days}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 500 }}>{row.time}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Built by */}
-          <div style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Built by</p>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--foreground)", lineHeight: 1.8, letterSpacing: "0.04em" }}>
-              {park.builder}
-            </p>
-            {/* "Opened" used to sit under the About block, which the editorial
-                band replaces. It is a practical fact, so it belongs here. */}
-            {park.opened && (
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: "0.06em", marginTop: 10 }}>
-                Opened {park.opened}
-              </p>
-            )}
-            {park.socials && park.socials.length > 0 && (
-              <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-                {park.socials.map((s: Social, i: number) => (
-                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" title={s.label || s.platform} className="fbs-social-link"
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "var(--card)", border: "1px solid var(--border)", color: "var(--muted)", fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: "0.08em", textTransform: "uppercase" }}
-                  >
-                    <SocialIcon platform={s.platform} />
-                    {s.label || s.platform}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-
+          )}
         </div>
       </div>
 

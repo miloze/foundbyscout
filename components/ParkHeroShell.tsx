@@ -19,6 +19,7 @@ function fmtDate(val: string): string {
 }
 import HeroNavOverlay from "./HeroNavOverlay";
 import ParkHeroViewer from "./ParkHeroViewer";
+import { ParkGlanceHeroOverlay, type ParkGlance } from "./ParkFacts";
 import ParkWeather from "./ParkWeather";
 import ParkViewerModal from "./ParkViewerModal";
 import { BwIcon, ArIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton } from "./ViewerControls";
@@ -56,6 +57,10 @@ type Props = {
   lng?: number;
   opened?: string;
   scanned?: string;
+  /** At a Glance, for the hero-overlay placement. The overlay renders nothing
+   *  while GLANCE_PLACEMENT is "sidebar", so this is inert until the flag in
+   *  ParkFacts is flipped. */
+  glance?: ParkGlance;
 };
 
 export default function ParkHeroShell({
@@ -63,6 +68,7 @@ export default function ParkHeroShell({
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   slug, catalogueId, name, address, location, postcode, lat, lng, opened, scanned,
+  glance,
 }: Props) {
   const vt = heroTransitionNames(slug);
   const vtDetail = parkDetailTransitionNames(slug);
@@ -174,6 +180,10 @@ export default function ParkHeroShell({
         pointerEvents: "none",
         zIndex: 2,
       }} />
+
+      {/* At a Glance, overlaid on the scan. Null under the sidebar placement —
+          see GLANCE_PLACEMENT in ParkFacts for why both exist. */}
+      {glance && <ParkGlanceHeroOverlay glance={glance} />}
 
       {/* Hero content — bottom anchored. Sits above the canvas, so it has to be
           transparent to the pointer or it swallows orbit drags across the whole

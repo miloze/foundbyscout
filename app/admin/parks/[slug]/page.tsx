@@ -129,6 +129,46 @@ function Select({ value, onChange, options }: {
   );
 }
 
+// Enum select with an explicit unset option — Select's string[] API has no
+// way to spell "not answered yet", and for `setting`/`entry` that is a real
+// third state: it renders the At a Glance card muted rather than asserting a
+// value nobody has checked.
+function EnumSelect({ value, onChange, options }: {
+  value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} style={{
+      width: "100%", background: "var(--card)", border: "1px solid var(--border)",
+      color: "var(--foreground)", fontSize: 13, padding: "10px 12px",
+      outline: "none", fontFamily: "var(--font-body)",
+    }}>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+
+// Amenity checkbox. Unchecked means "not here" on the park page, not "unknown"
+// — the grid only has two states, so leaving one off is a claim.
+function AmenityToggle({ label, checked, onChange }: {
+  label: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <label style={{
+      display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+      background: "var(--card)", border: "1px solid var(--border)",
+      padding: "10px 12px",
+    }}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor: "var(--accent)", width: 14, height: 14, flexShrink: 0 }} />
+      <span style={{
+        fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em",
+        textTransform: "uppercase", color: checked ? "var(--accent)" : "var(--muted)",
+      }}>{label}</span>
+    </label>
+  );
+}
+
 function AddRowBtn({ onClick, label = "+ Add row" }: { onClick: () => void; label?: string }) {
   return (
     <button type="button" onClick={onClick} style={{
@@ -152,8 +192,6 @@ function RemoveBtn({ onClick }: { onClick: () => void }) {
 }
 
 type TransportItem = { type: string; name: string; detail: string };
-type HoursItem     = { days: string; time: string };
-type GlanceItem    = { icon: string; value: string; label: string; available: boolean };
 type SocialItem    = { platform: string; url: string; label: string };
 
 type FormState = {
@@ -161,13 +199,19 @@ type FormState = {
   type: string; surface: string; surface_note: string;
   is_free: boolean; is_covered: boolean; published: boolean;
   sort_order: number;
-  opened: string; builder: string;
+  opened: string;
   lat: string; lng: string;
   address: string[];
   transport: TransportItem[];
-  hours: HoursItem[];
-  glance: GlanceItem[];
   socials: SocialItem[];
+  // Structured park facts — migrations/006_park_facts.sql. These replace the
+  // free-form `glance` array and the `hours` rows on the park page; both
+  // columns still exist and still hold their old values, they are just no
+  // longer edited or read. `built_by` likewise supersedes `builder`.
+  setting: string; entry: string;
+  cafe: boolean; toilets: boolean; water_fountain: boolean;
+  car_park: boolean; lighting: boolean; seating: boolean;
+  opening_times: string; built_by: string; getting_there: string;
   gallery_images: string[];
   brief: string; description: string;
   catalogue_id: string; scanned: string;
@@ -180,9 +224,13 @@ const EMPTY: FormState = {
   type: "Bowl", surface: "", surface_note: "",
   is_free: true, is_covered: false, published: false,
   sort_order: 0,
-  opened: "", builder: "",
+  opened: "",
   lat: "", lng: "",
-  address: [], transport: [], hours: [], glance: [], socials: [], gallery_images: [],
+  address: [], transport: [], socials: [], gallery_images: [],
+  setting: "", entry: "",
+  cafe: false, toilets: false, water_fountain: false,
+  car_park: false, lighting: false, seating: false,
+  opening_times: "", built_by: "", getting_there: "",
   brief: "", description: "",
   catalogue_id: "", scanned: "",
   hero_image: "", thumbnail: "", directory_image_url: "", model_file: "", model_file_low: "", preload_image_url: "",
@@ -255,14 +303,24 @@ export default function EditParkPage() {
           published:         park.published ?? false,
           sort_order:        park.sort_order ?? 0,
           opened:            park.opened ?? "",
-          builder:           park.builder ?? "",
           lat:  park.lat  != null ? String(park.lat)  : "",
           lng:  park.lng  != null ? String(park.lng)  : "",
           address:   Array.isArray(park.address)   ? park.address   : [],
           transport: Array.isArray(park.transport) ? park.transport : [],
-          hours:     Array.isArray(park.hours)     ? park.hours     : [],
-          glance:    Array.isArray(park.glance)    ? park.glance    : [],
           socials:   Array.isArray(park.socials)   ? park.socials   : [],
+          setting:        park.setting ?? "",
+          entry:          park.entry   ?? "",
+          cafe:           !!park.cafe,
+          toilets:        !!park.toilets,
+          water_fountain: !!park.water_fountain,
+          car_park:       !!park.car_park,
+          lighting:       !!park.lighting,
+          seating:        !!park.seating,
+          opening_times:  park.opening_times ?? "",
+          // Pre-006 rows have no built_by yet; seed it from builder so the
+          // first save carries the value across instead of blanking it.
+          built_by:       park.built_by ?? park.builder ?? "",
+          getting_there:  park.getting_there ?? "",
           gallery_images: Array.isArray(park.gallery_images) ? park.gallery_images : [],
           catalogue_id: park.catalogue_id ?? "",
           scanned:      park.scanned      ?? "",
@@ -355,6 +413,10 @@ export default function EditParkPage() {
       ...form,
       lat: latNum,
       lng: lngNum,
+      // parks_setting_check / parks_entry_check accept null but not "" —
+      // "not answered" has to reach the column as null.
+      setting: form.setting || null,
+      entry:   form.entry   || null,
       description:    form.description ? form.description.split("\n\n").filter(Boolean) : [],
       camera_pos:     strToNumArr(form.camera_pos),
       camera_target:  strToNumArr(form.camera_target),
@@ -703,61 +765,55 @@ export default function EditParkPage() {
               ))}
               <AddRowBtn onClick={() => upd("transport", [...form.transport, { type: "tube", name: "", detail: "" }])} />
             </div>
-          </div>
-        </section>
-
-        {/* 4. OPENING HOURS */}
-        <section>
-          <SectionHead>Opening hours</SectionHead>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 8 }}>
-            {["Days","Hours",""].map((h, i) => (
-              <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{h}</span>
-            ))}
-          </div>
-          {form.hours.map((row, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginBottom: 6, alignItems: "center" }}>
-              <Input value={row.days} placeholder="Mon – Fri"
-                onChange={v => { const a = [...form.hours]; a[i] = { ...a[i], days: v }; upd("hours", a); }} />
-              <Input value={row.time} placeholder="9:00 – 21:00"
-                onChange={v => { const a = [...form.hours]; a[i] = { ...a[i], time: v }; upd("hours", a); }} />
-              <RemoveBtn onClick={() => upd("hours", form.hours.filter((_, j) => j !== i))} />
+            <div>
+              <FieldLabel hint="blank line or newline starts a new paragraph">Getting there — directions & parking notes</FieldLabel>
+              <Textarea value={form.getting_there} onChange={v => upd("getting_there", v)} rows={4}
+                placeholder="Free on-street parking on Ledrington Rd after 6pm. The park is behind the athletics stadium — follow the path past the car park." />
             </div>
-          ))}
-          <AddRowBtn onClick={() => upd("hours", [...form.hours, { days: "", time: "" }])} />
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", marginTop: 8, letterSpacing: "0.04em" }}>
-            Leave empty if always open or unknown.
-          </p>
+          </div>
         </section>
 
-        {/* 5. AT A GLANCE */}
+        {/* 4. AT A GLANCE — the eight structured fields behind the park
+               page's icon grid. The old free-form editor (icon name / value /
+               label / on, plus the multi-row opening-hours table) is gone: the
+               render owns the icon and the wording now, so the only thing left
+               to answer here is the fact itself. The `glance` and `hours`
+               columns still hold their old values, untouched. */}
         <section>
           <SectionHead>At a glance</SectionHead>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 16, lineHeight: 1.9 }}>
-            Icons from <a href="https://fonts.google.com/icons" target="_blank" rel="noopener" style={{ color: "var(--accent)" }}>Material Symbols</a>.
-            Common: <span style={{ color: "var(--foreground)" }}>skatepark · wb_sunny · water_drop · groups · timer · directions_walk · local_parking · wc · star · water</span>
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr auto auto", gap: 8, marginBottom: 8 }}>
-            {["Icon name","Value","Label","On",""].map((h, i) => (
-              <span key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--border)" }}>{h}</span>
-            ))}
-          </div>
-          {form.glance.map((g, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr auto auto", gap: 8, marginBottom: 6, alignItems: "center" }}>
-              <Input value={g.icon} placeholder="skatepark"
-                onChange={v => { const a = [...form.glance]; a[i] = { ...a[i], icon: v }; upd("glance", a); }} />
-              <Input value={g.value} placeholder="Free entry"
-                onChange={v => { const a = [...form.glance]; a[i] = { ...a[i], value: v }; upd("glance", a); }} />
-              <Input value={g.label} placeholder="Admission"
-                onChange={v => { const a = [...form.glance]; a[i] = { ...a[i], label: v }; upd("glance", a); }} />
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <input type="checkbox" checked={g.available}
-                  onChange={e => { const a = [...form.glance]; a[i] = { ...a[i], available: e.target.checked }; upd("glance", a); }}
-                  style={{ accentColor: "var(--accent)", width: 14, height: 14 }} />
-              </label>
-              <RemoveBtn onClick={() => upd("glance", form.glance.filter((_, j) => j !== i))} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={G2}>
+              <div>
+                <FieldLabel hint="leave unset to grey the card out">Setting</FieldLabel>
+                <EnumSelect value={form.setting} onChange={v => upd("setting", v)}
+                  options={[
+                    { value: "",        label: "— not set —" },
+                    { value: "outdoor", label: "Outdoor" },
+                    { value: "indoor",  label: "Indoor" },
+                  ]} />
+              </div>
+              <div>
+                <FieldLabel hint="leave unset to grey the card out">Entry</FieldLabel>
+                <EnumSelect value={form.entry} onChange={v => upd("entry", v)}
+                  options={[
+                    { value: "",     label: "— not set —" },
+                    { value: "free", label: "Free" },
+                    { value: "paid", label: "Paid" },
+                  ]} />
+              </div>
             </div>
-          ))}
-          <AddRowBtn onClick={() => upd("glance", [...form.glance, { icon: "", value: "", label: "", available: true }])} />
+            <div>
+              <FieldLabel hint="unchecked reads as 'not here' on the park page">Amenities</FieldLabel>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                <AmenityToggle label="Café"     checked={form.cafe}           onChange={v => upd("cafe", v)} />
+                <AmenityToggle label="Toilets"  checked={form.toilets}        onChange={v => upd("toilets", v)} />
+                <AmenityToggle label="Water"    checked={form.water_fountain} onChange={v => upd("water_fountain", v)} />
+                <AmenityToggle label="Car park" checked={form.car_park}       onChange={v => upd("car_park", v)} />
+                <AmenityToggle label="Lighting" checked={form.lighting}       onChange={v => upd("lighting", v)} />
+                <AmenityToggle label="Seating"  checked={form.seating}        onChange={v => upd("seating", v)} />
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* 6. FACTS */}
@@ -780,8 +836,12 @@ export default function EditParkPage() {
             </div>
             <div style={G2}>
               <div>
-                <FieldLabel>Builder</FieldLabel>
-                <Input value={form.builder} onChange={v => upd("builder", v)} placeholder="Canvas Skateparks" />
+                <FieldLabel hint="one line — shown as a fact row, not a table">Opening times</FieldLabel>
+                <Input value={form.opening_times} onChange={v => upd("opening_times", v)} placeholder="Dawn until dusk" />
+              </div>
+              <div>
+                <FieldLabel hint="supersedes the old Builder field">Built by</FieldLabel>
+                <Input value={form.built_by} onChange={v => upd("built_by", v)} placeholder="Wheelscape" />
               </div>
             </div>
           </div>
@@ -1089,13 +1149,13 @@ export default function EditParkPage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, alignItems: "end" }}>
               <div>
-                <FieldLabel hint="parks directory list — 2:1 crop, duotone treatment">Directory image URL</FieldLabel>
+                <FieldLabel hint="directory list, map cards + grid — 16:10 crop, 1200x750, duotone treatment">Directory image URL</FieldLabel>
                 <Input value={form.directory_image_url} onChange={v => upd("directory_image_url", v)}
                   placeholder="/images/parks/crystal-palace/directory.webp" />
               </div>
               {form.directory_image_url
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={form.directory_image_url} alt="" style={{ width: "100%", aspectRatio: "2/1", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
+                ? <img src={form.directory_image_url} alt="" style={{ width: "100%", aspectRatio: "16/10", objectFit: "cover", filter: "grayscale(1)", display: "block" }} />
                 : <div style={{ width: "100%", aspectRatio: "2/1", background: "var(--card)", border: "1px dashed var(--border)" }} />
               }
             </div>
