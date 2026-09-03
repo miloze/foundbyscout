@@ -42,18 +42,50 @@ function getDotWindow(total: number, active: number, max: number): number[] {
   return Array.from({ length: max }, (_, i) => start + i);
 }
 
-// Basemap tiles come from Mapbox, on the same token the satellite view already
-// uses. CARTO retired anonymous access to their tile CDN and now gates it behind
-// a separate API key — a second credential to provision in every environment,
-// for a basemap we can serve from a token that is already here and already
-// deployed. light-v11/dark-v11 are the closest Mapbox styles to the CARTO
-// light_all/dark_all this replaces.
-function basemapUrl(theme: string, token: string | undefined): string {
-  const style = theme === "light" ? "light-v11" : "dark-v11";
-  return `https://api.mapbox.com/styles/v1/mapbox/${style}/tiles/256/{z}/{x}/{y}?access_token=${token}`;
+// Tile sources. CARTO retired anonymous access to their tile CDN, so each layer
+// picks a provider at runtime depending on whether a Mapbox token is present:
+//
+//  - Mapbox when NEXT_PUBLIC_MAPBOX_TOKEN is set, which is the closer match to
+//    the CARTO styles this replaced.
+//  - Esri otherwise. Esri needs no credential at all, which is what keeps the
+//    map drawing in an environment where the token was never provisioned.
+//
+// That fallback is not hypothetical: the token is set in .env.local but not on
+// the deploy host, so `${token}` interpolated as the literal string "undefined"
+// and every tile 401'd, leaving a blank map on the live site. Whichever way the
+// token question is settled, the map now renders.
+//
+// Esri's endpoints order the path {z}/{y}/{x}, not Leaflet's usual {z}/{x}/{y}.
+type TileSource = { url: string; options: { attribution: string; maxZoom: number } };
+
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+
+function basemap(theme: string, token: string | undefined): TileSource {
+  const light = theme === "light";
+  if (token) {
+    return {
+      url: `https://api.mapbox.com/styles/v1/mapbox/${light ? "light-v11" : "dark-v11"}/tiles/256/{z}/{x}/{y}?access_token=${token}`,
+      options: { attribution: "© Mapbox © OpenStreetMap", maxZoom: 19 },
+    };
+  }
+  return {
+    url: `${ESRI}/Canvas/${light ? "World_Light_Gray_Base" : "World_Dark_Gray_Base"}/MapServer/tile/{z}/{y}/{x}`,
+    options: { attribution: "© Esri © OpenStreetMap contributors", maxZoom: 18 },
+  };
 }
 
-const BASEMAP_ATTRIBUTION = "© Mapbox © OpenStreetMap";
+function satelliteMap(token: string | undefined): TileSource {
+  if (token) {
+    return {
+      url: `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}?access_token=${token}`,
+      options: { attribution: "© Mapbox © OpenStreetMap", maxZoom: 19 },
+    };
+  }
+  return {
+    url: `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
+    options: { attribution: "© Esri, Maxar, Earthstar Geographics", maxZoom: 18 },
+  };
+}
 
 export default function ParksMap({
   search,
@@ -134,10 +166,8 @@ export default function ParksMap({
       if (!el) { setMapStatus("error"); setMapError("Map container not found"); return; }
       try {
         const map = L.map(el, { center:[54.2,-3.5], zoom:6, zoomControl:false });
-        tileLayerRef.current = L.tileLayer(
-          basemapUrl(theme, MAPBOX_TOKEN),
-          { attribution: BASEMAP_ATTRIBUTION, maxZoom:19 }
-        ).addTo(map);
+        const base = basemap(theme, MAPBOX_TOKEN);
+        tileLayerRef.current = L.tileLayer(base.url, base.options).addTo(map);
         mapRef.current = map;
         setMapStatus("ready");
       } catch(err) { setMapStatus("error"); setMapError(String(err)); }
@@ -208,17 +238,8 @@ export default function ParksMap({
     if (!mapRef.current) return;
     import("leaflet").then(({ default: L }) => {
       if (tileLayerRef.current) { tileLayerRef.current.remove(); tileLayerRef.current = null; }
-      if (satellite) {
-        tileLayerRef.current = L.tileLayer(
-          `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
-          { attribution: "© Mapbox © OpenStreetMap", maxZoom: 19 }
-        ).addTo(mapRef.current);
-      } else {
-        tileLayerRef.current = L.tileLayer(
-          basemapUrl(theme, MAPBOX_TOKEN),
-          { attribution: BASEMAP_ATTRIBUTION, maxZoom: 19 }
-        ).addTo(mapRef.current);
-      }
+      const src = satellite ? satelliteMap(MAPBOX_TOKEN) : basemap(theme, MAPBOX_TOKEN);
+      tileLayerRef.current = L.tileLayer(src.url, src.options).addTo(mapRef.current);
     });
   }, [satellite, theme, MAPBOX_TOKEN]);
 
