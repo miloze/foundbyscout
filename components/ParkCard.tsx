@@ -103,8 +103,10 @@ export const PARK_CARD_CSS = `
   .pcard-map .pcard-tags{ margin:12px 0 4px; }
 
   .pcard-thumb{ position:relative; overflow:hidden; cursor:pointer; background:var(--pda-bg); }
-  .pcard-thumb img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:grayscale(1) contrast(1.05) brightness(0.88); transition:filter .2s var(--pda-ease); }
-  .pcard-thumb:hover img{ filter:brightness(1.15) grayscale(1) contrast(1.05); }
+  .pcard-thumb img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:filter .2s var(--pda-ease); }
+  /* Colour, not greyscale — see the note in ParksGridView. Hover keeps a
+     gentle lift so the thumbnail still reads as clickable. */
+  .pcard-thumb:hover img{ filter:brightness(1.06); }
   .pcard-thumb-map{ aspect-ratio:16 / 10; margin-top:12px; }
   /* Feature: large image-led card — desktop map split view. Image flush to
      the card edges. Nothing overlays the photo: navigation is the explicit

@@ -18,9 +18,13 @@ import Link from "next/link";
  * the two CTAs drifting again.
  */
 
-// One variant today. A second is a class block in globals.css setting
-// --cta-bg / --cta-fg / --cta-hover-bg and nothing else.
-type Variant = "accent";
+// A variant is a class block in globals.css setting the colour custom
+// properties and nothing else.
+//   accent — the primary fill (VIEW SCAN, EXPLORE).
+//   ghost  — quiet over imagery: translucent at rest with a low-contrast
+//            outline, inverting to a white fill on hover. Used where the CTA
+//            sits on a photo or a scan rather than on the page ground.
+type Variant = "accent" | "ghost";
 
 type Props = {
   label: string;

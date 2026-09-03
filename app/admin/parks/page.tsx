@@ -69,9 +69,14 @@ export default async function AdminParksPage({ searchParams }: {
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)", marginBottom: 8 }}>Admin</p>
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "2rem", fontWeight: 300, textTransform: "uppercase", letterSpacing: "-0.02em" }}>Parks</h1>
         </div>
-        <Link href="/admin/parks/new" style={{ padding: "10px 24px", background: "var(--accent)", color: "#fff", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
-          + Add park
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Link href="/admin/parks/images" style={{ fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--foreground)", textDecoration: "none" }}>
+            Image checklist →
+          </Link>
+          <Link href="/admin/parks/new" style={{ padding: "10px 24px", background: "var(--accent)", color: "#fff", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
+            + Add park
+          </Link>
+        </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>

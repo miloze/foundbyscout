@@ -7,7 +7,7 @@ const ParkModel = dynamic(() => import("./ParkModel"), { ssr: false });
 
 export default function ParkModelClient({
   modelFile, preloadImage, onLoad, cameraPos, cameraTarget, modelRotation,
-  pingPong, autoRotate, debug,
+  pingPong, autoRotate, debug, onZoomChange, loadingBackground, spinning, allowRotate, allowZoom, onInteract,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   grayscale,
 }: {
@@ -25,6 +25,12 @@ export default function ParkModelClient({
   environmentPreset?: string;
   environmentIntensity?: number;
   grayscale?: boolean;
+  onZoomChange?: (pct: number) => void;
+  loadingBackground?: string;
+  spinning?: boolean;
+  allowRotate?: boolean;
+  allowZoom?: boolean;
+  onInteract?: () => void;
 }) {
   // If the model can't render, the hero keeps the preload image it was already
   // showing — the still frame the viewer fades out of. The page loses the
@@ -53,7 +59,10 @@ export default function ParkModelClient({
         pingPong={pingPong} autoRotate={autoRotate} debug={debug}
         ambientIntensity={ambientIntensity} directionalIntensity={directionalIntensity}
         environmentPreset={environmentPreset} environmentIntensity={environmentIntensity}
-        grayscale={grayscale}
+        grayscale={grayscale} onZoomChange={onZoomChange}
+        loadingBackground={loadingBackground}
+        spinning={spinning} allowRotate={allowRotate} allowZoom={allowZoom}
+        onInteract={onInteract}
       />
     </ViewerErrorBoundary>
   );

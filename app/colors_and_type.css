@@ -243,6 +243,17 @@ a {
   --gap-sm:    0.75rem;
   --gap-md:    1.5rem;
   --gap-lg:    clamp(2rem, 5vw, 5rem);
+
+  /* The gutter between park photographs wherever they are tiled together —
+     the Parks Grid contact sheet and the homepage thumbnail strip. One token
+     because those two are the same object at different sizes, and they had
+     drifted to different hardcoded values (2px and 0).
+
+     --gap-tight is the scale's existing tight-grid step, which is what makes
+     it the right source of truth here rather than the strip's 0: that 0 was
+     introduced to fix a border showing through the gap, not chosen. Set this
+     to 0 to take every park grid edge to edge. */
+  --park-image-gap: var(--gap-tight);
 }
 
 /* ── Border Radii ─────────────────────────────────────── */

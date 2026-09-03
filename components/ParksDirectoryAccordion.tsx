@@ -3,8 +3,12 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ParkCard, ParkCardCTA, PARK_CARD_CSS, getParkAddressChain, getParkTags } from "./ParkCard";
+import { useExploreState } from "./parksGridState";
 
 const ParksMap = lazy(() => import("./ParksMap"));
+// Grid replaces the map entirely rather than sitting beside it, so it is never
+// needed in the same paint as Explore — lazy on the same terms.
+const ParksGridView = lazy(() => import("./ParksGridView"));
 
 // ── Local preview component ──────────────────────────────────────────────
 // Ported from the "Parks Directory" prototype handoff, then reworked per the
@@ -56,6 +60,14 @@ export default function ParksDirectoryAccordion() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "map">("list");
   const [isMobile, setIsMobile] = useState(true);
+  // exploreMode + gridDensity, both held in the URL. `mode` is null until the
+  // first client layout pass has read it; nothing renders in that commit, so
+  // the map never mounts for a frame on a /parks?mode=grid link.
+  const { mode, density, setMode, setDensity } = useExploreState();
+  // Latched once Explore has been on screen, so a /parks?mode=grid link still
+  // costs nothing — the map is only kept alive after it has actually been used.
+  const exploreSeen = useRef(false);
+  useEffect(() => { if (mode === "explore") exploreSeen.current = true; }, [mode]);
   const barRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -175,6 +187,19 @@ export default function ParksDirectoryAccordion() {
         .pda-view-toggle{ display:flex; align-items:center; flex-shrink:0; height:30px; border:1px solid var(--pda-line); border-radius:15px; overflow:hidden; }
         .pda-view-toggle button{ height:100%; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--pda-fg); font-family:var(--pda-font-mono); font-size:11px; line-height:1; text-transform:uppercase; letter-spacing:.03em; padding:0 14px; cursor:pointer; transition:background .15s var(--pda-ease), color .15s var(--pda-ease); }
         .pda-view-toggle button.pda-active{ background:var(--pda-accent); color:#fff; }
+        /* Icon buttons — three of them have to fit the same pill a two-word
+           toggle used to, so they drop the text padding for a fixed square. */
+        .pda-view-toggle button.pda-icon{ padding:0; width:38px; }
+        .pda-view-toggle button.pda-icon svg{ width:14px; height:14px; }
+        .pda-view-toggle button:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; }
+        /* Desktop bar: the search field keeps its own negative left margin, so
+           it stays flush with the split-view list column below it. The row only
+           reaches out to the right gutter, putting the mode toggle on the same
+           edge as the map. */
+        .pda-desktop-bar-row{
+          display:flex; align-items:center; justify-content:space-between; gap:12px;
+          margin-right:calc(var(--pda-gutter) * -1);
+        }
 
         /* ── Archive accordion row ──────────────────────────────────────
            The hover plate is static geometry: padding and negative margin are
@@ -256,10 +281,12 @@ export default function ParksDirectoryAccordion() {
         }
         .pda-figure img{
           position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-          filter:grayscale(1) contrast(1.05) brightness(.88);
+          /* Colour, not greyscale — see the note in ParksGridView. The label
+             below carries its own dark chip, so it never depended on the
+             photograph being knocked back. */
           transition:filter .2s var(--pda-ease);
         }
-        .pda-figure:hover img{ filter:grayscale(1) contrast(1.05) brightness(1.1); }
+        .pda-figure:hover img{ filter:brightness(1.06); }
         .pda-figure-label{
           position:absolute; left:8px; bottom:8px; z-index:2;
           font-family:var(--pda-font-mono); font-size:10px; letter-spacing:.1em;
@@ -287,7 +314,7 @@ export default function ParksDirectoryAccordion() {
         ${PARK_CARD_CSS}
       `}</style>
 
-      <div className={`pda-wrap${!isMobile ? " pda-wrap-wide" : ""}`}>
+      <div className={`pda-wrap${!isMobile || mode === "grid" ? " pda-wrap-wide" : ""}`}>
         {/* Always mounted in the same place for list and map view alike —
             search and the List/Map toggle must never move or change
             behaviour when switching views. */}
@@ -301,49 +328,129 @@ export default function ParksDirectoryAccordion() {
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
+              {/* List | Grid | Map. Grid is a mode, List and Map are the two
+                  halves of Explore that mobile has to choose between, so
+                  picking either of those also leaves Grid. */}
               <div className="pda-view-toggle">
-                <button className={view === "list" ? "pda-active" : ""} onClick={() => setView("list")}>List</button>
-                <button className={view === "map" ? "pda-active" : ""} onClick={() => setView("map")}>Map</button>
+                <ToggleButton label="List" active={mode === "explore" && view === "list"}
+                  onClick={() => { setMode("explore"); setView("list"); }} glyph="list" />
+                <ToggleButton label="Grid" active={mode === "grid"}
+                  onClick={() => setMode("grid")} glyph="grid" />
+                <ToggleButton label="Map" active={mode === "explore" && view === "map"}
+                  onClick={() => { setMode("explore"); setView("map"); }} glyph="map" />
               </div>
             </div>
           ) : (
-            <div className="pda-search-row">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-              <input
-                type="text" placeholder="SEARCH" value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+            <div className="pda-desktop-bar-row">
+              <div className="pda-search-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input
+                  type="text" placeholder="SEARCH" value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              {/* The one element common to both states, so the way back from
+                  Grid is the control that got you there. Not on the map's own
+                  control cluster: Grid replaces the map, so a control anchored
+                  there would have nowhere to live on the return trip. */}
+              <div className="pda-view-toggle">
+                <ToggleButton label="Explore" active={mode === "explore"}
+                  onClick={() => setMode("explore")} glyph="explore" />
+                <ToggleButton label="Grid" active={mode === "grid"}
+                  onClick={() => setMode("grid")} glyph="grid" />
+              </div>
             </div>
           )}
         </header>
 
-        {showMap ? (
-          <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
-            <div style={isMobile
-              ? { height: "calc(100dvh - var(--nav-height, 44px) - var(--pda-bar-height, 132px))", margin: "0 calc(var(--pda-gutter) * -1)" }
-              : { height: "calc(100dvh - 170px)", margin: "0 calc(var(--pda-gutter) * -1)" }}>
-              <ParksMap search={search} />
-            </div>
-          </Suspense>
-        ) : (
-          <div>
-            {displayedParks.map((park, idx) => (
-              <Row
-                key={park.id}
-                park={park}
-                idx={idx}
-                isOpen={openId === park.id}
-                onToggle={() => setOpenId(cur => (cur === park.id ? null : park.id))}
-                onNavigate={() => goToPark(park.slug)}
-              />
-            ))}
-            {displayedParks.length === 0 && (
-              <div className="pda-empty">No parks match your filters</div>
+        {mode === null ? null : (
+          <>
+            {mode === "grid" && (
+              <Suspense fallback={<div className="pda-empty">Loading grid…</div>}>
+                {/* Out to the gutter edges like the map, so the sheet runs the
+                    full content width on both breakpoints. */}
+                <div style={{ margin: "0 calc(var(--pda-gutter) * -1)" }}>
+                  <ParksGridView
+                    search={search}
+                    density={density}
+                    onDensityChange={setDensity}
+                  />
+                </div>
+              </Suspense>
             )}
-          </div>
+
+            {/* Explore is hidden rather than unmounted while Grid is up, once
+                it has been shown at least once. ParksMap keeps its Leaflet
+                instance that way, so centre, zoom and the selected park are all
+                still there on the way back — unmounting would not merely reset
+                the map, it would re-run the "open a random London park" pass
+                and return you somewhere you had never been. Its ResizeObserver
+                calls invalidateSize when the box comes back, so nothing has to
+                tell it it was hidden. */}
+            {(mode === "explore" || exploreSeen.current) && (
+              <div hidden={mode !== "explore"}>
+                {showMap ? (
+                  <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
+                    <div style={isMobile
+                      ? { height: "calc(100dvh - var(--nav-height, 44px) - var(--pda-bar-height, 132px))", margin: "0 calc(var(--pda-gutter) * -1)" }
+                      : { height: "calc(100dvh - 170px)", margin: "0 calc(var(--pda-gutter) * -1)" }}>
+                      <ParksMap search={search} />
+                    </div>
+                  </Suspense>
+                ) : (
+                  <div>
+                    {displayedParks.map((park, idx) => (
+                      <Row
+                        key={park.id}
+                        park={park}
+                        idx={idx}
+                        isOpen={openId === park.id}
+                        onToggle={() => setOpenId(cur => (cur === park.id ? null : park.id))}
+                        onNavigate={() => goToPark(park.slug)}
+                      />
+                    ))}
+                    {displayedParks.length === 0 && (
+                      <div className="pda-empty">No parks match your filters</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+// Icon-only mode buttons. Labelled for assistive tech and on hover, since the
+// glyphs are the only thing on screen — list rules, a 3x3 grid mark, a map pin,
+// and a split panel for Explore's list-beside-map.
+function ToggleButton({
+  label, active, onClick, glyph,
+}: {
+  label: string; active: boolean; onClick: () => void;
+  glyph: "list" | "grid" | "map" | "explore";
+}) {
+  return (
+    <button
+      type="button"
+      className={`pda-icon${active ? " pda-active" : ""}`}
+      aria-label={label}
+      aria-pressed={active}
+      title={label}
+      onClick={onClick}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {glyph === "list" && (<><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></>)}
+        {glyph === "grid" && (<g fill="currentColor" stroke="none">
+          {[3, 10, 17].map(y => [3, 10, 17].map(x => <rect key={`${x}-${y}`} x={x} y={y} width="4" height="4" />))}
+        </g>)}
+        {glyph === "map" && (<><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></>)}
+        {glyph === "explore" && (<><rect x="3" y="4" width="18" height="16" rx="1.5" /><line x1="10" y1="4" x2="10" y2="20" /><line x1="5.5" y1="9" x2="7.5" y2="9" /><line x1="5.5" y1="13" x2="7.5" y2="13" /></>)}
+      </svg>
+    </button>
   );
 }
 

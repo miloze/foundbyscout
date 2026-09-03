@@ -1,12 +1,21 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
+import { fetchCatalogueTotal } from "@/lib/catalogue";
 import HeroEntrance from "@/components/HeroEntrance";
 import { VISITED_COOKIE } from "@/lib/first-visit";
 import ParkHeroMeta from "@/components/ParkHeroMeta";
 import CTAButton from "@/components/CTAButton";
 import HeroNavOverlay from "@/components/HeroNavOverlay";
 import FooterWordmark from "@/components/FooterWordmark";
+
+// cookies() below already opts this route into per-request rendering, so this
+// is redundant today — and kept anyway. The featured park is chosen per request;
+// if the cookie read is ever refactored out, the page would silently fall back
+// to being rendered once and every visitor would see the same park until the
+// next deploy. That failure is invisible in dev and would be slow to spot in
+// production, so the guarantee is stated rather than inferred.
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const db = createServerClient();
@@ -19,7 +28,11 @@ export default async function Home() {
   // <HeroEntrance>, since a Server Component can't set one.
   const firstVisit = !(await cookies()).has(VISITED_COOKIE);
 
-  const [{ data: featuredParks }, { data: featured }] = await Promise.all([
+  // catalogueTotal is the whole published catalogue, deliberately not
+  // heroPool.length — the pool is filtered down to parks that have a hero
+  // image, so counting it would print a total smaller than the archive and
+  // disagree with the same badge on the park page.
+  const [{ data: featuredParks }, { data: heroPool }, catalogueTotal] = await Promise.all([
     db
       .from("parks")
       .select("slug, name, location, type, hero_image, thumbnail, catalogue_id")
@@ -27,15 +40,29 @@ export default async function Home() {
       .gt("sort_order", 0)
       .order("sort_order", { ascending: true })
       .limit(4),
-    // TEMP: hardcoded to Bloblands while homepage feature content/layout is being finalised.
-    // Future: replace with either curated "significant park" selection or random-from-archive.
+    // Random-from-archive, replacing the Bloblands hardcode. Only parks that
+    // actually have a hero image are eligible: this hero is that image at full
+    // bleed, so a pick without one would render the #111 fallback and read as
+    // broken rather than as a different park.
+    //
+    // The eligible set comes back and the choice is made below rather than in
+    // SQL — PostgREST has no ORDER BY random(), and the alternative (count,
+    // then fetch by offset) is two round trips to save a handful of rows on a
+    // catalogue this size. Columns are named rather than *, so the payload is
+    // only what the hero renders; worth revisiting if the table grows large.
     db
       .from("parks")
-      .select("*")
-      .eq("slug", "bloblands")
+      .select("slug, name, type, address, postcode, opened, scanned, catalogue_id, hero_image, is_free, is_covered")
       .eq("published", true)
-      .single(),
+      .not("hero_image", "is", null)
+      .neq("hero_image", ""),
+    fetchCatalogueTotal(db),
   ]);
+
+  // A different park per request. Nothing is remembered between visits, so the
+  // same park can repeat — that's the intent, not a shuffle through the set.
+  const pool = heroPool ?? [];
+  const featured = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
 
   // Derive tag list from structured fields
   const featureTags: string[] = featured ? [
@@ -157,6 +184,7 @@ export default async function Home() {
           <div className="contained" style={{ position: "relative", zIndex: 2 }}>
             <ParkHeroMeta
               catalogueId={featured.catalogue_id ?? undefined}
+              catalogueTotal={catalogueTotal || undefined}
               name={featured.name}
               address={featured.address}
               postcode={featured.postcode}
@@ -224,10 +252,13 @@ export default async function Home() {
         </div>
 
         {/* Thumbnails — 4 across */}
-        {/* No gap and no --border backing: the 2px grid gaps were showing the
-            border colour through as vertical rules between the cards. The
-            images now butt directly against each other. */}
-        <div data-park-thumbs style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
+        {/* Gap comes from --park-image-gap, shared with the Parks Grid contact
+            sheet so the two cannot drift apart again. This was hardcoded to 0
+            because the old 2px gaps showed the container's --border backing
+            through as vertical rules; that backing is gone, so the gap now
+            shows page background like any other grid. Take every park grid to
+            edge to edge by setting the token to 0. */}
+        <div data-park-thumbs style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--park-image-gap)" }}>
           {(featuredParks ?? []).map((park) => (
             <Link key={park.slug} href={`/parks/${park.slug}`} style={{ display: "block", background: "var(--background)", textDecoration: "none", color: "inherit" }}>
               <div style={{ position: "relative", overflow: "hidden", background: "#111", aspectRatio: "3/4" }}>

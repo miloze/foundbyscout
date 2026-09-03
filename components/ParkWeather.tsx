@@ -54,7 +54,10 @@ export default function ParkWeather({ lat, lng }: { lat: number; lng: number }) 
       <div style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         padding: "2px 10px",
-        background: "rgba(0,0,0,0.35)",
+        // Overridable per context rather than fixed: the hero fills this to
+        // match the metadata chips beside it (none of them see-through), while
+        // the directory accordion keeps the lighter original.
+        background: "var(--fbs-weather-bg, rgba(0,0,0,0.35))",
         backdropFilter: "blur(8px)",
         border: "1px solid rgba(255,255,255,0.12)",
         borderRadius: 20,

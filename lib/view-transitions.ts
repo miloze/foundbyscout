@@ -46,3 +46,31 @@ export function parkDetailTransitionNames(slug: string) {
     coords: `park-detail-coords-${slug}`,
   } as const;
 }
+
+/**
+ * Records which way the next park-to-park navigation is going, so the title's
+ * view transition slides the right way — see the ::view-transition rules in
+ * app/globals.css.
+ *
+ * It has to be an attribute on the document element because the
+ * ::view-transition pseudo-elements hang off the root, not off whichever
+ * component triggered the navigation, and it has to be written before the
+ * navigation starts so the style is in place when the browser takes its
+ * snapshots.
+ *
+ * It lived in ParkHeroDetails while the arrows flanked the title. The arrows
+ * are gone and the trigger is the header cluster now, so it lives here — with
+ * the rest of the transition's identities — rather than in whichever component
+ * currently happens to own a button.
+ */
+export function markParkNavDirection(dir: "prev" | "next") {
+  document.documentElement.dataset.parkNav = dir;
+  // Cleared again once the transition has had time to start and finish, so the
+  // flag only ever describes the navigation that set it. Without this it
+  // sticks, and the next Back — or a park opened from Grid or the map —
+  // inherits a direction it never asked for and slides the wrong way.
+  // 500ms against a 260ms transition: if a slow route somehow overran it the
+  // title would simply crossfade, the same graceful fallback as arriving with
+  // no flag at all.
+  window.setTimeout(() => { delete document.documentElement.dataset.parkNav; }, 500);
+}

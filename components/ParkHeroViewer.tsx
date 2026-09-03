@@ -23,13 +23,30 @@ type Props = {
   environmentPreset?: string;
   environmentIntensity?: number;
   grayscale?: boolean;
+  /** Live zoom readout for the overlay panel. Absent inline, where there
+   *  is nothing to report it to. */
+  onZoomChange?: (pct: number) => void;
+  /** Rendering inside the takeover rather than in the page hero. The hero
+   *  dresses its viewer to sit in a page — a scrim fading the bottom of the
+   *  model into var(--background) so it meets the editorial below, and a
+   *  loading plate in that same colour. Both are wrong once the viewer *is*
+   *  the window: the scrim became an opaque band across the bottom of the
+   *  overlay and the plate a slab over its ground. */
+  inOverlay?: boolean;
+  /** Idle rotation target, eased rather than switched — see ParkModel. */
+  spinning?: boolean;
+  /** Granted separately during the entrance: drag early, zoom last. */
+  allowRotate?: boolean;
+  allowZoom?: boolean;
+  /** First pointer or wheel gesture on the model. */
+  onInteract?: () => void;
 };
 
 export default function ParkHeroViewer({
   modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, forceViewer,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
-  grayscale,
+  grayscale, onZoomChange, inOverlay, spinning, allowRotate, allowZoom, onInteract,
 }: Props) {
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -108,6 +125,11 @@ export default function ParkHeroViewer({
     <>
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <ParkModelClient
+          loadingBackground={inOverlay ? "transparent" : undefined}
+          spinning={spinning}
+          allowRotate={allowRotate}
+          allowZoom={allowZoom}
+          onInteract={onInteract}
           modelFile={finalModelFile}
           preloadImage={preloadSrc}
           onLoad={handleLoad}
@@ -122,9 +144,15 @@ export default function ParkHeroViewer({
           environmentPreset={environmentPreset}
           environmentIntensity={environmentIntensity}
           grayscale={grayscale}
+          onZoomChange={onZoomChange}
         />
       </div>
-      <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to top, var(--background) 0%, transparent 55%)", pointerEvents: "none" }} />
+      {/* The scan meets the page directly now. This was a gradient fading the
+          bottom 55% of the model into var(--background), which is what put a
+          wash behind the hero's name and chips — removed with the hero's own
+          scrim so the metadata sits on the scan rather than on a plate. It
+          also softened the hero's bottom edge into the editorial below; if
+          that edge now reads too hard, this is what used to do it. */}
     </>
   );
 }

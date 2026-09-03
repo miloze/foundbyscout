@@ -1,6 +1,7 @@
 "use client";
 
 import CTAButton from "./CTAButton";
+import { catalogueIndexLabel } from "@/lib/catalogue";
 import ViewTransitionBoundary from "./ViewTransitionBoundary";
 import { heroTransitionNames } from "@/lib/view-transitions";
 
@@ -22,6 +23,8 @@ function fmtDate(val: string): string {
 
 type Props = {
   catalogueId?: string;
+  /** Size of the published catalogue — the "/11" half of the index badge. */
+  catalogueTotal?: number;
   name: string;
   address?: string[];
   postcode?: string;
@@ -44,8 +47,11 @@ const CHIP_VARIANT = "dark" as ChipVariant;
 const CHIP_CLASS = CHIP_VARIANT === "beige" ? "fbs-hp-chip fbs-hp-chip--inv" : "fbs-hp-chip";
 const BADGE_CLASS = CHIP_VARIANT === "beige" ? "fbs-hp-chip" : "fbs-hp-chip fbs-hp-chip--inv";
 
-export default function ParkHeroMeta({ catalogueId, name, address, postcode, opened, scanned, slug }: Props) {
-  const idNumber = catalogueId?.replace(/^SCN\//i, "");
+export default function ParkHeroMeta({ catalogueId, catalogueTotal, name, address, postcode, opened, scanned, slug }: Props) {
+  // "(003) /11", the same badge the park page carries — same helper, so the
+  // format cannot drift between the two heroes. This hero showed a bare "003"
+  // until the park page's treatment was brought across.
+  const indexLabel = catalogueIndexLabel(catalogueId, catalogueTotal);
   // Area name (not street) reads better at hero scale — street-level detail
   // lives in the park page's "Getting there" section.
   const areaName = address && address.length > 1 ? address[1] : address?.[0];
@@ -89,19 +95,21 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
       {/* hp-meta row: left fields + CTA right */}
       <div className="fbs-hp-meta">
         <div className="fbs-hpm-left">
-          {/* Catalogue no. + metadata chip — one row. The location and scan
-              date used to be two untreated lines sitting straight on the
-              photo, which vanished over bright concrete. */}
-          {(idNumber || metaLine) && (
-            <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Index badge stacked over the metadata chip, each on its own line.
+              Inline, the two ran together and the index read as the start of
+              the street address — "(003) Dulwich" parses as a house number.
+              The location and scan date used to be two untreated lines sitting
+              straight on the photo, which vanished over bright concrete. */}
+          {(indexLabel || metaLine) && (
+            <div className="fbs-hp-idstack">
               {/* Catalogue number and address line both continue onto the park
                   page. The markup there is different — different classes, a
                   fuller address, the scan date split into its own tag — so
                   these rely on the shared name rather than on matching DOM,
                   which is case (b) of the continuity spec. */}
-              {idNumber && (
+              {indexLabel && (
                 <ViewTransitionBoundary name={vt?.catalogue}>
-                  <span className={`${BADGE_CLASS} fbs-he-badge`}>{idNumber}</span>
+                  <span className={`${BADGE_CLASS} fbs-he-badge`}>{indexLabel}</span>
                 </ViewTransitionBoundary>
               )}
               {metaLine && (
@@ -122,6 +130,17 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
       </div>
 
       <style>{`
+        /* Badge over chip, not beside it. Column rather than a wrapped row so
+           the two never sit on one line at a wide viewport; flex-start so each
+           shrinks to its own content instead of stretching to the wider of the
+           two. The 4px gap is deliberately tight — badge and chip are one unit
+           identifying this park. */
+        .fbs-hp-idstack {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
         .fbs-hp-meta {
           display: flex;
           justify-content: space-between;

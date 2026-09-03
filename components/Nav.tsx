@@ -284,11 +284,15 @@ export default function Nav() {
           aria-hidden
           style={{
             display: "block",
-            // Between the original clamp(44px, 6vw, 68px) and the oversized
-            // clamp(56px, 7.5vw, 96px) that replaced it. --logo-h/--logo-w are
-            // published from the measured box, so the homepage postcode badge
-            // follows this without its own tuning.
-            height: "clamp(48px, 6.5vw, 78px)",
+            // Scaled down 15% from clamp(48px, 6.5vw, 78px), which itself sat
+            // between the original clamp(44px, 6vw, 68px) and the oversized
+            // clamp(56px, 7.5vw, 96px) that replaced it. All three terms are
+            // scaled by the same factor, so the viewport at which the mark
+            // stops growing is unchanged at 1200px. --logo-h/--logo-w and the
+            // rest are published from the measured box, so the nav scrim, the
+            // homepage postcode badge and the /parks sticky bar all follow
+            // without their own tuning.
+            height: "clamp(41px, 5.5vw, 66px)",
             aspectRatio: "500 / 130",
             background: "var(--accent)",
             maskImage: "url(/scout.svg)",

@@ -214,6 +214,7 @@ type FormState = {
   opening_times: string; built_by: string; getting_there: string;
   gallery_images: string[];
   brief: string; description: string;
+  pull_quote: string; pull_quote_attribution: string;
   catalogue_id: string; scanned: string;
   hero_image: string; thumbnail: string; directory_image_url: string; model_file: string; model_file_low: string; preload_image_url: string;
   camera_pos: string; camera_target: string; model_rotation: string;
@@ -232,6 +233,7 @@ const EMPTY: FormState = {
   car_park: false, lighting: false, seating: false,
   opening_times: "", built_by: "", getting_there: "",
   brief: "", description: "",
+  pull_quote: "", pull_quote_attribution: "",
   catalogue_id: "", scanned: "",
   hero_image: "", thumbnail: "", directory_image_url: "", model_file: "", model_file_low: "", preload_image_url: "",
   camera_pos: "", camera_target: "", model_rotation: "",
@@ -328,6 +330,10 @@ export default function EditParkPage() {
           description: Array.isArray(park.description)
             ? park.description.join("\n\n")
             : (park.description ?? ""),
+          // Undefined rather than null until 007 is applied — `?? ""`
+          // covers both, so the inputs stay controlled either way.
+          pull_quote:             park.pull_quote             ?? "",
+          pull_quote_attribution: park.pull_quote_attribution ?? "",
           hero_image:         park.hero_image        || "",
           thumbnail:          park.thumbnail         || `/images/parks/${slug}/thumb.webp`,
           directory_image_url: park.directory_image_url || `/images/parks/${slug}/directory.webp`,
@@ -417,6 +423,10 @@ export default function EditParkPage() {
       // "not answered" has to reach the column as null.
       setting: form.setting || null,
       entry:   form.entry   || null,
+      // Same reasoning: "not written yet" belongs in the column as null,
+      // not as an empty string every read then has to treat as falsy.
+      pull_quote:             form.pull_quote.trim()             || null,
+      pull_quote_attribution: form.pull_quote_attribution.trim() || null,
       description:    form.description ? form.description.split("\n\n").filter(Boolean) : [],
       camera_pos:     strToNumArr(form.camera_pos),
       camera_target:  strToNumArr(form.camera_target),
@@ -1267,6 +1277,20 @@ export default function EditParkPage() {
               <FieldLabel hint="objective and matter-of-fact — features, transitions, layout; separate paragraphs with a blank line">Introduction</FieldLabel>
               <Textarea value={form.description} onChange={v => upd("description", v)} rows={8}
                 placeholder="Bloblands is a compact concrete skatepark centred around a volcano feature. Banks, quarters and transitions connect around the perimeter to create a variety of routes within a relatively small footprint." />
+            </div>
+
+            {/* Pull quote — its own pair of fields rather than a convention
+                inside the Introduction copy, so the front end can style the
+                quote and its credit separately without parsing prose. */}
+            <div>
+              <FieldLabel hint="one line, in someone's voice — fills the gap beside the facts sidebar; leave empty and the block doesn't render">Pull quote</FieldLabel>
+              <Textarea value={form.pull_quote} onChange={v => upd("pull_quote", v)} rows={3}
+                placeholder="Small, strange, but surprisingly fun." />
+              <div style={{ marginTop: 10 }}>
+                <FieldLabel hint="optional — a name, a role, or a handle">Attribution</FieldLabel>
+                <Input value={form.pull_quote_attribution} onChange={v => upd("pull_quote_attribution", v)}
+                  placeholder="Local builder" />
+              </div>
             </div>
 
             {/* Scout notes */}

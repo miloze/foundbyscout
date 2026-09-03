@@ -7,6 +7,7 @@ import FloatingAsset from "@/components/FloatingAsset";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ParkFacts, { type ParkGlance } from "@/components/ParkFacts";
+import PullQuote from "@/components/editorial/PullQuote";
 import ParkHeroShell from "@/components/ParkHeroShell";
 import { createServerClient } from "@/lib/supabase-server";
 import { modelUrl, resolveModelUrl } from "@/lib/assets";
@@ -46,20 +47,69 @@ function SocialIcon({ platform }: { platform: Social["platform"] }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 export const dynamic = "force-dynamic";
 
-export default async function ParkPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ debug?: string }> }) {
+export default async function ParkPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ debug?: string; scroll?: string }> }) {
   const { slug } = await params;
+  // `scroll` stays in the param type — it is still a live URL flag, read
+  // client-side by reviewMode() — but nothing on the server branches on it.
   const { debug } = await searchParams;
   const isDebug = debug === "1";
 
+  // ── Click-to-explore viewer ────────────────────────────────────────────
+  // On for every park now. This was gated to Bloblands behind ?scroll=1 while
+  // the interaction was being designed; the design is settled, and the gate
+  // was the only thing scoping it to one park. ParkHeroShell still declines to
+  // render any of it without a model and on mobile, so a park with no scan is
+  // unaffected.
+  //
+  // The two flags survive as debug tooling, not as gates:
+  //   ?debug=1  — ParkModel's camera-tuning mode (unlocks pan, widens the zoom
+  //               clamp, shows the live camera readout). It also stops the
+  //               idle rotation, so it is the wrong flag to review motion on.
+  //   ?scroll=1 — no longer gates anything. It, and ?debug=1, switch off the
+  //               instructions' session memory so the entrance replays every
+  //               time — see reviewMode() in ParkHeroShell.
+  const viewerOverlay = true;
+
   const db = createServerClient();
-  const { data: park } = await db
-    .from("parks")
-    .select("*, viewer_settings, model_file_mobile, model_file_low, preload_image_url")
-    .eq("slug", slug)
-    .eq("published", true)
-    .single();
+  // Two reads, one round trip. The second is the published catalogue in index
+  // order, and it answers two questions at once: how many parks there are (the
+  // "/11" half of the hero's index badge) and which park follows this one (the
+  // hero's next-park link). It was a head-only count before the link existed;
+  // three columns for a catalogue this size is cheaper than a second query.
+  //
+  // Ordered by catalogue_id, not scanned date and not created_at — "next"
+  // means the next catalogue index, which is what the badge is showing. The
+  // column is zero-padded ("001"), so lexical order is numeric order.
+  const [{ data: park }, { data: catalogue }] = await Promise.all([
+    db
+      .from("parks")
+      .select("*, viewer_settings, model_file_mobile, model_file_low, preload_image_url")
+      .eq("slug", slug)
+      .eq("published", true)
+      .single(),
+    db
+      .from("parks")
+      .select("slug, name, catalogue_id")
+      .eq("published", true)
+      .order("catalogue_id", { ascending: true, nullsFirst: false }),
+  ]);
 
   if (!park) notFound();
+
+  // The catalogue has gaps — 002 and 004 aren't published — so a neighbour is
+  // the adjacent park in this list, not the adjacent number. Both directions
+  // wrap, which is the decision already taken for "next" and applied
+  // symmetrically here: it keeps both arrows live on every park page rather
+  // than leaving the first and last parks each missing one, and a nav that
+  // silently loses an arm on two pages out of eleven is worse than a loop.
+  const catalogueTotal = catalogue?.length ?? 0;
+  const hereIdx = catalogue?.findIndex(p => p.slug === slug) ?? -1;
+  const neighbour = (step: number) =>
+    catalogue && hereIdx >= 0 && catalogueTotal > 1
+      ? catalogue[(hereIdx + step + catalogueTotal) % catalogueTotal]
+      : null;
+  const prevPark = neighbour(-1);
+  const nextPark = neighbour(1);
 
   // Dev fallback: use local static images when the DB has no gallery yet.
   // Slot order matches EditorialGallery: full, wide-left, narrow-right, sq-left(model), sq-right, full, full
@@ -94,8 +144,12 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
     seating:       park.seating,
   };
 
+  // The fallback was written as a Bloblands special case; modelUrl() is keyed
+  // by slug and returns null for any park not on the CDN, so it generalises
+  // without needing the name. Any park whose row has no model_file but whose
+  // scan is uploaded now resolves the same way Bloblands did.
   const modelFile = resolveModelUrl(park.model_file, slug, "high")
-    ?? (slug === "bloblands" ? modelUrl("bloblands", "high") : null);
+    ?? modelUrl(slug, "high");
   // Low/mobile fall back to the high-res model when no low export exists.
   const modelFileLow = resolveModelUrl(park.model_file_low, slug, "low") ?? undefined;
   const modelFileMobile = resolveModelUrl(park.model_file_mobile, slug, "low") ?? undefined;
@@ -116,12 +170,16 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         pingPong={park.ping_pong ?? undefined}
         autoRotate={park.auto_rotate ?? false}
         debug={isDebug}
+        viewerOverlay={viewerOverlay}
         ambientIntensity={park.viewer_settings?.ambientIntensity}
         directionalIntensity={park.viewer_settings?.directionalIntensity}
         environmentPreset={park.viewer_settings?.environmentPreset}
         environmentIntensity={park.viewer_settings?.environmentIntensity}
         slug={slug}
         catalogueId={park.catalogue_id ?? undefined}
+        catalogueTotal={catalogueTotal || undefined}
+        prevPark={prevPark ?? undefined}
+        nextPark={nextPark ?? undefined}
         name={park.name}
         address={park.address}
         location={park.location}
@@ -141,6 +199,12 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         <div>
           {/* Introduction — the existing description[], unchanged data */}
           <EditorialSection label="Introduction" body={park.description} />
+
+          {/* Fills the run-off below the introduction, where the facts
+              sidebar opposite has already ended. Renders nothing when the
+              park has no quote, so the column falls back to the gap it has
+              today rather than to a placeholder. */}
+          <PullQuote quote={park.pull_quote} attribution={park.pull_quote_attribution} />
         </div>
 
         {/* Facts sidebar — At a Glance, the two fact rows and Getting

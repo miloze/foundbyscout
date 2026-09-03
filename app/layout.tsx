@@ -4,7 +4,6 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import ThemeProvider from "@/components/ThemeProvider";
 import NavOverlayProvider from "@/components/NavOverlay";
-import Grain from "@/components/Grain";
 
 // Rubik carries two additions for the Scout Notes block:
 //   · italic 300 — the notes are set in italic, and that has to come from a
@@ -44,7 +43,6 @@ export default function RootLayout({
       <body className={`${headingFont.variable} ${monoFont.variable} ${bodyFont.variable}`} style={{ fontFamily: "var(--font-body), sans-serif", margin: 0, background: "var(--background)", color: "var(--foreground)" }}>
         <ThemeProvider>
           <NavOverlayProvider>
-          <Grain />
           <Nav />
           {/* Full width and unpadded: the gutter and the max-width both live on
               .contained below, so .full-bleed children can break out of them

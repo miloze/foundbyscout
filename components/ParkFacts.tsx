@@ -13,8 +13,9 @@ import { useState } from "react";
 //    the same .42s curve, so short and long bodies both animate to their real
 //    height without a magic number.
 //  - no opacity dimming on an absent amenity. The muted state is a full
-//    colour swap: `color` is set once on the card and the icon, value and
-//    caption all inherit it, so the three never drift out of step.
+//    colour swap: `color` is set once on the card and the icon and value
+//    inherit it, so the pair never drifts out of step. The caption sits
+//    outside that swap and is muted in every state.
 
 export type ParkSetting = "outdoor" | "indoor";
 export type ParkEntry   = "free" | "paid";
@@ -77,8 +78,21 @@ const ENTRY_ICON:   Record<ParkEntry,   string> = { free: "money_off",  paid: "p
 const YES = "Yes";
 const NO  = "No";
 
+// An unanswered field is not a "No". These columns are null only on a park
+// whose amenities have never been saved — the admin coerces null to false when
+// it loads a row, so after one save they are always a real boolean. Collapsing
+// null into "No" made an unfilled park assert it has no cafe, no toilets, no
+// water, no parking, no lighting and no seating, which is a claim nobody made
+// and is indistinguishable from a park that genuinely has none of them.
+const UNKNOWN = "—";
+
+// Setting and Entry have no category glyph of their own — wb_sunny *is* the
+// outdoor answer and money_off *is* the free one, so falling back to either
+// drew the answer on a card that has none.
+const UNKNOWN_ICON = "help";
+
 function boolCard(icon: string, caption: string, v: boolean | null | undefined): Card {
-  return { icon, caption, value: v ? YES : NO, on: !!v };
+  return { icon, caption, value: v == null ? UNKNOWN : v ? YES : NO, on: !!v };
 }
 
 // Reading order is the handover's data-model table, which is also the mockup's
@@ -87,8 +101,8 @@ function boolCard(icon: string, caption: string, v: boolean | null | undefined):
 function glanceCards(g: ParkGlance): Card[] {
   return [
     {
-      icon: SETTING_ICON[g.setting ?? "outdoor"],
-      value: g.setting === "indoor" ? "Indoor" : "Outdoor",
+      icon: g.setting ? SETTING_ICON[g.setting] : UNKNOWN_ICON,
+      value: g.setting ? (g.setting === "indoor" ? "Indoor" : "Outdoor") : UNKNOWN,
       caption: "Setting",
       on: !!g.setting,
     },
@@ -98,8 +112,8 @@ function glanceCards(g: ParkGlance): Card[] {
     boolCard("local_parking", "Car park", g.carPark),
     boolCard("lightbulb",     "Lighting", g.lighting),
     {
-      icon: ENTRY_ICON[g.entry ?? "free"],
-      value: g.entry === "paid" ? "Paid" : "Free",
+      icon: g.entry ? ENTRY_ICON[g.entry] : UNKNOWN_ICON,
+      value: g.entry ? (g.entry === "paid" ? "Paid" : "Free") : UNKNOWN,
       caption: "Entry",
       // Paid entry is a fact, not an absence — both enum values read as
       // present. Only an unset field is muted.
@@ -152,10 +166,23 @@ export function ParkGlanceGrid({ glance, variant = "sidebar" }: {
         }
         .pfacts-card.is-on{ color:var(--accent); }
         .pfacts-card .material-symbols-outlined{ font-size:20px; }
-        .pfacts-value{ font-size:13px; font-weight:600; line-height:1.15; color:inherit; }
+        /* DM Mono, not the body sans. Metadata values are metadata: the type
+           hierarchy on this site puts MSCHN on park names, DM Mono on every
+           piece of metadata and Rubik on UI chrome only, so "Outdoor" / "Yes"
+           belongs in the same face as the caption under it. 500 is the
+           heaviest DM Mono weight loaded (see app/layout.tsx) — hierarchy
+           against the caption comes from size and weight, never a typeface
+           swap. */
+        .pfacts-value{
+          font-family:var(--font-mono); font-size:13px; font-weight:500;
+          line-height:1.15; letter-spacing:-0.01em; color:inherit;
+        }
+        /* Captions never take the state colour. The value and its icon carry
+           present/absent on their own; an orange caption said the same thing
+           a third time and left the grid with no fixed reading line. */
         .pfacts-caption{
           font-family:var(--font-mono); font-size:8.5px; letter-spacing:0.1em;
-          text-transform:uppercase; margin-top:4px; color:inherit;
+          text-transform:uppercase; margin-top:4px; color:var(--muted);
         }
 
         /* ── Hero variant ───────────────────────────────────────────────
@@ -168,6 +195,9 @@ export function ParkGlanceGrid({ glance, variant = "sidebar" }: {
         .pfacts-glance--hero .pfacts-eyebrow{ color:rgba(243,239,236,0.55); margin-bottom:10px; }
         .pfacts-glance--hero .pfacts-card{ background:#232220; color:#5a5a56; }
         .pfacts-glance--hero .pfacts-card.is-on{ color:var(--accent); }
+        /* page tokens don't apply over the scan, so the always-muted caption
+           takes the hero's own grey rather than --muted */
+        .pfacts-glance--hero .pfacts-caption{ color:#5a5a56; }
 
         /* ── Mobile ─────────────────────────────────────────────────────
            Three across instead of two, so eight cards fill three short rows
@@ -366,8 +396,12 @@ export default function ParkFacts({
           text-transform:uppercase; color:var(--muted);
         }
         .pfacts-row-label .material-symbols-outlined{ font-size:16px; }
+        /* Same rule as .pfacts-value above: the label is DM Mono, so the
+           value it answers is too. Every piece of type on this panel is now
+           one face. */
         .pfacts-row-value{
-          font-size:13px; font-weight:600; text-align:right;
+          font-family:var(--font-mono); font-size:13px; font-weight:500;
+          letter-spacing:-0.01em; text-align:right;
           color:var(--foreground); line-height:1.3;
         }
 
