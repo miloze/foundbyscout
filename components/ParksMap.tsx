@@ -56,7 +56,17 @@ function getDotWindow(total: number, active: number, max: number): number[] {
 // token question is settled, the map now renders.
 //
 // Esri's endpoints order the path {z}/{y}/{x}, not Leaflet's usual {z}/{x}/{y}.
-type TileSource = { url: string; options: { attribution: string; maxZoom: number } };
+// maxNativeZoom is the deepest level a source actually holds imagery for, as
+// opposed to maxZoom, which is how far the map lets you zoom. Leaflet upscales
+// the last real tile between the two. Esri's Gray Canvas stops at 16 and its
+// aerial imagery at 19, and past those it answers 200 with a "Map data not yet
+// available" placeholder rather than a 404 — so a status check reports the
+// tiles as fine while the map fills with grey. Without maxNativeZoom that
+// placeholder is what a reader sees on any park at close zoom.
+type TileSource = {
+  url: string;
+  options: { attribution: string; maxZoom: number; maxNativeZoom?: number };
+};
 
 const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
 
@@ -70,7 +80,7 @@ function basemap(theme: string, token: string | undefined): TileSource {
   }
   return {
     url: `${ESRI}/Canvas/${light ? "World_Light_Gray_Base" : "World_Dark_Gray_Base"}/MapServer/tile/{z}/{y}/{x}`,
-    options: { attribution: "© Esri © OpenStreetMap contributors", maxZoom: 18 },
+    options: { attribution: "© Esri © OpenStreetMap contributors", maxZoom: 19, maxNativeZoom: 16 },
   };
 }
 
@@ -83,7 +93,7 @@ function satelliteMap(token: string | undefined): TileSource {
   }
   return {
     url: `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
-    options: { attribution: "© Esri, Maxar, Earthstar Geographics", maxZoom: 18 },
+    options: { attribution: "© Esri, Maxar, Earthstar Geographics", maxZoom: 19, maxNativeZoom: 19 },
   };
 }
 
