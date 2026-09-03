@@ -42,6 +42,19 @@ function getDotWindow(total: number, active: number, max: number): number[] {
   return Array.from({ length: max }, (_, i) => start + i);
 }
 
+// Basemap tiles come from Mapbox, on the same token the satellite view already
+// uses. CARTO retired anonymous access to their tile CDN and now gates it behind
+// a separate API key — a second credential to provision in every environment,
+// for a basemap we can serve from a token that is already here and already
+// deployed. light-v11/dark-v11 are the closest Mapbox styles to the CARTO
+// light_all/dark_all this replaces.
+function basemapUrl(theme: string, token: string | undefined): string {
+  const style = theme === "light" ? "light-v11" : "dark-v11";
+  return `https://api.mapbox.com/styles/v1/mapbox/${style}/tiles/256/{z}/{x}/{y}?access_token=${token}`;
+}
+
+const BASEMAP_ATTRIBUTION = "© Mapbox © OpenStreetMap";
+
 export default function ParksMap({
   search,
 }: {
@@ -49,6 +62,7 @@ export default function ParksMap({
 }) {
   const router = useRouter();
   const [parks, setParks] = useState<Park[]>([]);
+  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef       = useRef<any>(null);
@@ -121,10 +135,8 @@ export default function ParksMap({
       try {
         const map = L.map(el, { center:[54.2,-3.5], zoom:6, zoomControl:false });
         tileLayerRef.current = L.tileLayer(
-          theme === "light"
-            ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          { attribution:"© OpenStreetMap contributors © CARTO", subdomains:"abcd", maxZoom:19 }
+          basemapUrl(theme, MAPBOX_TOKEN),
+          { attribution: BASEMAP_ATTRIBUTION, maxZoom:19 }
         ).addTo(map);
         mapRef.current = map;
         setMapStatus("ready");
@@ -192,8 +204,6 @@ export default function ParksMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapStatus, parks]);
 
-  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
   useEffect(() => {
     if (!mapRef.current) return;
     import("leaflet").then(({ default: L }) => {
@@ -205,10 +215,8 @@ export default function ParksMap({
         ).addTo(mapRef.current);
       } else {
         tileLayerRef.current = L.tileLayer(
-          theme === "light"
-            ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          { attribution: "© OpenStreetMap contributors © CARTO", subdomains: "abcd", maxZoom: 19 }
+          basemapUrl(theme, MAPBOX_TOKEN),
+          { attribution: BASEMAP_ATTRIBUTION, maxZoom: 19 }
         ).addTo(mapRef.current);
       }
     });
