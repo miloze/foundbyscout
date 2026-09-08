@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Coords from "./Coords";
+import { formatFieldDate } from "@/lib/fieldDate";
 import ParkWeather from "./ParkWeather";
 import { catalogueMark } from "@/lib/catalogue";
 import ViewTransitionBoundary from "./ViewTransitionBoundary";
@@ -25,21 +26,6 @@ import { parkTitleTransitionName, parkDetailTransitionNames } from "@/lib/view-t
  * it. The hero passes a slug; the viewer does not.
  */
 
-const MONTHS: Record<string, string> = {
-  january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",
-  july:"07",august:"08",september:"09",october:"10",november:"11",december:"12",
-};
-
-export function fmtDate(val: string): string {
-  const parts = val.trim().split(/\s+/);
-  if (parts.length === 2) {
-    const m = MONTHS[parts[0].toLowerCase()];
-    const y = parts[1];
-    if (m) return `${m}/${y}`;
-  }
-  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0];
-  return val;
-}
 
 type Props = {
   name: string;
@@ -82,6 +68,9 @@ export default function ParkHeroDetails({
   const areaName = address && address.length > 1 ? address[1] : address?.[0];
   const locationChain = [areaName, "London", postcode].filter(Boolean).join(", ").toUpperCase();
   const hasCoords = lat != null && lng != null;
+  // Null unless the stored value is genuinely a date, so an unscanned park
+  // shows no chip rather than a chip reading "NA".
+  const scannedText = formatFieldDate(scanned);
 
   return (
     <>
@@ -134,11 +123,11 @@ export default function ParkHeroDetails({
           <span className="fbs-field-tag fbs-field-tag--chip">{locationChain}</span>
         )}
 
-        {(scanned || hasCoords) && (
+        {(scannedText || hasCoords) && (
           <div className="fbs-field-line">
-            {scanned && (
+            {scannedText && (
               named(vtDetail?.scanned, <>
-                <span className="fbs-field-tag fbs-field-tag--chip">Scanned: {fmtDate(scanned)}</span>
+                <span className="fbs-field-tag fbs-field-tag--chip">Scanned: {scannedText}</span>
               </>)
             )}
             {hasCoords && (

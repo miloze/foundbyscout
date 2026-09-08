@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { formatFieldDateLong } from "@/lib/fieldDate";
+
 // ── Park page detail blocks ────────────────────────────────────────────────
 // At a Glance, Opening times, Built by, Getting there — the practical column
 // beside the introduction on desktop, stacked in flow above the photos on
@@ -290,7 +292,11 @@ export default function ParkFacts({
   const factRows: { icon: string; label: string; value: string }[] = [];
   if (openingTimes) factRows.push({ icon: "schedule",       label: "Opening times", value: openingTimes });
   if (builtBy)      factRows.push({ icon: "handyman",       label: "Built by",      value: builtBy });
-  if (opened)       factRows.push({ icon: "calendar_month", label: "Opened",        value: opened });
+  // Validated, not just truthy: the column is free text, so a row here would
+  // otherwise read "Opened  NA". Prose rather than field notation, because
+  // every other row in this block is prose.
+  const openedText = formatFieldDateLong(opened);
+  if (openedText)   factRows.push({ icon: "calendar_month", label: "Opened",        value: openedText });
 
   const addressLines = (address ?? []).filter(Boolean);
   const links = transport ?? [];

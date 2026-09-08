@@ -2,22 +2,7 @@
 
 import CTAButton from "./CTAButton";
 import { catalogueMark } from "@/lib/catalogue";
-
-const MONTHS: Record<string, string> = {
-  january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",
-  july:"07",august:"08",september:"09",october:"10",november:"11",december:"12",
-};
-
-function fmtDate(val: string): string {
-  const parts = val.trim().split(/\s+/);
-  if (parts.length === 2) {
-    const m = MONTHS[parts[0].toLowerCase()];
-    const y = parts[1];
-    if (m) return `${m}/${y}`;
-  }
-  if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0];
-  return val;
-}
+import { formatFieldDate } from "@/lib/fieldDate";
 
 type Props = {
   catalogueId?: string;
@@ -56,7 +41,10 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
   // One condensed line. "London" and the postcode are gone: the postcode area
   // is already the circle badge on this hero, and the city was never doing
   // work at this size.
-  const metaLine = [areaName, scanned && `Scanned ${fmtDate(scanned)}`]
+  // Drops out entirely when the stored value is not a date, so the line reads
+  // "WEST NORWOOD" rather than "WEST NORWOOD · SCANNED NA".
+  const scannedText = formatFieldDate(scanned);
+  const metaLine = [areaName, scannedText && `Scanned ${scannedText}`]
     .filter(Boolean)
     .join(" · ")
     .toUpperCase();
