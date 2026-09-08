@@ -1,8 +1,7 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ParkCard, ParkCardCTA, PARK_CARD_CSS, getParkAddressChain, getParkTags } from "./ParkCard";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { PARK_CARD_CSS } from "./ParkCard";
 import { useExploreState } from "./parksGridState";
 
 const ParksMap = lazy(() => import("./ParksMap"));
@@ -25,7 +24,8 @@ const ParksGridView = lazy(() => import("./ParksGridView"));
 // brand coral #FF7948 rather than the spec's #d97757 — see --pda-accent.
 //
 // Open decisions carried over from the handoff (not resolved here):
-//  - bare catalogue number vs. "SCN/" prefix (see getCatalogueIdLabel)
+//  - bare catalogue number vs. "SCN/" prefix (settled: see catalogueMark in
+//    lib/catalogue.ts — one mark, "001/", on every surface)
 //  - conditions (ParkWeather) tag omitted, as in the prototype
 //  - coordinates omitted from the title line
 //  - the display face is the --font-display token in app/colors_and_type.css
@@ -54,11 +54,12 @@ type ParkRow = {
 };
 
 export default function ParksDirectoryAccordion() {
-  const router = useRouter();
   const [parks, setParks] = useState<ParkRow[]>([]);
-  const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"list" | "map">("list");
+  // The park a dropdown pick wants opened on the map, and the counter that
+  // makes each pick distinct — see ParksMap's focus prop.
+  const [focus, setFocus] = useState<{ id: string; seq: number } | null>(null);
+  const focusSeq = useRef(0);
   const [isMobile, setIsMobile] = useState(true);
   // exploreMode + gridDensity, both held in the URL. `mode` is null until the
   // first client layout pass has read it; nothing renders in that commit, so
@@ -85,7 +86,14 @@ export default function ParksDirectoryAccordion() {
     const el = barRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
-      document.documentElement.style.setProperty("--pda-bar-height", `${entry.contentRect.height}px`);
+      // The border box, not contentRect. Padding is most of this bar's height
+      // — it clears the floating logo — and contentRect excludes padding, so
+      // this reported ~45px for a ~147px bar. The map below sizes itself by
+      // subtracting this from the viewport, so the under-report made the map
+      // that much too tall and pushed the detail card below the fold.
+      const h = entry.borderBoxSize?.[0]?.blockSize
+        ?? entry.target.getBoundingClientRect().height;
+      document.documentElement.style.setProperty("--pda-bar-height", `${h}px`);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -116,11 +124,21 @@ export default function ParksDirectoryAccordion() {
     );
   }, [parks, search]);
 
-  const goToPark = (slug: string) => router.push(`/parks/${slug}`);
+  // Search results, capped: this is a jump-to-park control, not a second list.
+  const suggestions = useMemo(
+    () => (search.trim() ? displayedParks.slice(0, 8) : []),
+    [search, displayedParks],
+  );
 
-  // Desktop always shows the map as a split list/map view — the header's
-  // List/Map toggle only matters on mobile, where screen space forces a choice.
-  const showMap = !isMobile || view === "map";
+  // A pick lands on the map exactly where tapping the pin would. The query is
+  // cleared on the way out: the map filters on that same string, so leaving it
+  // set would strand the chosen park as the only pin on screen — the opposite
+  // of the surrounding context you opened it to see.
+  const jumpToPark = (park: ParkRow) => {
+    setMode("explore");
+    setFocus({ id: park.id, seq: ++focusSeq.current });
+    setSearch("");
+  };
 
   return (
     <div className="pda-root">
@@ -132,8 +150,18 @@ export default function ParksDirectoryAccordion() {
           --pda-hover-bg:var(--card); --pda-ink:#0a0a0a;
           /* Shared geometry: the desktop list column width and the wrap gutter.
              The search field and the split-view list column are sized and
-             aligned from these, so they stay flush with each other. */
-          --pda-list-col:300px; --pda-gutter:24px;
+             aligned from these, so they stay flush with each other.
+             The gutter is Nav's own expression, not a flat number: Nav pads by
+             clamp(16px, 4vw, 56px) (components/Nav.tsx), so anything else here
+             tracks it at one width and drifts at every other — 24px against
+             Nav's 51px at 1280 was exactly that. */
+          /* 280, down from 300 — a 336px index instead of 356. Measured against
+             the real names at 18px display: the column gives the title 235px
+             and the longest plausible park name ("Stockwell Skatepark") needs
+             198, so there is 37px of headroom. 264 was also tested and fits,
+             but with only 21px spare it starts reading as cramped rather than
+             deliberate, and the 16px of map it buys back is not worth that. */
+          --pda-list-col:280px; --pda-gutter:clamp(16px, 4vw, 56px);
           --pda-ease: cubic-bezier(0.16, 1, 0.3, 1);
           --pda-font-mono: 'DM Mono', ui-monospace, monospace;
           --pda-font-ui: 'Rubik', Arial, sans-serif;
@@ -154,21 +182,22 @@ export default function ParksDirectoryAccordion() {
            visible as they scrolled up under it. Padding puts the contents back
            where they were. */
         .pda-bar{
-          position:sticky; top:var(--nav-height, 44px); z-index:5;
+          /* Above the map's overlay chrome (z-index 21), which the results
+             dropdown now hangs down over, and below Nav's floating logo (30) so
+             the wordmark still sits on the bar rather than behind it. */
+          position:sticky; top:var(--nav-height, 44px); z-index:25;
           background:var(--pda-bg);
           margin:0 calc(var(--pda-gutter) * -1);
-          padding:calc(var(--logo-bottom, 78px) - var(--nav-height, 44px) + 14px) var(--pda-gutter) 16px;
+          padding:calc(var(--logo-bottom, 78px) - var(--nav-height, 44px) + 22px) var(--pda-gutter) 18px;
         }
         /* Desktop: a compact utility field sitting above the list, not a
            hero-scale input — the list is the page, search is a tool for it. */
-        .pda-wrap-wide .pda-bar{ padding-bottom:10px; }
-        /* Desktop only. Sized and shifted to sit exactly over the split-view
-           list column below it — the column is pulled out of the wrap's gutter,
-           so the field is too. Both edges line up with the list. */
+        .pda-wrap-wide .pda-bar{ padding-bottom:16px; }
+        /* Sits on the page gutter like the field below it, so label, field
+           and the split-view list column all start at the same left edge. */
         .pda-search-row{
           display:flex; align-items:center; gap:8px;
-          width:var(--pda-list-col); height:32px;
-          margin-left:calc(var(--pda-gutter) * -1);
+          width:100%; height:32px;
           border-radius:16px; border:1px solid var(--pda-line);
           background:var(--pda-panel); padding:0 12px;
         }
@@ -177,137 +206,99 @@ export default function ParksDirectoryAccordion() {
         .pda-search-row input::placeholder{ color:var(--pda-accent); opacity:.5; }
         .pda-search-row input:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:2px; }
 
-        .pda-mobile-bar-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-        .pda-search-compact{ display:flex; align-items:center; gap:8px; height:30px; flex:1 1 auto; min-width:0; border-radius:15px; background:var(--pda-panel); border:1px solid var(--pda-line); padding:0 12px; }
+        /* Page label + count, on its own line above the controls. Giving it
+           the line is what buys the toggle the width to show words rather than
+           bare glyphs, and drops search onto a full-width row of its own. */
+        .pda-bar-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+        /* The page's own title, built from the two tiers every row on the site
+           already uses: the display face for the name, the 11px mono metadata
+           tier for what qualifies it (.pcard-title / .pcard-id in
+           PARK_CARD_CSS). At 11px mono it matched the search field beside it —
+           but those are controls and this is the page, so they should not have
+           read as the same rank. */
+        .pda-count{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+        .pda-count-title{
+          font-family:var(--pda-font-display); text-transform:uppercase;
+          font-size:clamp(18px, 2.4vw, 26px); line-height:1.05; letter-spacing:.005em;
+          font-weight:700; font-variation-settings:'wght' 700;
+          color:var(--pda-fg); white-space:nowrap;
+        }
+        .pda-count-meta{
+          font-family:var(--pda-font-mono); font-size:11px; font-weight:500;
+          line-height:1.2; letter-spacing:.08em; text-transform:uppercase;
+          color:var(--pda-muted);
+          min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+        }
+        .pda-search-compact{ display:flex; align-items:center; gap:8px; height:30px; min-width:0; border-radius:15px; background:var(--pda-panel); border:1px solid var(--pda-line); padding:0 12px; }
         .pda-search-compact svg{ width:13px; height:13px; opacity:.6; flex-shrink:0; }
         .pda-search-compact input{ flex:1; min-width:0; height:30px; background:none; border:none; color:var(--pda-accent); font-family:var(--pda-font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
         .pda-search-compact input::placeholder{ color:var(--pda-accent); opacity:.5; }
         .pda-search-compact input:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:2px; }
 
+        /* Field and results share one positioning box, so the dropdown hangs
+           from the field's own edges at either breakpoint — full width on
+           mobile, the list column's 300px on desktop. The wrapper carries the
+           Inset by the page gutter like every other piece of chrome, so the
+           field and the list column below it share one left edge. */
+        .pda-search-field{ position:relative; }
+        .pda-search-field-wide{ width:var(--pda-list-col); }
+        .pda-suggest{
+          position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:2;
+          margin:0; padding:4px; list-style:none;
+          max-height:min(52vh, 320px); overflow-y:auto;
+          background:var(--pda-panel); border:1px solid var(--pda-line);
+          border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,.28);
+        }
+        .pda-suggest-row{
+          display:flex; align-items:baseline; gap:10px; width:100%;
+          background:none; border:none; border-radius:8px; cursor:pointer;
+          padding:9px 10px; text-align:left;
+          font-family:var(--pda-font-mono); font-size:11px; line-height:1.3;
+          text-transform:uppercase; letter-spacing:.03em;
+          transition:background-color .12s var(--pda-ease);
+        }
+        .pda-suggest-name{ color:var(--pda-fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .pda-suggest-area{ margin-left:auto; flex-shrink:0; color:var(--pda-muted); }
+        .pda-suggest-row:hover, .pda-suggest-row.pda-suggest-on{ background:var(--pda-hover-bg); }
+        .pda-suggest-row.pda-suggest-on .pda-suggest-name{ color:var(--pda-accent); }
+        .pda-suggest-row:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; }
+
         .pda-view-toggle{ display:flex; align-items:center; flex-shrink:0; height:30px; border:1px solid var(--pda-line); border-radius:15px; overflow:hidden; }
         .pda-view-toggle button{ height:100%; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--pda-fg); font-family:var(--pda-font-mono); font-size:11px; line-height:1; text-transform:uppercase; letter-spacing:.03em; padding:0 14px; cursor:pointer; transition:background .15s var(--pda-ease), color .15s var(--pda-ease); }
         .pda-view-toggle button.pda-active{ background:var(--pda-accent); color:#fff; }
-        /* Icon buttons — three of them have to fit the same pill a two-word
-           toggle used to, so they drop the text padding for a fixed square. */
-        .pda-view-toggle button.pda-icon{ padding:0; width:38px; }
-        .pda-view-toggle button.pda-icon svg{ width:14px; height:14px; }
+        /* Glyph + word. These were fixed 38px squares because three of them
+           had to share the pill a two-word toggle used to fill; the count line
+           above freed that width, so each mode can say what it is instead of
+           leaving the glyph to carry it. Padding is tighter than the base rule
+           because three still have to share a phone's bar row. */
+        .pda-view-toggle button.pda-icon{ padding:0 11px; gap:6px; }
+        .pda-view-toggle button.pda-icon svg{ width:14px; height:14px; flex-shrink:0; }
+        .pda-view-toggle{ flex-shrink:0; }
+        /* Stacked, the title block is ~70px wide instead of the ~120px a single
+           mono line took, so it no longer competes with the toggle for the row.
+           The buttons keep the tighter padding anyway: the title is the widest
+           thing here now and should not be the first thing to give. */
+        @media (max-width: 420px){
+          .pda-view-toggle button.pda-icon{ padding:0 9px; gap:5px; }
+        }
         .pda-view-toggle button:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; }
-        /* Desktop bar: the search field keeps its own negative left margin, so
-           it stays flush with the split-view list column below it. The row only
-           reaches out to the right gutter, putting the mode toggle on the same
-           edge as the map. */
+        /* Desktop bar. Both ends stop at the page gutter: the field lines up
+           with the list column beneath it, the toggle with the map's right
+           edge. Chrome stays contained even where imagery under it does not. */
         .pda-desktop-bar-row{
           display:flex; align-items:center; justify-content:space-between; gap:12px;
-          margin-right:calc(var(--pda-gutter) * -1);
         }
 
-        /* ── Archive accordion row ──────────────────────────────────────
-           The hover plate is static geometry: padding and negative margin are
-           always applied so nothing reflows, and only background-color moves.
-           The negative margin pulls the plate past .pda-wrap's 24px gutter so
-           it reads edge-to-edge on mobile. */
-        /* No per-row rule. A divider under every row stacked up into a ladder of
-           repeating horizontal lines down the whole list; whitespace, the hover
-           plate and the chevron carry the structure instead, and the coral edge
-           still marks the open row. Padding is up from 20px to compensate.
-           Kept in step with .eacc-item in components/editorial/EditorialAccordion. */
-        .pda-item{
-          position:relative;
-          padding:26px 16px; margin:0 -16px;
-          transition:background-color .18s ease;
-        }
-        /* Open rule — the same 2px coral edge the desktop list shows on its
-           selected row, so "active" reads identically on both. */
-        .pda-item::after{
-          content:""; position:absolute; left:0; right:0; bottom:0; height:2px;
-          background:var(--pda-accent); opacity:0;
-          transition:opacity .18s ease; pointer-events:none;
-        }
-        .pda-item.pda-open::after{ opacity:1; }
-        /* hover: only on real pointers — on touch it would stick after tap */
-        @media (hover: hover){
-          .pda-item:not(.pda-open):hover{ background-color:var(--pda-hover-bg); }
-          .pda-item:not(.pda-open):hover .pda-chevron{ border-color:var(--pda-accent); }
-        }
-
-        .pda-trigger{
-          all:unset; box-sizing:border-box;
-          display:grid; grid-template-columns:1fr 28px; gap:16px; align-items:center;
-          width:100%; cursor:pointer;
-          transition:transform .12s var(--pda-ease);
-        }
-        .pda-trigger:active{ transform:scale(.995); }
-        .pda-trigger:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:4px; }
-
-        /* Fixed 12px inset on every trigger line, so hovering only changes
-           colour — text never shifts. The trigger's type comes from the shared
-           .pcard-archive scale in PARK_CARD_CSS, which the desktop split-list
-           row renders from too. */
-        .pda-trigger-content{ padding-left:12px; min-width:0; }
-
-        .pda-chevron{
-          width:28px; height:28px; border-radius:50%;
-          border:0.5px solid var(--pda-line);
-          display:flex; align-items:center; justify-content:center;
-          color:var(--pda-muted);
-          transition:border-color .18s ease;
-        }
-        .pda-chevron svg{
-          width:12px; height:12px;
-          transition:transform .28s cubic-bezier(.2,.8,.2,1);
-        }
-        .pda-item.pda-open .pda-chevron svg{ transform:rotate(180deg); }
-
-        /* Drawer. The handover asks for max-height 0 → 1000px; grid rows
-           0fr → 1fr gets the same look on the spec's 420ms curve without the
-           magic number, so short rows don't finish animating early. */
-        .pda-drawer{
-          display:grid; grid-template-rows:0fr; opacity:0;
-          transition:grid-template-rows .42s cubic-bezier(.22,1,.36,1), opacity .25s ease;
-        }
-        .pda-item.pda-open .pda-drawer{ grid-template-rows:1fr; opacity:1; }
-        .pda-drawer-inner{ overflow:hidden; min-height:0; }
-        /* Indented to sit under the trigger text, not the row edge. */
-        .pda-drawer-body{
-          padding:18px 12px 4px;
-          transform:translateY(-6px);
-          transition:transform .42s cubic-bezier(.22,1,.36,1);
-        }
-        .pda-item.pda-open .pda-drawer-body{ transform:none; }
-
-        .pda-figure{
-          position:relative; aspect-ratio:16 / 10; overflow:hidden; cursor:pointer;
-          background:linear-gradient(135deg, var(--pda-panel), var(--pda-line));
-        }
-        .pda-figure img{
-          position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-          /* Colour, not greyscale — see the note in ParksGridView. The label
-             below carries its own dark chip, so it never depended on the
-             photograph being knocked back. */
-          transition:filter .2s var(--pda-ease);
-        }
-        .pda-figure:hover img{ filter:brightness(1.06); }
-        .pda-figure-label{
-          position:absolute; left:8px; bottom:8px; z-index:2;
-          font-family:var(--pda-font-mono); font-size:10px; letter-spacing:.1em;
-          text-transform:uppercase; color:#fff;
-          background:rgba(0,0,0,.55); padding:4px 8px;
-        }
-
-        /* The brief itself is styled by .pcard-brief in PARK_CARD_CSS, shared
-           with the desktop map card — the gap here owns the spacing instead. */
-        .pda-details{ display:flex; flex-direction:column; gap:14px; margin-top:14px; }
-        .pda-details .pcard-brief{ margin:0; }
-        /* Tags and CTA come from PARK_CARD_CSS (.pcard-tag / .pcard-cta) so the
-           drawer and the map cards share one badge and one button. The flex gap
-           owns vertical spacing here, so the CTA's own margin is dropped. */
-        .pda-details .pcard-tags{ margin-top:0; }
-        .pda-details .pcard-cta{ margin-top:0; }
-        @media (prefers-reduced-motion: reduce){
-          .pda-item, .pda-trigger, .pda-chevron svg, .pda-drawer,
-          .pda-drawer-body, .pcard-cta, .pda-figure img{ transition-duration:.01ms; }
-          .pda-trigger:active{ transform:none; }
-        }
+        /* The accordion row, its drawer and its figure lived here to render
+           mobile's List mode. List is gone — search jumps straight to a park
+           now — and Explore's list column is ParksMap's own .pms-index-row,
+           which carries its own styles. PARK_CARD_CSS below still has to stay:
+           ParksMap does not inject it, and its rows render ParkCard. */
+        /* The reduced-motion guard for the card CTA used to live here, which
+           meant it only applied on pages that mounted this component — the
+           standalone grid preview mounted the same button without it. The CTA
+           is CTAButton/.fbs-cta now and carries its own guard in globals.css,
+           so it is correct everywhere the button renders. */
 
         .pda-empty{ padding:80px 24px; text-align:center; color:var(--pda-muted); font-size:12px; text-transform:uppercase; letter-spacing:.12em; font-family:var(--pda-font-mono); }
         ::selection{ background:var(--pda-accent); color:var(--pda-ink); }
@@ -315,51 +306,57 @@ export default function ParksDirectoryAccordion() {
       `}</style>
 
       <div className={`pda-wrap${!isMobile || mode === "grid" ? " pda-wrap-wide" : ""}`}>
-        {/* Always mounted in the same place for list and map view alike —
-            search and the List/Map toggle must never move or change
-            behaviour when switching views. */}
+        {/* Always mounted in the same place in every mode — search and the
+            mode toggle must never move or change behaviour between them. */}
         <header className="pda-bar" ref={barRef}>
           {isMobile ? (
-            <div className="pda-mobile-bar-row">
-              <div className="pda-search-compact">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                <input
-                  type="text" placeholder="SEARCH" value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
+            <>
+              <div className="pda-bar-head">
+                <ParkCount ready={parks.length > 0} count={displayedParks.length} />
+                {/* Map | Grid — the same two modes desktop offers, with Map in
+                    Explore's slot. List used to sit here; jumping straight to a
+                    named park is what it was for, and search does that now. */}
+                <div className="pda-view-toggle">
+                  <ToggleButton label="Map" active={mode === "explore"}
+                    onClick={() => setMode("explore")} glyph="map" />
+                  <ToggleButton label="Grid" active={mode === "grid"}
+                    onClick={() => setMode("grid")} glyph="grid" />
+                </div>
               </div>
-              {/* List | Grid | Map. Grid is a mode, List and Map are the two
-                  halves of Explore that mobile has to choose between, so
-                  picking either of those also leaves Grid. */}
-              <div className="pda-view-toggle">
-                <ToggleButton label="List" active={mode === "explore" && view === "list"}
-                  onClick={() => { setMode("explore"); setView("list"); }} glyph="list" />
-                <ToggleButton label="Grid" active={mode === "grid"}
-                  onClick={() => setMode("grid")} glyph="grid" />
-                <ToggleButton label="Map" active={mode === "explore" && view === "map"}
-                  onClick={() => { setMode("explore"); setView("map"); }} glyph="map" />
-              </div>
-            </div>
+              {/* Full width on its own row, directly above the sheet it filters
+                  — sharing a row with a now-worded toggle left it too narrow to
+                  read as a field. */}
+              <SearchField
+                search={search} onSearch={setSearch}
+                matches={suggestions} onPick={jumpToPark}
+              />
+            </>
           ) : (
-            <div className="pda-desktop-bar-row">
-              <div className="pda-search-row">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                <input
-                  type="text" placeholder="SEARCH" value={search}
-                  onChange={e => setSearch(e.target.value)}
+            <>
+              <div className="pda-bar-head">
+                <ParkCount ready={parks.length > 0} count={displayedParks.length} />
+              </div>
+              <div className="pda-desktop-bar-row">
+                <SearchField
+                  wide search={search} onSearch={setSearch}
+                  matches={suggestions} onPick={jumpToPark}
                 />
+                {/* The one element common to both states, so the way back from
+                    Grid is the control that got you there. Not on the map's own
+                    control cluster: Grid replaces the map, so a control anchored
+                    there would have nowhere to live on the return trip. */}
+                {/* MAP | GRID, the same two words mobile uses. Desktop called
+                    this mode "Explore" while mobile called it "Map" — one mode
+                    with two names, and "Grid" is a shape while "Explore" was a
+                    verb, so the pair never read as two views of one thing. */}
+                <div className="pda-view-toggle">
+                  <ToggleButton label="Map" active={mode === "explore"}
+                    onClick={() => setMode("explore")} glyph="explore" />
+                  <ToggleButton label="Grid" active={mode === "grid"}
+                    onClick={() => setMode("grid")} glyph="grid" />
+                </div>
               </div>
-              {/* The one element common to both states, so the way back from
-                  Grid is the control that got you there. Not on the map's own
-                  control cluster: Grid replaces the map, so a control anchored
-                  there would have nowhere to live on the return trip. */}
-              <div className="pda-view-toggle">
-                <ToggleButton label="Explore" active={mode === "explore"}
-                  onClick={() => setMode("explore")} glyph="explore" />
-                <ToggleButton label="Grid" active={mode === "grid"}
-                  onClick={() => setMode("grid")} glyph="grid" />
-              </div>
-            </div>
+            </>
           )}
         </header>
 
@@ -389,31 +386,29 @@ export default function ParksDirectoryAccordion() {
                 tell it it was hidden. */}
             {(mode === "explore" || exploreSeen.current) && (
               <div hidden={mode !== "explore"}>
-                {showMap ? (
-                  <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
-                    <div style={isMobile
-                      ? { height: "calc(100dvh - var(--nav-height, 44px) - var(--pda-bar-height, 132px))", margin: "0 calc(var(--pda-gutter) * -1)" }
-                      : { height: "calc(100dvh - 170px)", margin: "0 calc(var(--pda-gutter) * -1)" }}>
-                      <ParksMap search={search} />
-                    </div>
-                  </Suspense>
-                ) : (
-                  <div>
-                    {displayedParks.map((park, idx) => (
-                      <Row
-                        key={park.id}
-                        park={park}
-                        idx={idx}
-                        isOpen={openId === park.id}
-                        onToggle={() => setOpenId(cur => (cur === park.id ? null : park.id))}
-                        onNavigate={() => goToPark(park.slug)}
-                      />
-                    ))}
-                    {displayedParks.length === 0 && (
-                      <div className="pda-empty">No parks match your filters</div>
-                    )}
+                <Suspense fallback={<div className="pda-empty">Loading map…</div>}>
+                  {/* position + z-index pen Leaflet's own panes (z-index 400 and
+                      up) inside this box, so the sticky bar and its results
+                      dropdown paint over the map rather than under it. */}
+                  <div style={{
+                    position: "relative", zIndex: 0,
+                    // Both breakpoints measure the chrome above rather than
+                    // guessing it. Desktop used a flat 170px, but nav plus the
+                    // bar is 215px at 1280 — so the box hung 45px below the
+                    // fold and took the card anchored to its bottom edge with
+                    // it, costing a scroll to see the CTA.
+                    height: "calc(100dvh - var(--nav-height, 44px) - var(--pda-bar-height, 132px))",
+                    // Full bleed at both breakpoints. Contained chrome is not
+                    // achieved by insetting this box: the list column carries the
+                    // gutter as its own padding instead, so the map keeps the
+                    // screen edge. The satellite/locate and zoom controls inset
+                    // themselves from that edge by one gutter, which is what puts
+                    // them under the toggle above.
+                    margin: "0 calc(var(--pda-gutter) * -1)",
+                  }}>
+                    <ParksMap search={search} focus={focus} />
                   </div>
-                )}
+                </Suspense>
               </div>
             )}
           </>
@@ -423,14 +418,100 @@ export default function ParksDirectoryAccordion() {
   );
 }
 
-// Icon-only mode buttons. Labelled for assistive tech and on hover, since the
-// glyphs are the only thing on screen — list rules, a 3x3 grid mark, a map pin,
-// and a split panel for Explore's list-beside-map.
+// Search, plus the results that took over List's job of jumping straight to a
+// named park. One component for both breakpoints: they differ only in the
+// classes that size them, and the jump has to behave identically on each.
+//
+// A combobox rather than a bare field — the listbox is keyboard-reachable with
+// the arrows, Enter takes the highlighted row and Escape closes without
+// clearing what was typed. Rows suppress mousedown so the click lands before
+// the input's blur can close the list out from under it.
+function SearchField({
+  wide = false, search, onSearch, matches, onPick,
+}: {
+  wide?: boolean;
+  search: string;
+  onSearch: (value: string) => void;
+  matches: ParkRow[];
+  onPick: (park: ParkRow) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const show = open && search.trim().length > 0 && matches.length > 0;
+
+  const pick = (park: ParkRow) => { setOpen(false); setActive(-1); onPick(park); };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") { setOpen(false); setActive(-1); return; }
+    if (!show) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive(i => (i + 1) % matches.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActive(i => (i <= 0 ? matches.length : i) - 1); }
+    else if (e.key === "Enter" && active >= 0) { e.preventDefault(); pick(matches[active]); }
+  };
+
+  return (
+    <div className={`pda-search-field${wide ? " pda-search-field-wide" : ""}`}>
+      <div className={wide ? "pda-search-row" : "pda-search-compact"}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        <input
+          type="text" placeholder="SEARCH" value={search}
+          onChange={e => { onSearch(e.target.value); setOpen(true); setActive(-1); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onKeyDown={onKeyDown}
+          role="combobox" aria-expanded={show} aria-autocomplete="list"
+          aria-controls="pda-suggest" aria-label="Search parks"
+          aria-activedescendant={show && active >= 0 ? `pda-suggest-${active}` : undefined}
+        />
+      </div>
+      {show && (
+        <ul className="pda-suggest" id="pda-suggest" role="listbox" aria-label="Matching parks">
+          {matches.map((park, i) => (
+            <li key={park.id} id={`pda-suggest-${i}`} role="option" aria-selected={i === active}>
+              <button
+                type="button"
+                className={`pda-suggest-row${i === active ? " pda-suggest-on" : ""}`}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => pick(park)}
+              >
+                <span className="pda-suggest-name">{park.name}</span>
+                <span className="pda-suggest-area">{park.location ?? park.postcode ?? ""}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// "Parks · 24 places". Counts displayedParks, which uses the same predicate as
+// filterParks in parksIndex — so the number always agrees with the List and Grid
+// sheets below it. (ParksMap matches on name and location only, and layers its
+// own region filter on top, so a searched map can show fewer pins than this.)
+// The title shows straight away; only the count waits on the fetch. That keeps
+// the row from flashing "0 places" and from changing height when the data lands
+// — the non-breaking space holds the metadata line until there is a number.
+function ParkCount({ ready, count }: { ready: boolean; count: number }) {
+  return (
+    <span className="pda-count">
+      <span className="pda-count-title">Parks</span>
+      <span className="pda-count-meta">
+        {ready ? `${count} ${count === 1 ? "place" : "places"}` : " "}
+      </span>
+    </span>
+  );
+}
+
+// Mode buttons: a glyph — a 3x3 grid mark, a folded map, and a split panel for
+// Explore's list-beside-map — beside the word it stands for.
+// aria-label and title stay: the visible word is the same string, so nothing
+// changes for assistive tech, and the pressed state still needs announcing.
 function ToggleButton({
   label, active, onClick, glyph,
 }: {
   label: string; active: boolean; onClick: () => void;
-  glyph: "list" | "grid" | "map" | "explore";
+  glyph: "grid" | "map" | "explore";
 }) {
   return (
     <button
@@ -443,78 +524,13 @@ function ToggleButton({
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {glyph === "list" && (<><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></>)}
         {glyph === "grid" && (<g fill="currentColor" stroke="none">
           {[3, 10, 17].map(y => [3, 10, 17].map(x => <rect key={`${x}-${y}`} x={x} y={y} width="4" height="4" />))}
         </g>)}
-        {glyph === "map" && (<><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></>)}
+        {glyph === "map" && (<><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /><path d="M15 5.764v15" /><path d="M9 3.236v15" /></>)}
         {glyph === "explore" && (<><rect x="3" y="4" width="18" height="16" rx="1.5" /><line x1="10" y1="4" x2="10" y2="20" /><line x1="5.5" y1="9" x2="7.5" y2="9" /><line x1="5.5" y1="13" x2="7.5" y2="13" /></>)}
       </svg>
+      {label}
     </button>
-  );
-}
-
-function Row({
-  park, idx, isOpen, onToggle, onNavigate,
-}: {
-  park: ParkRow; idx: number; isOpen: boolean; onToggle: () => void; onNavigate: () => void;
-}) {
-  const chain = getParkAddressChain(park);
-  const fullAddress = [...(park.address ?? []), park.postcode].filter(Boolean).join(", ");
-  const tags = getParkTags(park);
-  const image = park.directory_image_url || park.hero_image;
-  const panelId = `pda-panel-${park.id}`;
-  const triggerId = `pda-trigger-${park.id}`;
-
-  return (
-    <div className={`pda-item${isOpen ? " pda-open" : ""}`}>
-      <button
-        type="button" className="pda-trigger" id={triggerId}
-        aria-expanded={isOpen} aria-controls={panelId}
-        onClick={onToggle}
-      >
-        <span className="pda-trigger-content">
-          <ParkCard park={park} idx={idx} variant="archive" showTags={false} showLocation />
-        </span>
-        <span className="pda-chevron" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </span>
-      </button>
-
-      {/* inert while closed so the drawer's link and image stay out of the
-          tab order and off screen readers until the row is actually open */}
-      <div className="pda-drawer" id={panelId} role="region" aria-labelledby={triggerId} inert={!isOpen}>
-        <div className="pda-drawer-inner">
-          <div className="pda-drawer-body">
-            <div className="pda-figure" onClick={onNavigate}>
-              {image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={image} alt="" loading="lazy" />
-              )}
-              {chain && <span className="pda-figure-label">{chain}</span>}
-            </div>
-
-            <div className="pda-details">
-              {park.brief && <p className="pcard-brief">{park.brief}</p>}
-
-              {/* Full address, not the trigger's abbreviated chain — the row
-                  above already carries street/area/postcode-prefix, and
-                  repeating it told the reader nothing new. This is the whole
-                  thing including the full postcode, so the drawer answers
-                  "where exactly is this?" without opening the park page. */}
-              {fullAddress && <p className="pcard-address">{fullAddress}</p>}
-              {tags.length > 0 && (
-                <div className="pcard-tags">
-                  {tags.map(t => <span key={t} className="pcard-tag">{t}</span>)}
-                </div>
-              )}
-              <ParkCardCTA slug={park.slug} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }

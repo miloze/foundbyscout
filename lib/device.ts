@@ -22,11 +22,6 @@ export function isPhone(): boolean {
   return isIPhone || isAndroidPhone;
 }
 
-/**
- * Supports ?model=low / ?model=high query params for testing on desktop.
- */
-export function getModelTierOverride(): 'low' | 'high' | null {
-  if (typeof window === 'undefined') return null;
-  const param = new URLSearchParams(window.location.search).get('model');
-  return param === 'low' || param === 'high' ? param : null;
-}
+// getModelTierOverride() lived here — a ?model=low / ?model=high switch for
+// testing the two tiers on desktop. Both the tiers and the switch are gone;
+// there is one production model per park now. See lib/assets.ts.

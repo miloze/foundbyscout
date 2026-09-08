@@ -55,23 +55,6 @@
   --muted:         #888888;
   --border:        #333333;
   --card:          #2a2a2a;
-
-  /* Raw palette references */
-  --color-dark-bg:     #202020;
-  --color-dark-fg:     #f0f0eb;
-  --color-dark-card:   #2a2a2a;
-  --color-dark-border: #333333;
-  --color-dark-muted:  #888888;
-
-  --color-light-bg:     #F3EFEC;
-  --color-light-fg:     #1a1a1a;
-  --color-light-card:   #ebe8e3;
-  --color-light-border: #dddad4;
-  /* #777777 on the light background is 4.0:1, under AA's 4.5:1. #6D6D6D clears it at 4.6:1. */
-  --color-light-muted:  #6D6D6D;
-
-  --color-accent:       #FF7948;
-  --color-accent-hover: #E65F32;
 }
 
 [data-theme="light"] {
@@ -270,82 +253,6 @@ a {
 }
 
 /* ── Component Primitives ────────────────────────────── */
-
-/* Button — Primary */
-.fbs-btn {
-  display: inline-block;
-  padding: 11px 28px;
-  font-family: var(--font-body);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.fbs-btn:hover { background: var(--accent-hover); }
-
-/* Button — Ghost */
-.fbs-btn-ghost {
-  display: inline-block;
-  padding: 8px 18px;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: none;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
-}
-.fbs-btn-ghost:hover { color: var(--foreground); border-color: var(--foreground); }
-
-/* Tag / Badge */
-.fbs-tag {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.5625rem; /* 9px */
-  padding: 3px 8px;
-  border: 1px solid rgba(255,255,255,0.25);
-  color: rgba(255,255,255,0.6);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-/* Accent pill badge */
-.fbs-badge-accent {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.5625rem;
-  padding: 3px 8px;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-/* Postcode circle */
-.fbs-postcode {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  font-weight: 300;
-  color: #fff;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
 /* Card */
 .fbs-card {

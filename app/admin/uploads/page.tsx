@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// No Supabase client here on purpose. Uploads and layout saves go through
+// /api/admin/uploads, which holds the service role server-side. Writing from
+// the browser would mean the bucket had to grant write to the anon key, and
+// that key is public — see supabase/migrations/008.
 
 type UploadedFile = { name: string; url: string; path: string };
 type LayoutImage = { url: string; path: string; name: string; ratio: "16x9" | "9x16" | "1x1"; id: string };
@@ -48,21 +47,18 @@ export default function AdminUploadsPage() {
     setError("");
     const results: UploadedFile[] = [];
 
-    for (const file of files) {
-      const path = `${parkSlug}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("park-images")
-        .upload(path, file, { upsert: true });
+    const form = new FormData();
+    form.append("parkSlug", parkSlug.trim());
+    for (const file of files) form.append("files", file);
 
-      if (uploadError) {
-        setError(`Failed to upload ${file.name}: ${uploadError.message}`);
-        setUploading(false);
-        return;
-      }
-
-      const { data } = supabase.storage.from("park-images").getPublicUrl(path);
-      results.push({ name: file.name, url: data.publicUrl, path });
+    const res = await fetch("/api/admin/uploads", { method: "POST", body: form });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(payload.error ?? "Upload failed");
+      setUploading(false);
+      return;
     }
+    results.push(...(payload.uploaded as UploadedFile[]));
 
     setLayout(prev => [
       ...prev,
@@ -112,19 +108,21 @@ export default function AdminUploadsPage() {
     setSaving(true);
     setSaved(false);
 
-    await supabase.from("park_images").delete().eq("park_slug", parkSlug);
+    const res = await fetch("/api/admin/uploads", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        parkSlug: parkSlug.trim(),
+        images: layout.map(img => ({ path: img.path, ratio: img.ratio })),
+      }),
+    });
 
-    const rows = layout.map((img, idx) => ({
-      park_slug: parkSlug,
-      path: img.path,
-      url: img.url,
-      ratio: img.ratio,
-      order_index: idx,
-    }));
-
-    const { error: saveError } = await supabase.from("park_images").insert(rows);
     setSaving(false);
-    if (saveError) { setError(`Save failed: ${saveError.message}`); return; }
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      setError(`Save failed: ${payload.error ?? res.statusText}`);
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   }

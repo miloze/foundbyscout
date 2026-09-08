@@ -9,11 +9,12 @@ export default function ParkModelClient({
   modelFile, preloadImage, onLoad, cameraPos, cameraTarget, modelRotation,
   pingPong, autoRotate, debug, onZoomChange, loadingBackground, spinning, allowRotate, allowZoom, onInteract,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
-  grayscale,
+  grayscale, onFailed,
 }: {
   modelFile: string;
   preloadImage?: string;
   onLoad?: () => void;
+  onFailed?: () => void;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
@@ -36,7 +37,10 @@ export default function ParkModelClient({
   // showing — the still frame the viewer fades out of. The page loses the
   // interaction and nothing else.
   const fallback = (
-    <div style={{ position: "absolute", inset: 0, background: "var(--card)" }}>
+    // --background, not --card: the fallback is what a reader actually sees
+    // when a scan fails, and --card is a step lighter than the page ground, so a
+    // failed viewer used to read as a deliberately paler panel.
+    <div style={{ position: "absolute", inset: 0, background: "var(--background)" }}>
       {preloadImage && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -51,8 +55,9 @@ export default function ParkModelClient({
     </div>
   );
 
+
   return (
-    <ViewerErrorBoundary fallback={fallback} resetKey={modelFile}>
+    <ViewerErrorBoundary fallback={fallback} resetKey={modelFile} onFailed={onFailed}>
       <ParkModel
         modelFile={modelFile} preloadImage={preloadImage} onLoad={onLoad}
         cameraPos={cameraPos} cameraTarget={cameraTarget} modelRotation={modelRotation}

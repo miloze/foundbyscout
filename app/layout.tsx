@@ -66,7 +66,12 @@ export default function RootLayout({
                   © 2026 Scout
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-                  {[["Parks", "/parks"], ["About", "/about"], ["Contact", "/contact"]].map(([label, href]) => (
+                  {/* /about and /contact are gone: neither page ever existed,
+                      so both links 404'd. Scout has one section, and the footer
+                      now says the same thing the header does rather than
+                      listing the pages a site is conventionally expected to
+                      have. Not replaced with anything. */}
+                  {[["Parks", "/parks"]].map(([label, href]) => (
                     <a key={href} href={href} style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
                       {label}
                     </a>

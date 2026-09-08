@@ -43,3 +43,6 @@ next-env.d.ts
 # 3D model files — too large for GitHub, stored separately
 *.glb
 *.gltf
+
+# supabase cli scratch
+supabase/.temp/

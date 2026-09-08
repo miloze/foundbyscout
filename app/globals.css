@@ -24,6 +24,28 @@ html, body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
 }
 
+/* color-scheme is here on its own merits, not as overscroll machinery. It tells
+   the browser which way round the document is, which is what makes native UI
+   agree with the page: form controls (the admin is full of them), scrollbars,
+   and the ground the browser paints behind its own chrome. Scout is dark by
+   default with light as the opt-in, so the pair below mirrors the --background
+   tokens exactly. */
+:root { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+/* Note on iOS Safari's top rubber-band, so nobody re-opens this by accident.
+   Pulling past the top of the homepage in dark mode shows a dark band rather
+   than continuing the hero's sky. It cannot be fixed from the page: that region
+   paints the CSS canvas, the canvas has ONE background for the whole document —
+   no separate top and bottom — and Safari takes it from the root's
+   background-color, ignoring background-image. A gradient cannot reach it, and
+   a flat colour would tint the bottom of every dark page near-white.
+   Tried and rejected: a 200vh gradient on <html> with the sky half above the
+   origin (never rendered on device), and a scroll-position toggle on the root
+   (worked in principle, not worth a listener and a root attribute for a colour
+   visible only mid-gesture). This is browser behaviour we have chosen not to
+   engineer around. Do not add root/document/theme hacks for it. */
+
 
 body {
   font-family: var(--font-body), 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -158,18 +180,120 @@ body {
   outline-offset: 2px;
 }
 
+/* ── Primary navigation link ─────────────────────────────────────────────
+   Lifted out of Nav.tsx's inline style objects, which is why this had no
+   hover and no focus state: an inline style cannot express a pseudo-class, so
+   the missing interaction was structural rather than an oversight.
+
+   There is one destination. PARKS is the archive and the archive is the site,
+   so it takes --foreground rather than the --muted it used to share with a
+   second item — same size, same weight, same tracking, same box as before.
+   Nothing here is larger or louder than what it replaces; it is one tier
+   further forward, and it is now the only thing in the bar that goes anywhere.
+
+   Active is a 1px accent rule under the label, never accent text. Two reasons:
+   it is the device .pms-index-row already uses to mark the selected row, and
+   accent *text* fails contrast badly on the light theme — #FF7948 on #F3EFEC
+   is 2.27:1, so the old treatment made the page you were on the hardest label
+   in the bar to read. As a rule rather than a glyph the accent carries no
+   legibility burden at all. */
+.fbs-nav-link {
+  /* 44px of height on a 13px label. The bar is already 68px tall because the
+     theme toggle is 44 — so this buys a compliant hit area and changes the
+     header's measured height by nothing, which matters because --nav-height
+     feeds the page shell, the hero's negative margin and the /parks sticky
+     bar. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--foreground);
+  /* The CTA's own timing and curve — the site has one rollover speed. */
+  transition: color 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* The rule hangs off the label, not off the padded 44px box, so it measures
+   the word rather than the hit area. */
+.fbs-nav-link__label { position: relative; display: inline-block; }
+.fbs-nav-link__label::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -6px;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Over a full-bleed photograph — the homepage hero, declared by
+   HeroNavOverlay tone="photo".
+
+   The bar goes transparent and the scrim fades there, so PARKS sits directly on
+   the image. --foreground is near-white in dark mode and Scout's hero
+   photography is concrete: pale, whatever the theme, which left the label
+   near-white on near-white. Pinning the ink dark is the fix rather than a
+   shadow, an outline or a plate, because the surface under it is a photograph
+   and not the page — the theme has no opinion about it worth following.
+
+   #14120f is the ink the site already uses over light ground (.fbs-cta hover,
+   the hero chrome's hover state), not a new value. The accent underline is
+   untouched: the active state still reads exactly as it does elsewhere. */
+.fbs-nav-link--on-photo { color: #14120f; }
+
+/* Current section — driven off aria-current, so the styling and the thing
+   screen readers announce cannot drift apart. */
+.fbs-nav-link[aria-current="page"] .fbs-nav-link__label::after { opacity: 1; }
+
+/* hover-capable pointers only, or a tap leaves the state stuck on. The label
+   is already --foreground, so hover is carried by the rule alone. */
+@media (hover: hover) {
+  .fbs-nav-link:hover .fbs-nav-link__label::after { opacity: 0.4; }
+  .fbs-nav-link[aria-current="page"]:hover .fbs-nav-link__label::after { opacity: 1; }
+}
+/* The ring the rest of the site uses — see .fbs-cta and the /parks controls.
+   The nav was the only interactive region with no focus style of its own. */
+.fbs-nav-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fbs-nav-link,
+  .fbs-nav-link__label::after { transition: none; }
+}
+
+/* Utility cluster. The theme toggle used to sit in an <li> inside the
+   navigation list, evenly spaced from the links by the same gap — so a control
+   read as a destination, and as the only filled object in the header it read
+   as the loudest one. It keeps its exact appearance and its 44x44 target; a
+   short hairline and a wider gap are all that separate it. The hairline is
+   14px, not the cluster's full height: it should divide the two, not draw a
+   column in the header. */
+.fbs-nav-utility { display: flex; align-items: center; gap: 16px; margin-left: 16px; }
+.fbs-nav-rule { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+
 /* ── View transitions ────────────────────────────────────────────────────
-   Timing for the hero → park page content continuity (see
-   lib/view-transitions.ts). The same fast ease-out the CTA rollover and the
-   hero entrance use — precise settle, no bounce, no overshoot — applied to
-   every group so the named elements travelling between layouts and the root
-   crossfade underneath them move as one gesture rather than at two speeds.
+   The site's one navigation transition: a restrained crossfade, 260ms on the
+   same fast ease-out the CTA rollover and the hero entrance use — precise
+   settle, no bounce, no overshoot.
 
-   260ms rather than the CTA's 170ms: these elements cross most of the
-   viewport, and a distance that long at hover speed reads as a jump.
+   This used to time a shared-element morph as well: the park name, catalogue
+   mark and address travelled from the home hero into the park page. That is
+   gone (see lib/view-transitions.ts). It read as glitchy — the title flew into
+   position while the destination hero was still resolving behind it — and the
+   two routes naming the same elements is what produced React's "two
+   <ViewTransition name=...> mounted at the same time" on every Home to
+   featured-park navigation.
 
-   The universal selector covers names generated per park slug, which can't
-   be enumerated in a stylesheet. */
+   260ms rather than the CTA's 170ms: a whole-frame crossfade at hover speed
+   reads as a flicker rather than a change of page.
+
+   The universal selector covers the root snapshot plus the park-to-park title,
+   whose name is generated per slug and so can't be enumerated here. */
 ::view-transition-group(*) {
   animation-duration: 260ms;
   animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
@@ -184,12 +308,11 @@ body {
    already waiting just off the sides: the outgoing name leaves in the
    direction of travel and the incoming one arrives from the opposite side,
    so the catalogue feels like a strip being scrolled rather than a page
-   being replaced.
+   being replaced. This is a different navigation from Home to park and it
+   survives: stepping through the archive with the header arrows is the one
+   place movement carries meaning.
 
-   Everything else — the catalogue badge, address, coordinates, scan date —
-   is left on the default crossfade above. Their names are slug-scoped too,
-   so they already exit and enter in place, which is exactly the wanted
-   "chips stay put and change" and needs no rule of its own.
+   Everything else on the page is left on the plain crossfade above.
 
    Selected by view-transition-class rather than by name: React assigns the
    name per slug (park-name-bloblands and so on), so there is no fixed name
@@ -284,38 +407,20 @@ body {
 }
 
 /* ── Metadata tags ───────────────────────────────────────────────────────
-   BOWL / STREET / MIXED and friends are information, not controls. They read
-   in the same register as SCANNED: 03/2026 and the address chain — DM Mono,
-   muted, thin outline, no fill — so they stop competing with the things that
-   actually do something. Saturated --accent is reserved for genuinely
-   interactive elements (VIEW SCAN, EXPLORE) and the catalogue number.
+   .fbs-meta-tag and .fbs-meta-tag--on-image lived here: a 999px outline pill
+   for BOWL / STREET / MIXED and friends. They are gone, not moved.
 
-   Uniform height whatever the label: fixed line-height, inline-flex centring
-   and no wrapping, so BOWL and CAR PARK are the same pill. */
-.fbs-meta-tag {
-  display: inline-flex;
-  align-items: center;
-  font-family: var(--font-mono), monospace;
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
+   Park metadata is field notation now — DM Mono, uppercase, wide tracking,
+   slash-separated, nothing drawn around it (see PARK_CARD_CSS in
+   components/ParkCard.tsx). The register the pills were reaching for is right;
+   the box was not. 999px was the only fully-round radius in the app outside
+   the postcode circle, against a design system that states plainly that no UI
+   element takes a border-radius — and on /parks, fully-round is what the
+   search field, the view toggle and the density toggle use, so boxed metadata
+   was wearing the one shape that page uses to mean "you can press this".
 
-/* Over photography the page's own greys have nothing to sit against, so this
-   variant swaps to light-on-dark with a faint backing. Still unfilled, still
-   no accent — just legible against an arbitrary frame. */
-.fbs-meta-tag--on-image {
-  background: rgba(20, 19, 15, 0.42);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: rgba(255, 255, 255, 0.82);
-}
+   Deleted rather than left unused: an unreferenced pill definition in globals
+   is how the pill comes back. */
 
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
@@ -323,7 +428,11 @@ body {
   line-height: 1;
 }
 
-h1, h2, h3, h4, h5, h6 {
+/* h1–h3 have their own complete rules (family/size/line-height/letter-spacing/
+   weight/case) in colors_and_type.css — this rule now only covers h4–h6,
+   which have no other source, so each heading level is styled from exactly
+   one place. */
+h4, h5, h6 {
   font-family: var(--font-heading), sans-serif;
   font-weight: 300;
   text-transform: uppercase;
@@ -404,3 +513,16 @@ a[href^="mailto:"] {
 .fbs-drift  { animation: fbs-drift  var(--fbs-dur, 9s) ease-in-out infinite; }
 .fbs-sway   { animation: fbs-sway   var(--fbs-dur, 5s) ease-in-out infinite; }
 .fbs-blink  { animation: fbs-blink  var(--fbs-dur, 4s) ease-in-out infinite; }
+/* ── Scout mark handoff ───────────────────────────────────────────────
+   The mark is fixed, so on a long page it otherwise sits over the catalogue
+   for the rest of the scroll. HomeLogoHandoff releases it when the PARKS
+   heading reaches the mark's own lower edge, and restores it on the way back
+   up — the homepage opens the way it always did.
+
+   Opacity only, and quick. No scaling into a small sticky logo, no second
+   header state: PARKS and the theme control are untouched and stay put. */
+.logo-overhang { transition: opacity 140ms ease; }
+[data-logo-released] .logo-overhang { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .logo-overhang { transition-duration: .01ms; }
+}

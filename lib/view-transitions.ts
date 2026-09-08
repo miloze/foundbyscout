@@ -1,36 +1,28 @@
 /**
- * Shared view-transition identities for the hero → park page navigation.
+ * View-transition identities for the park page.
  *
- * The home hero and the park page hero render the same three facts — park
- * name, catalogue number, address — in different layouts, with different
- * markup, at different sizes. Giving each pair one matching
- * `view-transition-name` is what makes the browser treat them as one element
- * continuing into a new position rather than two elements being unmounted and
- * mounted. See app/globals.css for the timing applied to every group.
+ * There used to be three, shared with the homepage hero — park name, catalogue
+ * mark and address — so the trio morphed from the home hero into the park page.
+ * That is gone. It read as glitchy (the title flew into position while the
+ * destination hero was still resolving behind it, so the one composed thing on
+ * screen was the piece that moved), and because the two routes named the same
+ * elements identically while an App Router transition mounts both route trees
+ * at once, React reported "two <ViewTransition name=...> components with the
+ * same name mounted at the same time" on every Home to featured-park click.
  *
- * Names are defined here rather than inline in either component precisely
- * because they have to match: a typo in one of the two files would silently
- * degrade to a crossfade with no error anywhere. Both consumers call this.
+ * Home to park is a plain root crossfade now; the timing lives in
+ * app/globals.css.
  *
- * Scoped by slug so two heroes for different parks can never claim the same
- * name — `view-transition-name` must be unique across the document at the
- * moment a transition starts. That matters the day the parks directory
- * animates a card into this same hero.
- *
- * Deliberately NOT included: the hero image. The homepage's beauty photo and
- * the park page's orthographic scan frame are genuinely different pictures,
- * and the flash-cut spec exists to mask exactly that swap. Naming it would
- * morph one into the other, which is the opposite of a cut.
+ * What survives is park to park, which is a different navigation with a
+ * different job: stepping through the catalogue with the header's prev/next
+ * arrows slides the title in the direction of travel, so the archive reads as
+ * a strip being scrolled rather than a page being replaced. That needs a name
+ * on the title — a view-transition-class only applies to an element that has
+ * one — and it cannot collide, because the two parks either side of a step
+ * always have different slugs.
  */
-export function heroTransitionNames(slug: string) {
-  return {
-    /** MSCHN park name — the anchor of the whole transition. */
-    name: `park-name-${slug}`,
-    /** Catalogue number, e.g. 004. Inverted chip on home, accent tag on park. */
-    catalogue: `park-cat-${slug}`,
-    /** Address/location line. Condensed on home, fuller on the park page. */
-    address: `park-address-${slug}`,
-  } as const;
+export function parkTitleTransitionName(slug: string): string {
+  return `park-name-${slug}`;
 }
 
 /**

@@ -5,7 +5,6 @@ type Props = {
   heroImage?: string | null;
   parkName: string;
   modelFile: string;
-  modelFileMobile?: string;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];

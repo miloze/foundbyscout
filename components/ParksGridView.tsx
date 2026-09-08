@@ -16,6 +16,21 @@ import type { ParkAudit, SlotAudit } from "@/lib/parkImages";
 // grid, not masonry — every park gets the same cell, so the sheet reads as an
 // index rather than a feed, and density changes scale only.
 //
+// A tile is a FRAME and a CAPTION, in that order, and they do not overlap.
+// Identification lives beneath the photograph the way a plate number lives in
+// the margin of a contact sheet — permanently, at every width, on every
+// pointer type. It used to be an overlay revealed on hover, which failed in
+// both directions at once: on a desktop sheet at rest the grid contained
+// literally zero characters of text, so nothing was identifiable without
+// hovering it one tile at a time; on touch the same block was permanent and
+// therefore sat on the photograph, taking 45-56% of the frame at the denser
+// sizes. Both were the same decision — label and image competing for the same
+// pixels — so both are answered by moving the label off the image.
+//
+// Consequently the photograph is never drawn on. No scrim, no gradient, no
+// title over the image, and no card around the pair: no border, no radius, no
+// shadow, no plate, no CTA. The frame plus its caption is the whole link.
+//
 // Built to mount either standalone (app/parks/grid-preview) or nested inside
 // .pda-root on /parks. The --pda-* block below and PARK_CARD_CSS are therefore
 // redeclared here at the same values the accordion sets; nested, they resolve
@@ -30,17 +45,18 @@ const INITIAL = 60;
 // Column counts are per density and per breakpoint. They are set in one place
 // because `sizes` below has to describe the same layout to the image optimiser
 // — if these drift apart the browser downloads the wrong tier.
+// Unchanged by the caption: captions cost vertical space, not horizontal, so
+// there is no reason to fit more columns now that they exist. Photography
+// stays the dominant material at both densities.
 const COLS: Record<GridDensity, [number, number, number]> = {
   large:  [1, 2, 3],
   medium: [2, 3, 4],
-  small:  [3, 5, 7],
 };
 
 // Matches COLS: <640 mobile, <1100 tablet, else desktop.
 const SIZES: Record<GridDensity, string> = {
   large:  "(max-width: 639px) 100vw, (max-width: 1099px) 50vw, 33vw",
   medium: "(max-width: 639px) 50vw,  (max-width: 1099px) 33vw, 25vw",
-  small:  "(max-width: 639px) 33vw,  (max-width: 1099px) 20vw, 15vw",
 };
 
 export default function ParksGridView({
@@ -131,6 +147,13 @@ export default function ParksGridView({
           --pda-font-mono: 'DM Mono', ui-monospace, monospace;
           --pda-font-ui: 'Rubik', Arial, sans-serif;
           --pda-font-display: var(--font-display), Arial, sans-serif;
+          /* The page gutter, at the accordion's value. Redeclared for the same
+             reason as the colours above: nested on /parks it resolves to the
+             identical value .pda-root sets, and standalone in the preview
+             harness there is no .pda-root to inherit from. The control row
+             below is the only thing that reads it — the photographic sheet
+             itself stays full-bleed. */
+          --pda-gutter: clamp(16px, 4vw, 56px);
           /* One ratio for every density. The handover asks for equal
              photographic hierarchy with only scale changing, so the crop must
              not move between densities — a per-density ratio would recompose
@@ -143,30 +166,68 @@ export default function ParksGridView({
              composed for any surface reads the same on all of them. Only the
              feature card differs, at 16:9.
 
-             Keep in step with .pda-figure and .pcard-thumb-map if that ratio
-             ever moves. */
+             Keep in step with .pcard-thumb-map if that ratio ever moves. */
           --pgv-ratio: 16 / 10;
           font-family:var(--pda-font-ui);
         }
 
-        /* The control row is the only chrome the sheet carries. */
+        /* ── The control row ───────────────────────────────────────────────
+           The only chrome the sheet carries, and it sits on the page gutter —
+           not on the viewport edge.
+
+           This row used to have no horizontal padding at all. It is mounted
+           inside a full-bleed wrapper on /parks, so with zero padding it landed
+           flush against the screen while MAP | GRID, which lives in .pda-bar
+           (full-bleed with the gutter as padding), stopped one gutter short.
+           The density control therefore sat exactly one --pda-gutter to the
+           right of the toggle above it at every width: 56px at 1440, 41px at
+           1024, 33px at 834, 16px at 390. On desktop the offset was large
+           enough to read as "that one belongs to the sheet"; in the 640-1099
+           band it shrank to the point where it just read as two controls that
+           failed to line up.
+
+           The rule the page already states for itself is that chrome is
+           contained even where the imagery under it is not (see
+           .pda-desktop-bar-row). This row was the one piece of chrome never
+           brought into it. One gutter here puts both controls on a single
+           right-hand edge at every width, and costs the photographs nothing —
+           the sheet below still runs to the screen. */
         .pgv-controls{
           display:flex; justify-content:flex-end; align-items:center;
-          padding:0 0 10px;
+          /* The top padding is not decorative: .pda-bar above is sticky at
+             z-index 25, so anything of this row that reaches into the bar's box
+             is covered by it — including the button's extended hit area, which
+             measured as blocked on its top edge with the pill sitting 1px below
+             the bar. 10px clears the 8px the target extends upward. */
+          padding:10px var(--pda-gutter) 12px;
         }
         .pgv-density{
-          display:flex; align-items:center; height:28px;
-          border:1px solid var(--pda-line); border-radius:14px; overflow:hidden;
+          display:flex; align-items:center; height:30px;
+          border:1px solid var(--pda-line); border-radius:15px;
         }
         .pgv-density button{
-          height:100%; width:34px; display:flex; align-items:center; justify-content:center;
+          position:relative;
+          height:100%; width:46px; display:flex; align-items:center; justify-content:center;
           background:transparent; border:none; cursor:pointer;
           color:var(--pda-muted);
           transition:background .15s var(--pda-ease), color .15s var(--pda-ease);
         }
+        /* A 44x44 target without a 44px-tall control. The pill stays 30px —
+           this is a photographic sheet and its one control should not read as a
+           toolbar — and the hit area extends 7px past it top and bottom, into
+           the row's own padding rather than onto the first row of frames.
+           Was 34x26, which is under the touch minimum in both axes. */
+        .pgv-density button::after{
+          content:""; position:absolute; left:0; right:0; top:50%;
+          height:44px; transform:translateY(-50%);
+        }
+        /* Own radii rather than overflow:hidden on the pill — clipping the
+           parent would clip the hit area above with it. */
+        .pgv-density button:first-child{ border-radius:15px 0 0 15px; }
+        .pgv-density button:last-child{ border-radius:0 15px 15px 0; }
         .pgv-density button:hover{ color:var(--pda-fg); }
         .pgv-density button[aria-pressed="true"]{ background:var(--pda-accent); color:#fff; }
-        .pgv-density button:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; }
+        .pgv-density button:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:2px; z-index:1; }
         .pgv-density svg{ width:13px; height:13px; }
 
         .pgv-grid{
@@ -174,93 +235,132 @@ export default function ParksGridView({
           grid-template-columns:repeat(var(--pgv-cols), minmax(0, 1fr));
         }
 
-        /* The tile is the whole interface: no border, no plate, no button. The
-           photograph is the control, and the only thing drawn over it is the
-           catalogue block. */
+        /* ── The tile: a frame, then a caption ─────────────────────────────
+           Both are inside the one <a>, so the photograph and its notation are a
+           single target. Nothing is drawn around the pair — no border, radius,
+           shadow or plate — and nothing at all is drawn on the photograph. */
         .pgv-tile{
-          position:relative; display:block;
-          aspect-ratio:var(--pgv-ratio);
-          overflow:hidden; background:var(--pda-panel);
-          /* Lets the browser skip layout and paint for tiles that are scrolled
-             out. The aspect ratio still resolves from the grid track, so a
-             skipped tile keeps its exact height and nothing shifts. */
-          content-visibility:auto;
+          position:relative; display:block; text-decoration:none; color:inherit;
         }
         .pgv-tile:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; z-index:2; }
-        .pgv-tile img{
+
+        /* The photograph. 100% of this box is image; the caption is a sibling
+           below it, never an overlay. */
+        .pgv-frame{
+          position:relative; overflow:hidden;
+          aspect-ratio:var(--pgv-ratio);
+          background:var(--pda-panel);
+          /* Lets the browser skip layout and paint for frames that are scrolled
+             out. The aspect ratio still resolves from the grid track, so a
+             skipped frame keeps its exact height and nothing shifts. Scoped to
+             the frame rather than the whole tile now the tile also contains
+             text: the caption has no intrinsic height to fall back on, so
+             skipping it would collapse the row and shift the sheet. */
+          content-visibility:auto;
+        }
+        .pgv-frame img{
           object-fit:cover;
           /* No filter. Park photography runs in colour, matching the homepage
              thumbnail strip — the b/w treatment read as too grungy against the
              current palette. The interactive B&W toggles (hero/3D viewer,
-             gallery) are a separate concern and are untouched.
-             Legibility of the catalogue block is the scrim's job below, not a
-             brightness knock-down on the photograph. */
+             gallery) are a separate concern and are untouched. */
           transition:transform .45s var(--pda-ease);
         }
 
-        /* Scrim carries the text, not a box around it. Only as tall as the
-           block it protects. */
-        .pgv-scrim{
-          position:absolute; left:0; right:0; bottom:0; height:62%;
-          /* Raised from .72 when the hover brightness(.62) was removed: that
-             knock-down was doing part of the work of making the white block
-             readable, and over a bright colour frame the scrim now has to do
-             all of it. */
-          background:linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0));
-          opacity:0; transition:opacity .2s var(--pda-ease); pointer-events:none;
+        /* ── The caption ───────────────────────────────────────────────────
+           Field notation set as it is everywhere else on the site, laid out to
+           read as a margin note rather than a card footer:
+
+               005/  CRYSTAL PALACE
+                     SE19 / SOUTH LONDON
+
+           Two columns, not three rows. The catalogue mark holds the first
+           column and the name sits beside it on a shared baseline; the place
+           line takes the second column on the row below, so it hangs under the
+           name rather than under the mark. That indent is what makes the mark
+           read as a plate number in the margin — three left-aligned rows read
+           as a stack of fields, which is a card.
+
+           The .pcard-* selectors below set arrangement and scale only. The
+           notation itself — which tiers exist, what they are set in, their
+           order — stays ParkCard's, and no prop or variant is added for this.
+           That is the split ParkCard documents: the component owns the
+           language, the layout owns the scale. */
+        .pgv-cap{
+          padding:var(--pgv-cap-top, 10px) var(--pgv-cap-x, 12px) var(--pgv-cap-bottom, 20px);
         }
-        .pgv-meta{
-          position:absolute; left:0; right:0; bottom:0;
-          padding:var(--pgv-meta-pad, 12px);
-          opacity:0; transform:translateY(4px);
-          transition:opacity .2s var(--pda-ease), transform .2s var(--pda-ease);
-          pointer-events:none;
+        .pgv-cap .pcard{
+          display:grid;
+          grid-template-columns:auto minmax(0, 1fr);
+          column-gap:var(--pgv-mark-gap, 10px);
+          align-items:baseline;
         }
-        .pgv-meta .pcard-id{ color:rgba(255,255,255,.72); }
-        .pgv-meta .pcard-title .pcard-name{ color:#fff; }
-        .pgv-meta .pcard-title .pcard-postcode{ color:var(--pda-accent); }
-        .pgv-meta .pcard-location{ color:rgba(255,255,255,.72); }
+        .pgv-cap .pcard-id{ grid-column:1; grid-row:1; }
+        .pgv-cap .pcard-title{ grid-column:2; grid-row:1; min-width:0; }
+        .pgv-cap .pcard-location{ grid-column:2; grid-row:2; }
+        /* Full names survive: the name wraps inside its column rather than
+           being truncated, and a single long word breaks rather than pushing
+           the column open. */
+        .pgv-cap .pcard-name{ overflow-wrap:anywhere; }
 
         @media (hover: hover){
-          .pgv-tile:hover .pgv-meta, .pgv-tile:hover .pgv-scrim{ opacity:1; }
-          .pgv-tile:hover .pgv-meta{ transform:none; }
-          .pgv-tile:hover img{ transform:scale(1.02); }
-          .pgv-tile:focus-visible .pgv-meta, .pgv-tile:focus-visible .pgv-scrim{ opacity:1; }
-        }
-        /* Touch: the block is permanent. Tap-to-reveal would put a park page
-           two taps away, and the sheet is meant to be scanned, not probed. */
-        @media (hover: none){
-          .pgv-meta, .pgv-scrim{ opacity:1; transform:none; }
+          /* The one hover response, and the ceiling for it. Enough to confirm
+             the frame is a control; identity is already on screen and does not
+             move. */
+          .pgv-tile:hover .pgv-frame img{ transform:scale(1.02); }
         }
 
-        /* Density only changes scale — the type steps down with the cell so a
-           dense sheet stays a sheet rather than a wall of labels. Below medium
-           the location line goes: at 7 columns it is the first thing to become
-           unreadable, and the catalogue no. plus name still identify the park. */
-        .pgv-root[data-density="large"]{ --pgv-meta-pad:16px; }
-        .pgv-root[data-density="medium"] .pgv-meta .pcard-title{ font-size:15px; }
-        .pgv-root[data-density="small"]{ --pgv-meta-pad:8px; }
-        .pgv-root[data-density="small"] .pgv-meta .pcard-id{ font-size:9px; letter-spacing:.06em; }
-        .pgv-root[data-density="small"] .pgv-meta .pcard-title{ font-size:12px; margin-top:2px; }
-        .pgv-root[data-density="small"] .pgv-meta .pcard-location{ display:none; }
+        /* ── Density: scale, and only scale ────────────────────────────────
+           Same crop, same treatment, same information at both — a tile at
+           Medium is a tile at Large, smaller. Geography is shown at every
+           density and every width, including mobile Medium: off the photograph
+           it is no longer competing with it, and on a national archive the area
+           is the thing a reader most needs. */
+        .pgv-root[data-density="large"]{
+          --pgv-cap-top:12px; --pgv-cap-x:14px; --pgv-cap-bottom:26px;
+          --pgv-mark-gap:12px;
+          --pcard-title-size:19px;
+          --pcard-place-size:11px;
+        }
+        .pgv-root[data-density="medium"]{
+          --pgv-cap-top:10px; --pgv-cap-x:12px; --pgv-cap-bottom:22px;
+          --pgv-mark-gap:10px;
+          --pcard-title-size:15px;
+          --pcard-place-size:10.5px;
+        }
+        /* ParkCard's own vertical margins are zeroed — the caption grid owns
+           the rhythm now, through row-gap and the place gap below. */
+        .pgv-cap{ --pcard-mark-gap:0px; }
+        .pgv-root[data-density="large"] .pgv-cap{ --pcard-place-gap:5px; }
+        .pgv-root[data-density="medium"] .pgv-cap{ --pcard-place-gap:4px; }
+
         @media (max-width: 639px){
-          .pgv-root[data-density="medium"]{ --pgv-meta-pad:8px; }
-          .pgv-root[data-density="medium"] .pgv-meta .pcard-title{ font-size:13px; }
-          .pgv-root[data-density="medium"] .pgv-meta .pcard-location{ display:none; }
-          .pgv-root[data-density="small"] .pgv-meta .pcard-title{ font-size:10px; }
+          .pgv-root[data-density="large"]{
+            --pgv-cap-top:11px; --pgv-cap-x:14px; --pgv-cap-bottom:24px;
+            --pcard-title-size:18px;
+          }
+          .pgv-root[data-density="medium"]{
+            --pgv-cap-top:8px; --pgv-cap-x:10px; --pgv-cap-bottom:18px;
+            --pgv-mark-gap:8px;
+            --pcard-title-size:13px;
+            --pcard-place-size:9.5px;
+            --pcard-place-tracking:.05em;
+          }
+          /* At two columns on a phone the second column is too narrow to hold
+             the place line at a readable size, so it gives up the indent and
+             takes the caption's full width instead. The hierarchy still reads
+             — it is below the name and set in muted mono — and legibility is
+             worth more here than the hanging alignment. */
+          .pgv-root[data-density="medium"] .pgv-cap .pcard-location{ grid-column:1 / -1; }
         }
 
-        /* No photograph on file. The tile still holds its place in the sheet
-           and still identifies the park, rather than leaving a hole. */
+        /* No photograph on file. Only the frame is empty — the caption beneath
+           still names the park, so the tile holds its place in the sheet and
+           stays identifiable rather than leaving a hole. */
         .pgv-plate{
-          position:absolute; inset:0; display:flex; align-items:flex-end;
-          padding:var(--pgv-meta-pad, 12px);
+          position:absolute; inset:0;
           background:linear-gradient(135deg, var(--pda-panel), var(--pda-line));
         }
-        .pgv-plate .pcard-id{ color:var(--pda-accent); }
-        .pgv-plate .pcard-title .pcard-name{ color:var(--pda-fg); }
-        .pgv-plate .pcard-location{ color:var(--pda-muted); }
-        .pgv-root[data-density="small"] .pgv-plate .pcard-location{ display:none; }
 
         /* ── ?debug=1 missing-image indicator ─────────────────────────────
            Hazard stripes, not a muted placeholder: this has to stay obvious in
@@ -298,25 +398,11 @@ export default function ParksGridView({
           font-size:8px; letter-spacing:.06em; color:#ffd400; opacity:.75;
           line-height:1.3;
         }
-        .pgv-missing-id{
-          margin-top:2px; opacity:.6;
-        }
-        .pgv-missing-id .pcard-id,
-        .pgv-missing-id .pcard-title .pcard-name,
-        .pgv-missing-id .pcard-title .pcard-postcode,
-        .pgv-missing-id .pcard-location{ color:#fff; }
-        .pgv-missing-id .pcard-title{ font-size:11px; margin:0; }
-        .pgv-missing-id .pcard-id{ font-size:9px; }
-        .pgv-missing-id .pcard-location{ display:none; }
-        /* Dense sheets have no room for the path or the park name; the stripes
-           and the title still carry the signal. */
-        .pgv-root[data-density="small"] .pgv-missing-path,
-        .pgv-root[data-density="small"] .pgv-missing-reason,
-        .pgv-root[data-density="small"] .pgv-missing-id{ display:none; }
-        .pgv-root[data-density="small"] .pgv-missing-title{ font-size:9px; letter-spacing:.06em; }
+        /* The block no longer repeats the park name: the caption below the
+           frame carries it now, at every density, so the indicator can spend
+           all of its room on the path that needs fixing. */
         @media (max-width: 639px){
-          .pgv-root[data-density="medium"] .pgv-missing-reason,
-          .pgv-root[data-density="medium"] .pgv-missing-id{ display:none; }
+          .pgv-root[data-density="medium"] .pgv-missing-reason{ display:none; }
           .pgv-root[data-density="medium"] .pgv-missing-title{ font-size:9px; }
           .pgv-root[data-density="medium"] .pgv-missing-path{ font-size:8px; }
         }
@@ -329,8 +415,8 @@ export default function ParksGridView({
         .pgv-sentinel{ height:1px; }
 
         @media (prefers-reduced-motion: reduce){
-          .pgv-tile img, .pgv-meta, .pgv-scrim{ transition-duration:.01ms; }
-          .pgv-tile:hover img{ transform:none; }
+          .pgv-frame img{ transition-duration:.01ms; }
+          .pgv-tile:hover .pgv-frame img{ transform:none; }
         }
 
         /* Column count per breakpoint. Written from the COLS table above so the
@@ -415,45 +501,48 @@ function GridTile({ park, idx, density, missing }: {
   const [attempt, setAttempt] = useState(0);
   const src = candidates[attempt];
 
-  // The catalogue block is the same ParkCard the accordion row and the map
-  // list render, in the same variant — the sheet cannot drift out of step with
-  // how a park is named anywhere else on the site.
-  const label = <ParkCard park={park} idx={idx} variant="archive" showTags={false} showLocation />;
-
   return (
     <Link
       href={`/parks/${park.slug}`}
       className="pgv-tile"
       // Viewport prefetch across a full sheet would fire a request per tile.
       prefetch={false}
-      aria-label={`${park.name}${park.location ? `, ${park.location}` : ""}`}
+      // No aria-label: the caption is inside the link and is the visible name
+      // of this control, so it is already the accessible name. An aria-label
+      // here would override the text a sighted reader is looking at.
     >
-      {/* Replaces the photograph rather than sitting over it. The tile would
-          otherwise fall back to the park's hero and look perfectly fine, which
-          is exactly the case this is meant to catch: the directory export is
-          the missing asset, not the photography. */}
-      {missing ? (
-        <MissingImage slot={missing} label={label} />
-      ) : src ? (
-        <>
+      <div className="pgv-frame">
+        {/* Replaces the photograph rather than sitting over it. The frame would
+            otherwise fall back to the park's hero and look perfectly fine,
+            which is exactly the case this is meant to catch: the directory
+            export is the missing asset, not the photography. */}
+        {missing ? (
+          <MissingImage slot={missing} />
+        ) : src ? (
           <Image
             src={src}
             alt=""
             fill
             sizes={SIZES[density]}
-            // The optimiser serves a real per-density tier off this: a small
-            // sheet pulls ~200px files, not a full frame scaled down in CSS.
+            // The optimiser serves a real per-density tier off this: a medium
+            // sheet pulls ~360px files, not a full frame scaled down in CSS.
             loading={idx < 8 ? "eager" : "lazy"}
             // Walks the candidate list — see getParkImageCandidates. Several
             // published parks point at a directory image that does not exist.
             onError={() => setAttempt(a => a + 1)}
           />
-          <div className="pgv-scrim" />
-          <div className="pgv-meta">{label}</div>
-        </>
-      ) : (
-        <div className="pgv-plate">{label}</div>
-      )}
+        ) : (
+          <div className="pgv-plate" />
+        )}
+      </div>
+
+      {/* The same ParkCard the accordion row and the map list render, in the
+          same variant — the sheet cannot drift out of step with how a park is
+          named anywhere else on the site. Rendered unconditionally: a tile
+          without a photograph is still an identified park. */}
+      <div className="pgv-cap">
+        <ParkCard park={park} density="standard" />
+      </div>
     </Link>
   );
 }
@@ -478,7 +567,7 @@ function copyText(text: string): boolean {
 }
 
 // Dev/preview only — see the debugAllowed() gate at the call site.
-function MissingImage({ slot, label }: { slot: SlotAudit; label: React.ReactNode }) {
+function MissingImage({ slot }: { slot: SlotAudit }) {
   const [feedback, setFeedback] = useState<null | "copied" | "failed">(null);
 
   // Reverts to the path so it can be read and copied again — and so a failure
@@ -513,18 +602,15 @@ function MissingImage({ slot, label }: { slot: SlotAudit; label: React.ReactNode
           {feedback === "copied" ? "COPIED" : feedback === "failed" ? "COPY FAILED — SELECT MANUALLY" : slot.expectedPath}
         </button>
         {slot.reason && <span className="pgv-missing-reason">{slot.reason}</span>}
-        {/* Which park this is, still — the sheet has to stay readable as an
-            index while it is full of these. */}
-        <span className="pgv-missing-id">{label}</span>
       </div>
     </div>
   );
 }
 
 function DensityGlyph({ density }: { density: GridDensity }) {
-  // 2x2 / 3x3 / 4x4 — the mark reads as how much fits on screen, which is the
-  // only thing the control changes.
-  const n = density === "large" ? 2 : density === "medium" ? 3 : 4;
+  // 2x2 / 3x3 — the mark reads as how much fits on screen, which is the only
+  // thing the control changes.
+  const n = density === "large" ? 2 : 3;
   const unit = 24 / n;
   const pad = unit * 0.16;
   const cells = [];

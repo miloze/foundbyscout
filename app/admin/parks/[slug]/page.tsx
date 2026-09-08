@@ -2,13 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-import { modelUrl } from "@/lib/assets";
+import { modelUrl, resolveModelUrl } from "@/lib/assets";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Slot uploads go through /api/admin/uploads (service role, server-side).
+// The anon key can no longer write to the bucket — see migrations/008.
 
 type GalleryRowItem = { slot: number; ratio: string; type: "image" | "video" | "gif" | "glb"; glbFile?: string; label?: string; caption?: string };
 type GalleryColumn = { slots: GalleryRowItem[] };
@@ -216,7 +213,7 @@ type FormState = {
   brief: string; description: string;
   pull_quote: string; pull_quote_attribution: string;
   catalogue_id: string; scanned: string;
-  hero_image: string; thumbnail: string; directory_image_url: string; model_file: string; model_file_low: string; preload_image_url: string;
+  hero_image: string; thumbnail: string; directory_image_url: string; model_file: string; preload_image_url: string;
   camera_pos: string; camera_target: string; model_rotation: string;
 };
 
@@ -235,7 +232,7 @@ const EMPTY: FormState = {
   brief: "", description: "",
   pull_quote: "", pull_quote_attribution: "",
   catalogue_id: "", scanned: "",
-  hero_image: "", thumbnail: "", directory_image_url: "", model_file: "", model_file_low: "", preload_image_url: "",
+  hero_image: "", thumbnail: "", directory_image_url: "", model_file: "", preload_image_url: "",
   camera_pos: "", camera_target: "", model_rotation: "",
 };
 
@@ -337,8 +334,13 @@ export default function EditParkPage() {
           hero_image:         park.hero_image        || "",
           thumbnail:          park.thumbnail         || `/images/parks/${slug}/thumb.webp`,
           directory_image_url: park.directory_image_url || `/images/parks/${slug}/directory.webp`,
-          model_file:         park.model_file        || modelUrl(slug, "high") || "",
-          model_file_low:     park.model_file_low    || modelUrl(slug, "low")  || "",
+          // Through resolveModelUrl, not the raw column: rows written before the
+          // R2 migration still store /images/parks/{slug}/model.glb, and the
+          // field was showing that stale local path — for the-grove, a 128MB
+          // file that is not what anything should load. Resolving here means
+          // the admin shows the URL the site actually uses, and saving the form
+          // migrates the row to it.
+          model_file:         resolveModelUrl(park.model_file, slug) || modelUrl(slug) || "",
           preload_image_url:  park.preload_image_url || `/images/parks/${slug}/glb-preload.png`,
           camera_pos:     numArrToStr(park.camera_pos),
           camera_target:  numArrToStr(park.camera_target),
@@ -386,13 +388,15 @@ export default function EditParkPage() {
     if (!files?.length) return;
     setUploadingSlot(slotIndex);
     setError("");
-    const file = files[0];
-    const path = `${slug}/${Date.now()}-${file.name}`;
-    const { error: err } = await supabase.storage
-      .from("park-images").upload(path, file, { upsert: true });
-    if (err) { setError(`Upload failed: ${err.message}`); setUploadingSlot(null); return; }
-    const { data } = supabase.storage.from("park-images").getPublicUrl(path);
-    setSlotImage(slotIndex, data.publicUrl);
+    const body = new FormData();
+    body.append("parkSlug", slug);
+    body.append("files", files[0]);
+
+    const res = await fetch("/api/admin/uploads", { method: "POST", body });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) { setError(`Upload failed: ${payload.error ?? res.statusText}`); setUploadingSlot(null); return; }
+
+    setSlotImage(slotIndex, payload.uploaded[0].url);
     setUploadingSlot(null);
   }
 
@@ -1169,17 +1173,15 @@ export default function EditParkPage() {
                 : <div style={{ width: "100%", aspectRatio: "2/1", background: "var(--card)", border: "1px dashed var(--border)" }} />
               }
             </div>
+            {/* One model per park — the low/mobile field is gone with the tier
+                system. The columns stay in the database untouched; nothing
+                reads them. */}
             <div>
-              <FieldLabel hint="https://cdn.foundbyscout.fyi/parks/{slug}/model-high.glb">3D model file URL</FieldLabel>
+              <FieldLabel hint="the park's production model on R2 — leave blank to derive from the slug">3D model file URL</FieldLabel>
               <Input value={form.model_file} onChange={v => upd("model_file", v)}
                 placeholder="https://cdn.foundbyscout.fyi/parks/crystal-palace/model-high.glb" />
             </div>
             <div style={G2}>
-              <div>
-                <FieldLabel hint="served to phones — leave blank to use main model on all devices">Model (low / mobile)</FieldLabel>
-                <Input value={form.model_file_low} onChange={v => upd("model_file_low", v)}
-                  placeholder="https://cdn.foundbyscout.fyi/parks/crystal-palace/model-low.glb" />
-              </div>
               <div>
                 <FieldLabel hint="shown while GLB loads — leave blank to auto-derive from the park's local image folder">Preload image URL</FieldLabel>
                 <Input value={form.preload_image_url} onChange={v => upd("preload_image_url", v)}

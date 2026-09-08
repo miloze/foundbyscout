@@ -8,8 +8,11 @@ import { ParkGlanceHeroOverlay, type ParkGlance } from "./ParkFacts";
 import ParkWeather from "./ParkWeather";
 import ParkViewerModal from "./ParkViewerModal";
 import ParkHeroDetails from "./ParkHeroDetails";
-import { BwIcon, ArIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton } from "./ViewerControls";
-import Link from "next/link";
+import {
+  BwIcon, ArIcon, ExitIcon, PrevIcon, NextIcon,
+  ViewerControlBar, ViewerCluster, ViewerClusterButton, ViewerClusterDivider, ViewerReadout,
+  VIEWER_CONTROLS_CSS,
+} from "./ViewerControls";
 import { markParkNavDirection } from "@/lib/view-transitions";
 import { catalogueIndexLabel } from "@/lib/catalogue";
 import { lockPageScroll } from "@/lib/scrollLock";
@@ -44,8 +47,6 @@ function markInstructionsSeen() {
 type Props = {
   // Viewer
   modelFile: string | null;
-  modelFileLow?: string;
-  modelFileMobile?: string;
   heroImage?: string;
   preloadImageUrl?: string;
   cameraPos?: [number, number, number];
@@ -68,7 +69,10 @@ type Props = {
       slug, which is what pairs the two heroes' elements. */
   slug: string;
   catalogueId?: string;
-  /** Size of the published catalogue — the index badge's "/11". */
+  /** Size of the published catalogue — the "/11" of the prev/index/next
+   *  cluster below, and nothing else. That cluster is the one place on the
+   *  site where a park is genuinely a position in a traversable sequence;
+   *  everything that merely names the park takes catalogueMark. */
   catalogueTotal?: number;
   /** The parks either side of this one in catalogue order. Hero only — the
    *  3D viewer does not carry them, so there is no second copy to navigate
@@ -90,7 +94,7 @@ type Props = {
 };
 
 export default function ParkHeroShell({
-  modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
+  modelFile, heroImage, preloadImageUrl,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, viewerOverlay,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   slug, catalogueId, catalogueTotal, prevPark, nextPark, name, address, location, postcode, lat, lng, opened, scanned,
@@ -114,6 +118,22 @@ export default function ParkHeroShell({
   const [instructionsShown, setInstructionsShown] = useState(false);
   // Guards the entrance against a second click landing mid-sequence.
   const [busy, setBusy] = useState(false);
+  // Pointer capability, which is a different question from viewport width and
+  // was never asked before. The entry affordance was gated on a 300ms hover
+  // dwell, so on a touch tablet — which gets the live model, not the still —
+  // it never appeared: the whole hero was a button with nothing saying so.
+  // Resolved after mount for the same reason isMobile is; the server has no
+  // pointer, and rendering a different tree on the first client pass would be
+  // a hydration mismatch.
+  const [coarse, setCoarse] = useState(false);
+  // What the scan is actually doing, reported by the viewer itself rather than
+  // assumed. The entry affordance used to promise "Click to explore" from the
+  // first paint, while the GLB was still downloading — so a reader could be
+  // invited into a viewer that had nothing in it yet, and on a failed scan the
+  // invitation never withdrew at all.
+  const [scanState, setScanState] = useState<"loading" | "ready" | "failed">("loading");
+  const onScanReady = useCallback(() => setScanState("ready"), []);
+  const onScanFailed = useCallback(() => setScanState("failed"), []);
   // The hover prompt is dwell-gated, and leaves at two different speeds: a
   // click is an acknowledgement, a pointer-leave is just the end of a hover.
   const [promptShown, setPromptShown] = useState(false);
@@ -144,6 +164,10 @@ export default function ParkHeroShell({
   // Colour is part of what entering means, not a separate control to find.
   const openViewer = useCallback(() => {
     if (busy || viewerActive) return;   // a second click mid-sequence is a no-op
+    // Nothing to explore until the model is on screen. This is the guard, not
+    // just the label: the whole hero is the click target, so without it a tap
+    // anywhere would start the entrance over an empty scene.
+    if (scanState !== "ready") return;
     setBusy(true);
     clearTimers();
     if (dwellRef.current) clearTimeout(dwellRef.current);
@@ -166,7 +190,7 @@ export default function ParkHeroShell({
     after(450, () => setControlsShown(true));
     after(700, () => setCanZoom(true));
     after(900, () => setBusy(false));
-  }, [busy, viewerActive, clearTimers, after]);
+  }, [busy, viewerActive, scanState, clearTimers, after]);
 
   // ── Exit ──────────────────────────────────────────────────────────────
   // Interaction is withdrawn at once so there is no half-live window, then
@@ -191,17 +215,23 @@ export default function ParkHeroShell({
   // ── Hover prompt ──────────────────────────────────────────────────────
   const armPrompt = useCallback(() => {
     if (viewerActive || promptShown) return;   // no re-pulse while hovering
+    if (scanState !== "ready") return;        // nothing to invite anyone into yet
+    // On a coarse pointer the prompt is already up and stays up until the
+    // scan is entered — there is no dwell to wait for, and a pointerenter
+    // fired by a tap would just restart a timer the tap has already beaten.
     if (dwellRef.current) clearTimeout(dwellRef.current);
+    if (coarse) return;
     dwellRef.current = setTimeout(() => {
       setPromptExit("hover");
       setPromptShown(true);
     }, 300);
-  }, [viewerActive, promptShown]);
+  }, [viewerActive, promptShown, coarse, scanState]);
   const disarmPrompt = useCallback(() => {
+    if (coarse) return;               // nothing to leave; the prompt is resident
     if (dwellRef.current) clearTimeout(dwellRef.current);
     setPromptExit("hover");
     setPromptShown(false);
-  }, []);
+  }, [coarse]);
 
   // ── First gesture stands the instructions down ────────────────────────
   const handleInteract = useCallback(() => {
@@ -236,6 +266,14 @@ export default function ParkHeroShell({
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    const sync = () => setCoarse(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
   }, []);
 
   useEffect(() => {
@@ -300,13 +338,20 @@ export default function ParkHeroShell({
   // so wherever it is absent the toggle has to fall back to the pill by the
   // metadata — otherwise turning the scan to colour becomes unreachable.
   const topCluster = !!(viewerOverlay && modelFile && !isMobile);
+  // Fine pointers earn the prompt by dwelling; coarse pointers get it outright
+  // and keep it until the scan is entered. Same element, same plate, same
+  // motion — only what decides it differs.
+  // Loading and failure states are shown outright on every pointer type: they
+  // are status, not an invitation, and hiding a failure behind a hover would
+  // leave a dead scan looking like a photograph. Only the invitation itself
+  // keeps the dwell behaviour on a fine pointer.
+  const ctaShown = scanState !== "ready" ? !viewerActive : (coarse ? !viewerActive : promptShown);
 
   return (
     <>
     {open3D && modelFile && (
       <ParkViewerModal
         modelFile={modelFile}
-        modelFileMobile={modelFileMobile}
         parkName={name}
         onClose={() => setOpen3D(false)}
         // Always the mobile full-screen treatment now. Desktop no longer hands
@@ -316,7 +361,6 @@ export default function ParkHeroShell({
         // the component but is no longer reachable from here.
         variant="fullscreen"
         catalogueId={catalogueId}
-        catalogueTotal={catalogueTotal}
         address={address}
         postcode={postcode}
         lat={lat}
@@ -390,9 +434,7 @@ export default function ParkHeroShell({
           <div className="fbs-hero-zoom">
           <ParkHeroViewer
             modelFile={modelFile}
-            modelFileLow={modelFileLow}
-            modelFileMobile={modelFileMobile}
-            heroImage={heroImage}
+                heroImage={heroImage}
             preloadImageUrl={preloadImageUrl}
             cameraPos={cameraPos}
             cameraTarget={cameraTarget}
@@ -409,6 +451,8 @@ export default function ParkHeroShell({
             allowRotate={canRotate}
             allowZoom={canZoom}
             onInteract={handleInteract}
+            onReady={onScanReady}
+            onFailed={onScanFailed}
           />
           </div>
         </div>
@@ -438,7 +482,7 @@ export default function ParkHeroShell({
           // Inert the moment the viewer is live: it is still on screen for the
           // length of the fade, and it sits over the canvas, so it must stop
           // taking events before the model starts needing them.
-          className={`fbs-expand${viewerActive ? " is-inert" : ""}`}
+          className={`fbs-expand${viewerActive ? " is-inert" : ""}${scanState !== "ready" ? " is-waiting" : ""}`}
           onClick={openViewer}
           onPointerEnter={armPrompt}
           onPointerLeave={disarmPrompt}
@@ -449,12 +493,50 @@ export default function ParkHeroShell({
               hero's. The wrapper is what takes the click, so anywhere on the
               scan activates — the button is the visible affordance, not the
               only target. */}
-          <span className={`fbs-expand-cta${promptShown ? " is-shown" : ""}`} data-exit={promptExit}>
-            <CTAButton
-              label="Click to explore"
-              variant="ghost"
-              onClick={openViewer}
-            />
+          <span className={`fbs-expand-cta${ctaShown ? " is-shown" : ""}`} data-exit={promptExit}>
+            {/* The eyebrow is coarse-pointer only. On a touch tablet the model
+                is live but stationary and there is no hover to discover it
+                with, so the affordance has to say what the thing IS before it
+                says what to do with it — a still frame of a skatepark and a
+                stationary scan look identical. On a mouse the idle rotation
+                already answers "is this live?", the dwell answers "can I touch
+                it?", and an eyebrow would only be restating both. */}
+            {/* One box, three labels. The states must read as the SAME object
+                changing its text, not as one element leaving and another
+                arriving somewhere else — so the passive states reproduce
+                CTAButton's internal structure exactly rather than approximating
+                it: the same .fbs-cta plate, the same .fbs-cta__label, and the
+                same caret occupying the same space with its ink turned off.
+                Only the characters differ between states.
+
+                There was an "INTERACTIVE 3D SCAN" eyebrow above this on coarse
+                pointers. It was the main source of the jump — present only when
+                ready, so the pill dropped by its height plus the gap the moment
+                the model arrived — and with "LOADING 3D SCAN…" naming the object
+                a moment earlier, it was saying it twice. */}
+            {scanState === "ready" ? (
+              /* One label on every device. "Click to explore" / "Drag to
+                 explore" described the input rather than the offer, and split
+                 one state into two vocabularies for no functional reason. The
+                 CTA says what you get; the instructions after entry say how to
+                 work it on this device, which is where the pointer type
+                 genuinely matters. */
+              <CTAButton label="Explore 3D" variant="ghost" onClick={openViewer} />
+            ) : (
+              <span className="fbs-cta fbs-cta--ghost fbs-cta--status">
+                <span className="fbs-cta__label">
+                  {scanState === "loading" ? "Loading 3D scan…" : "3D scan unavailable"}
+                </span>
+                {/* Reserves the caret's slot so the plate's metrics are identical
+                    in all three states. Not decoration — it is never drawn. */}
+                <svg className="fbs-cta__arrow" width="9" height="9" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="3"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                  style={{ visibility: "hidden" }}>
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            )}
           </span>
         </div>
       )}
@@ -469,94 +551,86 @@ export default function ParkHeroShell({
         <div ref={frameRef} aria-hidden className="fbs-hero-frame" />
       )}
 
-      {/* ── Viewer-mode controls ───────────────────────────────────────────
-          Top-right, the corner the idle hint already uses, so entering viewer
-          mode swaps the content of that corner instead of moving anything.
-          Deliberately the opposite end of the hero from the metadata block. */}
-      {/* ── Catalogue nav cluster ──────────────────────────────────────────
-          Prev / index / next, in the header's utility row immediately left of
-          the colour toggle. Navigation lived in the hero title through five
-          rejected treatments; as functional chrome sitting with the other
-          controls it stops competing with the park name entirely.
+      {/* ── Control bar ────────────────────────────────────────────────────
+          One positioned box, two laid-out clusters.
 
-          Rendered whenever there are neighbours, not gated on topCluster the
-          way the viewer chrome is: moving through the catalogue has nothing to
-          do with whether this park has a scan to look at. The cluster shifts
-          right into the freed space when that chrome is absent. */}
-      {(prevPark || nextPark) && (
-        <div
-          className={`fbs-hero-nav${topCluster ? "" : " fbs-hero-nav--alone"}`}
-          data-hero-chrome
-        >
-          {prevPark && (
-            <Link
-              href={`/parks/${prevPark.slug}`}
-              className="fbs-hero-nav-btn"
-              aria-label={`Previous park: ${prevPark.name}`}
-              onClick={() => markParkNavDirection("prev")}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M20 12H4" /><path d="M10 6l-6 6 6 6" />
-              </svg>
-            </Link>
+          NAVIGATION (prev / index / next) moves you to another park.
+          TOOLS (colour, exit) change how you are looking at this one.
+
+          They were already independent in the code — navigation renders
+          whether or not the park has a scan, viewer chrome only when it does —
+          and they are now independent in the layout too. A wider gap between
+          the groups than inside either one is the whole statement of the
+          split: no box, no rule, no heading.
+
+          What this replaces: three separately positioned elements, each
+          computing its `right` as a running sum of the widths to its right
+          (`--content-padding + 34 + 8 + 34 + 8`). A fifth control meant
+          editing three expressions. The bar now owns the single offset and
+          flex owns everything else, so SCALE / FLOW / FEATURES will be
+          elements added to the tools cluster and nothing else. */}
+      {(prevPark || nextPark || topCluster) && (
+        <ViewerControlBar className="fbs-hero-bar">
+          {(prevPark || nextPark) && (
+            <ViewerCluster variant="spaced" label="Catalogue navigation" className="fbs-hero-navgroup">
+              {prevPark && (
+                <ViewerClusterButton
+                  href={`/parks/${prevPark.slug}`}
+                  label={`Previous park: ${prevPark.name}`}
+                  icon={<PrevIcon />}
+                  onClick={() => markParkNavDirection("prev")}
+                />
+              )}
+              {indexLabel && (
+                <ViewerReadout label={`Park ${indexLabel.replace(/[()]/g, "")} in the catalogue`}>
+                  {indexLabel}
+                </ViewerReadout>
+              )}
+              {nextPark && (
+                <ViewerClusterButton
+                  href={`/parks/${nextPark.slug}`}
+                  label={`Next park: ${nextPark.name}`}
+                  icon={<NextIcon />}
+                  onClick={() => markParkNavDirection("next")}
+                />
+              )}
+            </ViewerCluster>
           )}
-          {indexLabel && <span className="fbs-hero-nav-idx">{indexLabel}</span>}
-          {nextPark && (
-            <Link
-              href={`/parks/${nextPark.slug}`}
-              className="fbs-hero-nav-btn"
-              aria-label={`Next park: ${nextPark.name}`}
-              onClick={() => markParkNavDirection("next")}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M4 12h16" /><path d="M14 6l6 6-6 6" />
-              </svg>
-            </Link>
+
+          {topCluster && (
+            <ViewerCluster variant="spaced" label="Scan controls">
+              {/* The icon reports state, the label reports the action. Both are
+                  deliberate: a half-filled circle says "colour is on", and a
+                  control's accessible name has to say what pressing it does.
+                  `active` draws the accent — the one place the brand colour is
+                  allowed in this chrome besides a focus ring. */}
+              <ViewerClusterButton
+                label={bw ? "Show the scan in colour" : "Show the scan in black and white"}
+                icon={<BwIcon filled={!bw} />}
+                active={!bw}
+                onClick={() => setBw(b => !b)}
+              />
+              {/* Exit keeps its slot whether or not it is showing, so the
+                  controls beside it do not shift when it fades in — the same
+                  reason the old colour toggle reserved this space by hand.
+                  `inert` takes it out of the tab order and the a11y tree while
+                  it is invisible, which the fade alone would not.
+
+                  Never `active`: exit must stay outside the accent vocabulary
+                  the interpretive tools will use for their on-state, or it
+                  reads as one more layer you can switch. */}
+              <span className={`fbs-hero-exit${controlsShown ? " is-shown" : ""}`} inert={!controlsShown}>
+                <ViewerClusterButton
+                  label="Exit 3D view"
+                  icon={<ExitIcon />}
+                  onClick={closeViewer}
+                />
+              </span>
+            </ViewerCluster>
           )}
-        </div>
+        </ViewerControlBar>
       )}
 
-      {/* ── Colour toggle ──────────────────────────────────────────────────
-          Top-right, immediately left of Close, and independent of it: a way of
-          looking at the scan rather than a viewer control, so it is present
-          and unchanged in both states while Close fades. Its offset reserves
-          Close's slot rather than sitting beside it in a flow, which is what
-          keeps it still when Close arrives and leaves. */}
-      {topCluster && (
-        <button
-          type="button"
-          data-hero-chrome
-          className="fbs-hero-bw"
-          onClick={() => setBw(b => !b)}
-          title={bw ? "Show colour" : "Show B&W"}
-          aria-label={bw ? "Show the scan in colour" : "Show the scan in black and white"}
-        >
-          <BwIcon filled={!bw} />
-        </button>
-      )}
-
-      {/* ── Close ──────────────────────────────────────────────────────────
-          Top-right, on its own, icon only. It was briefly grouped with the
-          instructions and the colour toggle; that cluster read as
-          disconnected and left the toggle looking widowed beside controls it
-          has nothing to do with. The three are independent elements now. */}
-      {topCluster && (
-        <button
-          type="button"
-          data-hero-chrome
-          className={`fbs-hero-close${controlsShown ? " is-shown" : ""}`}
-          onClick={closeViewer}
-          aria-hidden={!controlsShown}
-          tabIndex={controlsShown ? 0 : -1}
-          aria-label="Exit 3D view"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-      )}
 
       {/* ── Centered instructions ──────────────────────────────────────────
           They take over the spot the hover prompt just left, rising the same
@@ -572,7 +646,9 @@ export default function ParkHeroShell({
               state — the wrapper is pointer-transparent, so this reads as the
               same object settling into a passive role rather than a second
               button appearing. */}
-          <span className="fbs-cta fbs-cta--ghost">Drag to rotate · Scroll to zoom</span>
+          <span className="fbs-cta fbs-cta--ghost">
+            {coarse ? "Drag to rotate · Pinch to zoom" : "Drag to rotate · Scroll to zoom"}
+          </span>
         </div>
       )}
 
@@ -606,7 +682,6 @@ export default function ParkHeroShell({
         <ParkHeroDetails
           name={name}
           catalogueId={catalogueId}
-          catalogueTotal={catalogueTotal}
           address={address}
           postcode={postcode}
           lat={lat}
@@ -625,22 +700,31 @@ export default function ParkHeroShell({
                 that have no corner cluster — mobile, and any park without the
                 viewer gated on — so colour never becomes unreachable. */}
             {(!topCluster || (isMobile && modelFile)) && (
-              <ViewerCluster>
+              <ViewerCluster variant="joined" label="Scan controls">
                 {!topCluster && (
                   <ViewerClusterButton
-                    onClick={() => setBw(b => !b)}
-                    title={bw ? "Show colour" : "Show B&W"}
+                    label={bw ? "Show the scan in colour" : "Show the scan in black and white"}
+                    icon={<BwIcon filled={!bw} />}
                     active={!bw}
-                  >
-                    <BwIcon filled={!bw} />
-                  </ViewerClusterButton>
+                    onClick={() => setBw(b => !b)}
+                  />
                 )}
                 {isMobile && modelFile && (
                   <>
                     {!topCluster && <ViewerClusterDivider />}
-                    <ViewerClusterButton onClick={() => setOpen3D(true)} title="Explore in 3D">
-                      <ArIcon />
-                    </ViewerClusterButton>
+                    {/* Labelled, not a bare glyph. This is the only way into
+                        the scan on a phone — the hero there is a still, and
+                        the still has no handler — and the audit found it as an
+                        unlabelled 44px cube sitting among the metadata chips,
+                        with nothing on the page saying a 3D scan existed at
+                        all. The icon stays; the words are what make it an
+                        entry point rather than a fourth chip. */}
+                    <ViewerClusterButton
+                      label="Explore 3D"
+                      icon={<ArIcon />}
+                      showLabel
+                      onClick={() => setOpen3D(true)}
+                    />
                   </>
                 )}
               </ViewerCluster>
@@ -650,6 +734,7 @@ export default function ParkHeroShell({
       </div>
 
       <style>{`
+        ${VIEWER_CONTROLS_CSS}
         /* ── Click-to-expand shield ─────────────────────────────────── */
         /* ── Viewer mode ───────────────────────────────────────────────
            Inset and curve of the window. Clamped rather than raw vw: a
@@ -703,82 +788,53 @@ export default function ParkHeroShell({
            the nav's 52px and read as part of that row. Icon only: with the
            instructions moved to the centre there is nothing left for a label
            to pair with, and a lone word beside an × was saying it twice. */
-        /* Shared chrome for the two corner buttons — one box, so they read as
-           a pair without being grouped into a cluster. --hero-btn is the slot
-           width the colour toggle offsets itself by. */
-        /* The utility-button look, in one place. Split out from the placement
-           below so the catalogue nav can be the same object as the colour
-           toggle rather than a copy of its values — same border, radius, fill,
-           blur, colour and timing by construction. */
-        .fbs-hero-close, .fbs-hero-bw, .fbs-hero-nav-btn, .fbs-hero-nav-idx{
-          --hero-btn:34px;
-          appearance:none; -webkit-appearance:none; margin:0;
-          display:inline-flex; align-items:center; justify-content:center;
-          height:var(--hero-btn); padding:0;
-          border:1px solid rgba(255,255,255,0.34); border-radius:3px;
-          background:rgba(20,18,15,0.66);
-          backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-          color:rgba(255,255,255,0.88);
-          transition:color .18s ease, border-color .18s ease, background-color .18s ease;
-        }
-        .fbs-hero-close, .fbs-hero-bw{
+        /* ── Control bar placement ─────────────────────────────────────
+           ONE offset for the whole system. Everything inside is flex.
+
+           This replaces four hand-derived expressions — the nav cluster's
+           right was content-padding + 34 + 8 + 34 + 8, the colour toggle's
+           + 34 + 8, close's content-padding, and each depended on the
+           pixel widths of the controls to its right. Adding a control meant
+           re-deriving the ones beside it; that is what the tools roadmap could
+           not survive. The buttons' own look now comes from
+           VIEWER_CONTROLS_CSS, so the hero no longer restates the primitive's
+           border, radius, fill, blur, colour or timing. */
+        .fbs-hero-bar{
           position:absolute;
           top:calc(var(--nav-height, 44px) + 24px);
+          right:var(--content-padding);
           z-index:6;
-          width:var(--hero-btn);
-          cursor:pointer;
-        }
-        /* Sits left of the colour toggle, which itself reserves Close's slot:
-           content-padding + close(34) + 8 + bw(34) + 8. Written out rather
-           than magic-numbered so moving any one of them stays traceable. */
-        .fbs-hero-nav{
-          position:absolute;
-          top:calc(var(--nav-height, 44px) + 24px);
-          right:calc(var(--content-padding) + 34px + 8px + 34px + 8px);
-          z-index:6;
-          display:flex; align-items:center; gap:6px;
-        }
-        /* With no viewer chrome there is nothing to sit left of, so the cluster
-           takes the row's end itself. */
-        .fbs-hero-nav--alone{ right:var(--content-padding); }
-        .fbs-hero-nav-btn{ width:var(--hero-btn); cursor:pointer; text-decoration:none; }
-        .fbs-hero-nav-btn svg{ width:15px; height:15px; display:block; }
-        /* The index is the same plate, only wider — it is a readout, not a
-           button, so it takes no hover and no pointer. */
-        .fbs-hero-nav-idx{
-          padding:0 10px;
-          font-family:var(--font-mono);
-          font-size:11px; font-weight:500; letter-spacing:.08em;
-          white-space:nowrap;
-          cursor:default;
         }
         /* Below the breakpoint the header is already logo + nav + toggle, and
-           Miles has flagged crowding as a real risk. Desktop-only until the
-           mobile treatment is designed — deliberately not a guess. */
+           Miles has flagged crowding as a real risk. Desktop and tablet only
+           until the phone treatment is designed — deliberately not a guess.
+           Hiding the group rather than the bar leaves the scan controls in
+           place, which is what the phone actually needs. */
         @media (max-width: 767px){
-          .fbs-hero-nav{ display:none; }
+          .fbs-hero-navgroup{ display:none; }
         }
-        /* Reserves Close's slot rather than flowing beside it, so it does not
-           shift when Close fades in and out. */
-        .fbs-hero-bw{ right:calc(var(--content-padding) + 34px + 8px); }
-        .fbs-hero-bw svg{ width:15px; height:15px; display:block; }
-        @media (hover: hover){
-          .fbs-hero-bw:hover, .fbs-hero-nav-btn:hover{ color:#14120f; background:#fff; border-color:#fff; }
-        }
-        .fbs-hero-bw:focus-visible, .fbs-hero-nav-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
-        .fbs-hero-close{
-          right:var(--content-padding);
-          opacity:0; transform:translateY(-6px); pointer-events:none;
-          transition:opacity 180ms ease, transform 180ms ease,
-                     color .18s ease, border-color .18s ease, background-color .18s ease;
+        /* Exit occupies its slot in BOTH states. It is always laid out; only
+           its ink changes. That is what keeps the catalogue nav and the colour
+           toggle physically still when the viewer is entered — the cluster is
+           an anchored instrument whose available functions change, not a
+           toolbar that grows.
+
+           Opacity only. The 6px rise this used to have was a positional
+           animation on a control that must not appear to move, and it read as
+           the cluster settling rather than a function becoming available.
+           inert (on the element itself) keeps it out of the tab order and the
+           accessibility tree while it is invisible, so reserving the space
+           costs nothing to a keyboard or a screen reader. */
+        .fbs-hero-exit{
+          display:inline-flex;
+          opacity:0;
+          transition:opacity 140ms ease;
         }
-        .fbs-hero-close.is-shown{ opacity:1; transform:none; pointer-events:auto; }
-        .fbs-hero-close svg{ width:15px; height:15px; display:block; }
-        @media (hover: hover){
-          .fbs-hero-close:hover{ color:#14120f; background:#fff; border-color:#fff; }
+        .fbs-hero-exit.is-shown{ opacity:1; }
+        @media (prefers-reduced-motion: reduce){
+          .fbs-hero-exit{ transition-duration:.01ms; }
         }
-        .fbs-hero-close:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
         /* ── Centered instructions ─────────────────────────────────────
            Same box as the hover prompt, so they occupy the spot it just left
@@ -795,7 +851,7 @@ export default function ParkHeroShell({
         }
         .fbs-hero-instructions.is-shown{ opacity:1; transform:none; }
         @media (prefers-reduced-motion: reduce){
-          .fbs-hero-close, .fbs-hero-instructions{ transition-duration:.01ms; }
+          .fbs-hero-instructions{ transition-duration:.01ms; }
         }
 
         .fbs-expand{
@@ -812,7 +868,16 @@ export default function ParkHeroShell({
            is 110ms and reads as the input being taken rather than the hover
            ending. */
         .fbs-expand.is-inert{ pointer-events:none; }
+        /* Still swallows the tap — a click on a scan that is not ready should do
+           nothing, not fall through to whatever is underneath — but stops
+           advertising itself as pressable. */
+        .fbs-expand.is-waiting{ cursor:default; }
+        .fbs-cta--status{ cursor:default; pointer-events:none; }
+        /* One child in every state, so nothing here can move the plate
+           vertically between them. The column layout and its 8px gap existed
+           only for the eyebrow; both went with it. */
         .fbs-expand-cta{
+          display:flex;
           opacity:0; transform:translateY(6px);
           transition:opacity 180ms ease, transform 180ms ease;
         }

@@ -658,7 +658,14 @@ export default function ParkModel({
       >
         <ambientLight color={0xffffff} intensity={ambientIntensity} />
         <directionalLight color={0xffffff} position={[10, 20, 10]} intensity={directionalIntensity} />
-        <Environment preset={environmentPreset as any} environmentIntensity={environmentIntensity} />
+        {/* Its own Suspense boundary, deliberately. The preset pulls a 1.67MB
+            HDR from a third-party CDN, and unboundaried it suspends whatever
+            boundary sits above it — which is the whole scene, model and
+            controls included. Scoped here, a slow or unreachable HDR costs the
+            environment lighting and nothing else. */}
+        <Suspense fallback={null}>
+          <Environment preset={environmentPreset as any} environmentIntensity={environmentIntensity} />
+        </Suspense>
 
         {debug && <CaptureSetup captureRef={captureRef} snapRef={snapRef} filterRef={filterRef} controlsRef={controlsRef} limits={heroLimits} />}
 

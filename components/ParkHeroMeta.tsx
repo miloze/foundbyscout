@@ -1,9 +1,7 @@
 "use client";
 
 import CTAButton from "./CTAButton";
-import { catalogueIndexLabel } from "@/lib/catalogue";
-import ViewTransitionBoundary from "./ViewTransitionBoundary";
-import { heroTransitionNames } from "@/lib/view-transitions";
+import { catalogueMark } from "@/lib/catalogue";
 
 const MONTHS: Record<string, string> = {
   january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",
@@ -23,8 +21,6 @@ function fmtDate(val: string): string {
 
 type Props = {
   catalogueId?: string;
-  /** Size of the published catalogue — the "/11" half of the index badge. */
-  catalogueTotal?: number;
   name: string;
   address?: string[];
   postcode?: string;
@@ -47,11 +43,13 @@ const CHIP_VARIANT = "dark" as ChipVariant;
 const CHIP_CLASS = CHIP_VARIANT === "beige" ? "fbs-hp-chip fbs-hp-chip--inv" : "fbs-hp-chip";
 const BADGE_CLASS = CHIP_VARIANT === "beige" ? "fbs-hp-chip" : "fbs-hp-chip fbs-hp-chip--inv";
 
-export default function ParkHeroMeta({ catalogueId, catalogueTotal, name, address, postcode, opened, scanned, slug }: Props) {
-  // "(003) /11", the same badge the park page carries — same helper, so the
-  // format cannot drift between the two heroes. This hero showed a bare "003"
-  // until the park page's treatment was brought across.
-  const indexLabel = catalogueIndexLabel(catalogueId, catalogueTotal);
+export default function ParkHeroMeta({ catalogueId, name, address, postcode, opened, scanned, slug }: Props) {
+  // "001/", the same mark the park page and every card carry — one helper, so
+  // the format cannot drift between them. This carried "(003) /11" until the
+  // notations were separated: a featured park on the homepage is not a
+  // position in a sequence, so there was no total for the "/11" to be true
+  // against. See lib/catalogue.
+  const mark = catalogueMark(catalogueId);
   // Area name (not street) reads better at hero scale — street-level detail
   // lives in the park page's "Getting there" section.
   const areaName = address && address.length > 1 ? address[1] : address?.[0];
@@ -63,21 +61,25 @@ export default function ParkHeroMeta({ catalogueId, catalogueTotal, name, addres
     .join(" · ")
     .toUpperCase();
 
-  // Only the featured park has a slug, and only it can be navigated into, so
-  // the transition identities exist only when there's a destination.
-  const vt = slug ? heroTransitionNames(slug) : null;
+  // No view-transition names here any more. The park name, catalogue mark and
+  // address used to carry park-name/park-cat/park-address-{slug}, matching the
+  // park page so the three morphed across the navigation.
+  //
+  // Two reasons they are gone. The morph read as glitchy in practice — the
+  // title flew into place while the destination hero was still resolving
+  // behind it, so the one composed thing on screen was the piece that moved.
+  // And it was the source of "two <ViewTransition name=...> mounted at the
+  // same time": these names and the park page's are identical by design, and
+  // an App Router view transition mounts both route trees at once, so React
+  // saw two of each. Home to park is a plain crossfade now — see the root
+  // timing in app/globals.css.
 
   return (
     <div>
-      {/* Park name — the anchor of the hero → park page transition. It keeps
-          its identity across the navigation and repositions/resizes into the
-          park hero's layout rather than being unmounted and rebuilt. */}
-      <ViewTransitionBoundary name={vt?.name}>
       {/* fbs-he-* are the homepage entrance's hooks. They carry no styling of
           their own and do nothing unless an ancestor sets data-hero-entrance,
           which only the home hero does on a first visit — see
-          components/HeroEntrance. ViewTransitionBoundary renders no element of
-          its own, so they have to sit on the real nodes. */}
+          components/HeroEntrance. */}
       <div className="fbs-he-title" style={{
         fontFamily: "var(--font-display), Arial, sans-serif", fontWeight: 300,
         fontStyle: "italic",
@@ -90,33 +92,24 @@ export default function ParkHeroMeta({ catalogueId, catalogueTotal, name, addres
       }}>
         {name}
       </div>
-      </ViewTransitionBoundary>
 
       {/* hp-meta row: left fields + CTA right */}
       <div className="fbs-hp-meta">
         <div className="fbs-hpm-left">
-          {/* Index badge stacked over the metadata chip, each on its own line.
-              Inline, the two ran together and the index read as the start of
-              the street address — "(003) Dulwich" parses as a house number.
+          {/* Mark stacked over the metadata chip, each on its own line.
+              Inline, the two ran together and the mark read as the start of
+              the street address — "003/ Dulwich" parses as a house number.
               The location and scan date used to be two untreated lines sitting
               straight on the photo, which vanished over bright concrete. */}
-          {(indexLabel || metaLine) && (
+          {(mark || metaLine) && (
             <div className="fbs-hp-idstack">
               {/* Catalogue number and address line both continue onto the park
                   page. The markup there is different — different classes, a
                   fuller address, the scan date split into its own tag — so
                   these rely on the shared name rather than on matching DOM,
                   which is case (b) of the continuity spec. */}
-              {indexLabel && (
-                <ViewTransitionBoundary name={vt?.catalogue}>
-                  <span className={`${BADGE_CLASS} fbs-he-badge`}>{indexLabel}</span>
-                </ViewTransitionBoundary>
-              )}
-              {metaLine && (
-                <ViewTransitionBoundary name={vt?.address}>
-                  <span className={`${CHIP_CLASS} fbs-he-chip`}>{metaLine}</span>
-                </ViewTransitionBoundary>
-              )}
+              {mark && <span className={`${BADGE_CLASS} fbs-he-badge`}>{mark}</span>}
+              {metaLine && <span className={`${CHIP_CLASS} fbs-he-chip`}>{metaLine}</span>}
             </div>
           )}
         </div>

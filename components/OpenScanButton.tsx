@@ -4,7 +4,6 @@ import ParkViewerModal from "./ParkViewerModal";
 
 type Props = {
   modelFile: string;
-  modelFileMobile?: string;
   parkName: string;
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];

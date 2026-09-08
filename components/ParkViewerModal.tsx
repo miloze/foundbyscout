@@ -4,11 +4,11 @@ import { createPortal } from "react-dom";
 
 import ParkHeroViewer from "./ParkHeroViewer";
 import ParkHeroDetails from "./ParkHeroDetails";
-import { BwIcon, ArExitIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton } from "./ViewerControls";
+import { catalogueMark } from "@/lib/catalogue";
+import { BwIcon, ExitIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton, VIEWER_CONTROLS_CSS } from "./ViewerControls";
 
 type Props = {
   modelFile: string;
-  modelFileMobile?: string;
   parkName: string;
   onClose: () => void;
   cameraPos?: [number, number, number];
@@ -34,7 +34,6 @@ type Props = {
   variant?: "fullscreen" | "takeover";
   /** Shown in the panel header ahead of the name, in accent. */
   catalogueId?: string;
-  catalogueTotal?: number;
   /** The park's identity block, rendered over the model in the fullscreen
    *  viewer. Without these the viewer replaced the hero's whole metadata
    *  block with one small park-name label, which on mobile read as the text
@@ -51,7 +50,7 @@ type Props = {
 };
 
 export default function ParkViewerModal({
-  parkName, onClose, variant = "fullscreen", catalogueId, catalogueTotal,
+  parkName, onClose, variant = "fullscreen", catalogueId,
   address, postcode, lat, lng, scanned, preloadImageUrl, ...viewerProps
 }: Props) {
   const isTakeover = variant === "takeover";
@@ -82,6 +81,9 @@ export default function ParkViewerModal({
   // it up. The hero behind stays black and white and is what you come back to,
   // since this unmounts on close.
   const [bw, setBw] = useState(false);
+  // Shown on entry, withdrawn on the first gesture — or on a timer if none
+  // arrives, so it never becomes permanent copy over the scan.
+  const [hintShown, setHintShown] = useState(true);
 
   useEffect(() => {
     const doc = document.documentElement;
@@ -113,6 +115,20 @@ export default function ParkViewerModal({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // The first touch on the stage is the gesture the hint was describing, so
+  // that is what stands it down. The timer is the backstop for someone who
+  // reads it and does nothing.
+  useEffect(() => {
+    if (!hintShown) return;
+    const dismiss = () => setHintShown(false);
+    const t = setTimeout(dismiss, 6000);
+    window.addEventListener("pointerdown", dismiss, { once: true, passive: true });
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("pointerdown", dismiss);
+    };
+  }, [hintShown]);
 
   // Rendered into <body>, not where it sits in the tree. The park page mounts
   // this inside <div class="contained">, and `position: fixed` only escapes
@@ -173,7 +189,13 @@ export default function ParkViewerModal({
             // put grey-on-near-black in the header.
             textTransform: "uppercase", color: "rgba(255,255,255,0.55)",
           }}>
-            {catalogueId && <span style={{ color: "var(--accent)" }}>{catalogueId}/ </span>}
+            {/* The catalogue mark, built by the one helper that builds it —
+                this was rendering the raw column with a slash appended, so a
+                row written as "SCN/003" showed "SCN/003/" here and "003/"
+                everywhere else. */}
+            {catalogueMark(catalogueId) && (
+              <span style={{ color: "var(--accent)" }}>{catalogueMark(catalogueId)} </span>
+            )}
             {parkName}
           </span>
           <button
@@ -215,7 +237,6 @@ export default function ParkViewerModal({
             <ParkHeroDetails
               name={parkName}
               catalogueId={catalogueId}
-              catalogueTotal={catalogueTotal}
               address={address}
               postcode={postcode}
               lat={lat}
@@ -273,7 +294,6 @@ export default function ParkViewerModal({
       >
         <ParkHeroViewer
           modelFile={viewerProps.modelFile}
-          modelFileMobile={viewerProps.modelFileMobile}
           cameraPos={viewerProps.cameraPos}
           cameraTarget={viewerProps.cameraTarget}
           modelRotation={viewerProps.modelRotation}
@@ -302,23 +322,24 @@ export default function ParkViewerModal({
         right: isTakeover ? "calc(var(--vm-inset) + 20px)" : 12,
         zIndex: 3,
       }}>
-        <ViewerCluster>
-          {/* The icon reports the current state, not the action the title
-              describes: filled and orange while colour is on, empty outline
-              while it's stripped. Both were bound to `bw` — outline for
-              colour, fill for B&W — which read backwards, since an empty
-              shape suggests nothing applied. */}
+        <ViewerCluster label="Scan controls">
+          {/* The icon reports the current state, the label the action: filled
+              and accented while colour is on, empty outline while it's
+              stripped. */}
           <ViewerClusterButton
-            onClick={() => setBw(b => !b)}
-            title={bw ? "Show colour" : "Show B&W"}
+            label={bw ? "Show the scan in colour" : "Show the scan in black and white"}
+            icon={<BwIcon filled={!bw} />}
             active={!bw}
-          >
-            <BwIcon filled={!bw} />
-          </ViewerClusterButton>
+            onClick={() => setBw(b => !b)}
+          />
           <ViewerClusterDivider />
-          <ViewerClusterButton onClick={onClose} title="Exit 3D view">
-            <ArExitIcon />
-          </ViewerClusterButton>
+          {/* A cross, not the slashed cube this used to carry — see ExitIcon.
+              Never `active`: exit stays out of the accent vocabulary. */}
+          <ViewerClusterButton
+            label="Exit 3D view"
+            icon={<ExitIcon />}
+            onClick={onClose}
+          />
         </ViewerCluster>
       </div>
 
@@ -339,9 +360,37 @@ export default function ParkViewerModal({
         </div>
       )}
 
+      {/* The shipped mobile viewer had no instructions at all: this hint was
+          gated on `isTakeover`, and ParkHeroShell only ever opens the
+          fullscreen variant. Temporary rather than resident — it stands down
+          on the first gesture, or after 6s if none comes — because permanent
+          instructional copy over a scan is exactly what the hero avoids. */}
+      {!isTakeover && (
+        <div className={`fbs-vm-hint${hintShown ? " is-shown" : ""}`} aria-hidden={!hintShown}>
+          <span className="fbs-cta fbs-cta--ghost">Drag to rotate · Pinch to zoom</span>
+        </div>
+      )}
+
       </div>
 
       <style>{`
+        ${VIEWER_CONTROLS_CSS}
+        /* Top, not bottom. The desktop takeover puts its hint at the bottom
+           because nothing else is down there; in the fullscreen viewer the
+           bottom half is the park's identity block — name, coordinates,
+           address, scanned date — and a centred hint landed across the address
+           line. The top of this viewer is empty. */
+        .fbs-vm-hint{
+          position:absolute; left:0; right:0; z-index:3;
+          top:calc(16px + env(safe-area-inset-top, 0px));
+          display:flex; justify-content:center; pointer-events:none;
+          opacity:0; transform:translateY(-6px);
+          transition:opacity 200ms ease, transform 200ms ease;
+        }
+        .fbs-vm-hint.is-shown{ opacity:1; transform:none; }
+        @media (prefers-reduced-motion: reduce){
+          .fbs-vm-hint{ transition-duration:.01ms; }
+        }
         /* Window inset and curve. Not raw vw/vh: on a 13" laptop a percentage
            inset eats a far bigger share of the window than on a 27" monitor,
            so the frame stopped reading as a margin and started reading as a

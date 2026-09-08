@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchCatalogueTotal } from "@/lib/catalogue";
+import { catalogueMark } from "@/lib/catalogue";
+import CTAButton from "@/components/CTAButton";
 import HeroEntrance from "@/components/HeroEntrance";
 import { VISITED_COOKIE } from "@/lib/first-visit";
 import ParkHeroMeta from "@/components/ParkHeroMeta";
-import CTAButton from "@/components/CTAButton";
 import HeroNavOverlay from "@/components/HeroNavOverlay";
 import FooterWordmark from "@/components/FooterWordmark";
+import FoundObject from "@/components/FoundObject";
+import { FOUND_OBJECT_SLUGS } from "@/lib/foundObjects";
+import HomeLogoHandoff from "@/components/HomeLogoHandoff";
 
 // cookies() below already opts this route into per-request rendering, so this
 // is redundant today — and kept anyway. The featured park is chosen per request;
@@ -28,18 +31,26 @@ export default async function Home() {
   // <HeroEntrance>, since a Server Component can't set one.
   const firstVisit = !(await cookies()).has(VISITED_COOKIE);
 
-  // catalogueTotal is the whole published catalogue, deliberately not
-  // heroPool.length — the pool is filtered down to parks that have a hero
-  // image, so counting it would print a total smaller than the archive and
-  // disagree with the same badge on the park page.
-  const [{ data: featuredParks }, { data: heroPool }, catalogueTotal] = await Promise.all([
+  // No catalogue count is read here. The collection header used to print one
+  // and the hero badge before that; neither does now — see the note on the
+  // header's CTA for why the homepage deliberately does not foreground how
+  // many parks the archive currently holds.
+  //
+  // postcode is in the strip's columns for the secondary field-notation line
+  // ("SE24 / SOUTH LONDON"). Columns are still named rather than *.
+  const [{ data: featuredParks }, { data: heroPool }, { data: foundObjectParks }] = await Promise.all([
     db
       .from("parks")
-      .select("slug, name, location, type, hero_image, thumbnail, catalogue_id")
+      .select("slug, name, location, postcode, type, hero_image, thumbnail, catalogue_id, sort_order")
       .eq("published", true)
       .gt("sort_order", 0)
       .order("sort_order", { ascending: true })
-      .limit(4),
+      // Eight, not four. The grid below is repeat(4, 1fr) and wraps on its own,
+      // so the second four land as a second row of the same catalogue at the
+      // same 2px gutter — one selection, no second heading, no new container.
+      // Nothing here fabricates rows: with four published parks this renders
+      // one row today and becomes two the moment 007-010 exist.
+      .limit(8),
     // Random-from-archive, replacing the Bloblands hardcode. Only parks that
     // actually have a hero image are eligible: this hero is that image at full
     // bleed, so a pick without one would render the #111 fallback and read as
@@ -56,13 +67,23 @@ export default async function Home() {
       .eq("published", true)
       .not("hero_image", "is", null)
       .neq("hero_image", ""),
-    fetchCatalogueTotal(db),
+    // Found Object reads its park facts from here rather than carrying its own
+    // copies. Two rows, named columns: the name for the display type, the
+    // postcode and region for the field notation, the coordinates for the
+    // position. A hardcoded copy of any of these is how the module came to
+    // print SE24 for a park whose postcode is SE27.
+    db
+      .from("parks")
+      .select("slug, name, postcode, location, lat, lng")
+      .in("slug", FOUND_OBJECT_SLUGS)
+      .eq("published", true),
   ]);
 
   // A different park per request. Nothing is remembered between visits, so the
   // same park can repeat — that's the intent, not a shuffle through the set.
   const pool = heroPool ?? [];
   const featured = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+
 
   // Derive tag list from structured fields
   const featureTags: string[] = featured ? [
@@ -73,6 +94,10 @@ export default async function Home() {
 
   return (
     <div>
+      {/* Releases the fixed Scout mark once the PARKS heading reaches it, so the
+          catalogue is not read through the logo. Homepage only. */}
+      <HomeLogoHandoff targetId="fbs-parks-heading" />
+
       {/* HERO — static single-park feature */}
       {featured && (
         <section
@@ -106,7 +131,9 @@ export default async function Home() {
           }}
         >
           {/* Makes the nav transparent while this hero is behind it */}
-          <HeroNavOverlay />
+          {/* tone="photo": a full-bleed photograph runs under the bar here,
+              so the nav cannot use its theme colours over it. */}
+          <HeroNavOverlay tone="photo" />
 
           {/* Carries the entrance's stylesheet and writes the visited cookie.
               Mounted only on a first visit, so neither exists otherwise. */}
@@ -153,9 +180,9 @@ export default async function Home() {
                 come from --logo-w / --logo-h, which Nav measures and
                 publishes, so the badge tracks the logo across every
                 breakpoint instead of being re-tuned against it. */}
-            <div style={{
+            <div className="fbs-he-badge-row" style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              gap: 24, height: "var(--logo-h, 96px)", marginTop: "var(--logo-top, 10px)",
+              gap: 24, height: "var(--logo-h, 96px)",
             }}>
             <div aria-hidden style={{ width: "var(--logo-w, 262px)", flexShrink: 0 }} />
             {/* Snaps in with the catalogue badge while the image is still
@@ -184,7 +211,6 @@ export default async function Home() {
           <div className="contained" style={{ position: "relative", zIndex: 2 }}>
             <ParkHeroMeta
               catalogueId={featured.catalogue_id ?? undefined}
-              catalogueTotal={catalogueTotal || undefined}
               name={featured.name}
               address={featured.address}
               postcode={featured.postcode}
@@ -201,7 +227,7 @@ export default async function Home() {
           statement to read, not a display word, so it stays sentence case and
           sits below the section headings in the hierarchy. The second sentence
           is muted so the claim leads and the detail follows. */}
-      <section style={{ paddingTop: "clamp(3rem, 7vw, 5rem)", paddingBottom: "clamp(2rem, 5vw, 3rem)" }}>
+      <section style={{ paddingTop: "clamp(3rem, 7vw, 5rem)", paddingBottom: "clamp(1.5rem, 3.5vw, 2.25rem)" }}>
         <p style={{
           fontFamily: "var(--font-heading)",
           fontSize: "clamp(1.25rem, 2.6vw, 2rem)",
@@ -217,19 +243,41 @@ export default async function Home() {
         </p>
       </section>
 
-      {/* DIRECTORY CTA + FEATURED PARKS */}
-      <section style={{ paddingTop: "5rem", paddingBottom: "6rem" }}>
+      {/* PARKS COLLECTION
+          The proposition above used to hand off to the collection through an
+          EXPLORE eyebrow, a second line of copy restating what the parks are,
+          and an EXPLORE button — a marketing layer between the reader and the
+          photography, and about 200px of it. All three are gone. What is left
+          is the collection announcing itself and saying how big it is, which
+          is the same pair /parks leads with (.pda-count there: display name
+          over a mono count).
 
-        {/* Header row — label */}
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--muted)" }}>
-            Explore
-          </p>
-        </div>
+          The whitespace either side is deliberately still generous — the point
+          was to remove the redundant layer, not to tighten the page. */}
+      <section style={{ paddingTop: "clamp(1.5rem, 3.5vw, 2.5rem)", paddingBottom: "6rem" }}>
 
-        {/* Full-width heading + description */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "clamp(2rem, 6vw, 6rem)", marginBottom: "3rem", flexWrap: "wrap" }}>
-          <h2 style={{
+        {/* PARKS / VIEW ALL PARKS →. The heading keeps the section-heading
+            rule it already had, untouched.
+
+            The four cards below are a *selection*, not the archive, and the
+            header is the only thing that can say so. A count cannot do it:
+            printed beside four cards it reads as a caption for those four, and
+            printed in the link it invites the reader to size the archive at
+            the moment it is smallest. The link alone carries the point — there
+            is more than this, and here is the way to it — without quoting a
+            figure that has to grow before it flatters.
+
+            Baseline, not flex-end. flex-end aligns the two *boxes*, and the
+            heading's 0.9 line-height puts its box bottom nowhere near its
+            baseline — measured, that dropped the CTA about 10px below the foot
+            of PARKS. Baseline sets the button's label on the heading's own
+            line, from the type's metrics rather than a measured offset that
+            would go stale if the heading's size or leading changed. */}
+        <div style={{
+          display: "flex", alignItems: "baseline", justifyContent: "space-between",
+          gap: "clamp(1rem, 4vw, 3rem)", marginBottom: "clamp(1.25rem, 2.5vw, 1.75rem)",
+        }}>
+          <h2 id="fbs-parks-heading" style={{
             fontFamily: "var(--font-display), Arial, sans-serif",
             fontSize: "clamp(3rem, 7vw, 6rem)",
             lineHeight: 0.9,
@@ -240,15 +288,20 @@ export default async function Home() {
           }}>
             Parks
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1.25rem", maxWidth: "44ch" }}>
-            <p style={{ color: "var(--muted)", lineHeight: 1.65, fontSize: 15 }}>
-              Discover our growing collection of carefully documented skateparks.
-            </p>
-            {/* Same component as the hero's View scan — this was a separate
-                inline-styled Link at 10px/400/.14em with no radius, which had
-                drifted from the hero on type, corner and hover. */}
-            <CTAButton label="Explore" href="/parks" />
-          </div>
+          {/* The site's CTA, not a new one: same component, same DM Mono 11/500,
+              same 3px corner, same caret and the same nudge as VIEW SCAN. Only
+              the label is this section's. The EXPLORE button that used to sit
+              under a paragraph of copy was already this component — what is
+              gone is the marketing layer around it, not the control.
+
+              No count in the label. "VIEW ALL 4 PARKS" is accurate and is
+              exactly the wrong thing to lead with: it invites the reader to
+              measure the archive at the moment it is smallest, and it would
+              read as a smaller claim than "VIEW ALL PARKS" until the catalogue
+              is well into double figures. The link still does the job the count
+              was added for — it says these four are a selection and that there
+              is somewhere else to go — without pricing the collection. */}
+          <CTAButton label="View all parks" href="/parks" />
         </div>
 
         {/* Thumbnails — 4 across */}
@@ -281,40 +334,113 @@ export default async function Home() {
                   />
                 )}
                 <div className="fbs-thumb-overlay" />
-                {/* Informational, not interactive — outline rather than the
-                    accent fill it used to carry. This one sits on photography
-                    rather than a flat page, so it keeps a faint dark backing:
-                    a bare muted outline disappears entirely over a light frame.
-                    Still no accent, still not a filled chip. */}
-                <span className="fbs-meta-tag fbs-meta-tag--on-image" style={{
-                  position: "absolute", top: 10, left: 10,
-                }}>
-                  {park.type}
-                </span>
+                {/* The type used to sit here as a rounded outline pill over the
+                    photograph — the last .fbs-meta-tag on the site. It reads as
+                    tertiary metadata, so it has moved down into the card's
+                    field notation with the rest of it, and the frame is left as
+                    a photograph. */}
               </div>
+              {/* Field notation — the same three tiers the park cards carry:
+                    001/ CRYSTAL PALACE
+                    SE19 / SOUTH LONDON
+                    BOWL
+                  The layout is this strip's own (the name is body type at 13px,
+                  not the display face, because these cells are a quarter of a
+                  row wide). Only the notation is shared. */}
               <div style={{ padding: "10px 12px 14px" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em" }}>
-                  {/* Catalogue no. leads the name, same line. The SCN/ prefix
-                      is stripped the same way the hero and park page do it, so
-                      the archive reference reads identically everywhere. */}
-                  {park.catalogue_id && (
-                    <span style={{
-                      fontFamily: "var(--font-mono)", color: "var(--accent)",
-                      letterSpacing: "0.04em", marginRight: 7,
-                    }}>
-                      {park.catalogue_id.replace(/^SCN\//i, "")}
-                    </span>
-                  )}
+                {/* The catalogue mark, from the one helper that builds it. This
+                    was a bare "003" with no slash — a third format for a fact
+                    the cards and the hero were already agreeing on. */}
+                {catalogueMark(park.catalogue_id) && (
+                  <p style={{
+                    fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 500,
+                    color: "var(--accent)", letterSpacing: "0.08em",
+                    textTransform: "uppercase", marginBottom: 3,
+                  }}>
+                    {catalogueMark(park.catalogue_id)}
+                  </p>
+                )}
+                {/* The display face, uppercase — the same rule that names a
+                    park in the directory, the grid and both heroes. It was
+                    13px/600 Geist, which is a weight Geist does not ship
+                    (next/font loads 300 and 400 only), so the browser was
+                    faking the bold and the name still sat only 3px clear of
+                    its own 10px metadata. 16px/600 on MSCHN is a real cut and
+                    a real step up in rank, without touching the metadata
+                    below it or the 3:4 frame above. Scaled to the cell, not
+                    to the grid's 18px tile — these are a quarter of a row. */}
+                <p style={{
+                  fontFamily: "var(--font-display), Arial, sans-serif",
+                  fontSize: 16,
+                  fontWeight: 600,
+                  fontVariationSettings: "'wght' 600",
+                  lineHeight: 1.15,
+                  letterSpacing: "0.005em",
+                  textTransform: "uppercase",
+                }}>
                   {park.name}
                 </p>
-                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>{park.location}</p>
+                {(park.postcode || park.location) && (
+                  <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 3, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    {[park.postcode?.split(" ")[0], park.location].filter(Boolean).join(" / ")}
+                  </p>
+                )}
+                {park.type && (
+                  <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    {park.type}
+                  </p>
+                )}
               </div>
             </Link>
           ))}
         </div>
       </section>
 
+{/* FOUND OBJECT — the archive exhibiting one scanned form.
+
+          Third of three things the homepage does, and deliberately the only
+          one that is not a way into a park: the hero features a place, PARKS
+          browses places, and this shows skateable *form* on its own. Placed
+          after the eight and before the wordmark because it is the one that
+          does not end.
+
+          VIEW ALL PARKS stays in the PARKS header rather than moving down
+          here — it belongs to the selection ("these eight are not all of
+          them"), it is already baseline-aligned with the heading, and this
+          module is not an alternative route to the catalogue for it to sit
+          after.
+
+          The Random Park prototype it replaces is paused, not deleted:
+          components/RandomPark.tsx and randomRenderUrl() are both still there
+          and still work. */}
+      <FoundObject parks={foundObjectParks ?? []} />
+
       <style>{`
+        /* The postcode badge's band, at every width.
+
+           It used to sit on var(--logo-top) on desktop — the logo's own band —
+           on the theory that sharing the mark's band tied the two together.
+           But --logo-top is 56px and the 44px theme control ends at 56px too
+           (12px of nav padding + 44), so the badge's circle, being 5% taller
+           than the row it centres in, started ~1.6px *above* that line. On
+           desktop the badge read as hanging off the theme control rather than
+           as part of the photograph, which is the same fault narrow widths
+           were already fixed for.
+
+           So the narrow rule is now the only rule: measure down from the bar
+           itself, --nav-height + 20px, rather than from the logo. The bar's
+           bottom edge is the thing the badge has to clear, and --nav-height is
+           published from the bar's measured height, so this tracks the bar if
+           the bar ever changes rather than being a desktop number of its own.
+           It leaves ~30px between the theme control's bottom and the top of
+           the badge at desktop and ~31px at narrow — the badge sits on the
+           hero, clear of the header, at both.
+
+           Mobile is untouched: it was already this expression, so the value it
+           computes there is unchanged. Right alignment, size, type and colour
+           are untouched everywhere. */
+        .fbs-he-badge-row { margin-top: calc(var(--nav-height, 68px) + 20px); }
+
         .fbs-thumb-img { color: transparent; transition: filter 0.4s ease; }
         /* .fbs-colour was the opt-out from the grayscale default. Nothing in
            the app ever set that class on an ancestor, so it never fired and

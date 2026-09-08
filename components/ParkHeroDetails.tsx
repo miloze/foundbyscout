@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Coords from "./Coords";
 import ParkWeather from "./ParkWeather";
-import { catalogueIndexLabel } from "@/lib/catalogue";
+import { catalogueMark } from "@/lib/catalogue";
 import ViewTransitionBoundary from "./ViewTransitionBoundary";
-import { heroTransitionNames, parkDetailTransitionNames } from "@/lib/view-transitions";
+import { parkTitleTransitionName, parkDetailTransitionNames } from "@/lib/view-transitions";
 
 /**
  * The park's identity block — name, catalogue index, address, coordinates,
@@ -43,8 +44,6 @@ export function fmtDate(val: string): string {
 type Props = {
   name: string;
   catalogueId?: string;
-  /** Size of the published catalogue — the "/11" half of the index badge. */
-  catalogueTotal?: number;
   address?: string[];
   postcode?: string;
   lat?: number;
@@ -68,13 +67,18 @@ function named(name: string | undefined, children: ReactNode) {
 }
 
 export default function ParkHeroDetails({
-  name, catalogueId, catalogueTotal, address, postcode, lat, lng, scanned, slug, compact, rightSlot,
+  name, catalogueId, address, postcode, lat, lng, scanned, slug, compact, rightSlot,
 }: Props) {
-  const vt = slug ? heroTransitionNames(slug) : null;
+  // Title only. See lib/view-transitions — this is the park-to-park slide,
+  // not the retired home-to-park morph.
+  const titleName = slug ? parkTitleTransitionName(slug) : undefined;
   const vtDetail = slug ? parkDetailTransitionNames(slug) : null;
 
-  // Shared with the homepage hero — see lib/catalogue.
-  const indexLabel = catalogueIndexLabel(catalogueId, catalogueTotal);
+  // The catalogue mark, not the index badge. This row names the park; it is
+  // not a position in a walk, so the "/11" the badge used to carry was
+  // counting against a sequence that is not here. The prev/next cluster in
+  // ParkHeroShell is the one place that total is true — see lib/catalogue.
+  const mark = catalogueMark(catalogueId);
   const areaName = address && address.length > 1 ? address[1] : address?.[0];
   const locationChain = [areaName, "London", postcode].filter(Boolean).join(", ").toUpperCase();
   const hasCoords = lat != null && lng != null;
@@ -86,11 +90,12 @@ export default function ParkHeroDetails({
           rejected in review, so prev/next moved out to the header's utility
           cluster and this is back to being only the park's name.
 
-          It still carries the view-transition class, because the park-to-park
-          title slide survived the move — the header buttons set its direction
-          now. See markParkNavDirection and app/globals.css. */}
+          It still carries a view-transition name and class, and that is now
+          the only reason either exists: the park-to-park slide, set by the
+          header's prev/next buttons. The home-to-park morph this name once
+          also served is gone. See markParkNavDirection and app/globals.css. */}
       <div className={compact ? "fbs-title-row fbs-title-row--compact" : "fbs-title-row"}>
-        {named(vt?.name, <>
+        {named(titleName, <>
           <span className="fbs-title">{name}</span>
         </>)}
       </div>
@@ -104,31 +109,29 @@ export default function ParkHeroDetails({
       <div className="fbs-hero-meta">
       <div className="fbs-hm-left">
       <div className="fbs-field-row">
-        {(indexLabel || hasCoords) && (
+        {(mark || hasCoords) && (
           <div className="fbs-field-line">
-            {indexLabel && (
-              named(vt?.catalogue, <>
-                <span className="fbs-field-tag fbs-field-tag--cat">{indexLabel}</span>
-              </>)
-            )}
-            {hasCoords && (
-              named(vtDetail?.coords, <>
-                <a
-                  href={`https://maps.google.com/?q=${lat},${lng}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="fbs-field-tag fbs-field-tag--chip fbs-coord-tag"
-                >
-                  {Math.abs(lat!).toFixed(4)}° {lat! >= 0 ? "N" : "S"}, {Math.abs(lng!).toFixed(4)}° {lng! >= 0 ? "E" : "W"}
-                </a>
-              </>)
-            )}
+            {/* No transition name. This paired with the homepage badge to
+                morph the mark across the navigation; that pairing is gone and
+                a name with nothing to pair against would only give this chip a
+                fade of its own, out of step with the frame around it. */}
+            {mark && <span className="fbs-field-tag fbs-field-tag--cat">{mark}</span>}
+            {/* The formatting and the Maps link now come from <Coords>, shared
+                with the homepage's Found Object. The classes and therefore the
+                appearance are unchanged and still styled below — only the
+                string-building moved. */}
+            <Coords
+              lat={lat}
+              lng={lng}
+              className="fbs-field-tag fbs-field-tag--chip fbs-coord-tag"
+              wrap={node => named(vtDetail?.coords, node)}
+            />
           </div>
         )}
 
+        {/* Likewise unnamed — it paired with the homepage's address chip. */}
         {locationChain && (
-          named(vt?.address, <>
-            <span className="fbs-field-tag fbs-field-tag--chip">{locationChain}</span>
-          </>)
+          <span className="fbs-field-tag fbs-field-tag--chip">{locationChain}</span>
         )}
 
         {(scanned || hasCoords) && (

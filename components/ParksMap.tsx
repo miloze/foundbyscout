@@ -29,9 +29,21 @@ const REGION_BOUNDS: Record<string,[[number,number],[number,number]]> = {
 };
 
 
-type CardState = "hidden" | "peek";
+type CardState = "hidden" | "peek" | "expanded";
 
-const PEEK_H = 196;
+// The collapsed sheet's height, used to offset the map's pan so the selected
+// marker is never parked underneath it.
+const PEEK_H = 162;
+// The photographic strip in the collapsed sheet. 80px, chosen against real
+// park photography rather than picked as the smallest number that fits: at
+// 60-70px the bowl lip and transitions flatten into a band and a reader cannot
+// tell a bowl from a street plaza; by 80px the form reads. 90 and 100 add
+// little the crop had not already given. The sources are 16:10, so 80px on a
+// full-width sheet is roughly a 4.3:1 slice of the frame.
+const PEEK_IMAGE_H = 80;
+// Below this much map height the desktop strip drops its thumbnail and its
+// attributes and tightens its padding.
+const SHORT_H = 440;
 const DOT_WINDOW = 7;
 
 // Sliding window of dot indices centred on `active`, capped at `max` — real
@@ -99,8 +111,14 @@ function satelliteMap(token: string | undefined): TileSource {
 
 export default function ParksMap({
   search,
+  focus = null,
 }: {
   search: string;
+  // A park to open from outside — the directory's search dropdown picks one and
+  // wants exactly what tapping its pin does. Carries a sequence number rather
+  // than a bare id so picking the same park twice re-centres it instead of
+  // being swallowed as an unchanged prop.
+  focus?: { id: string; seq: number } | null;
 }) {
   const router = useRouter();
   const [parks, setParks] = useState<Park[]>([]);
@@ -113,6 +131,8 @@ export default function ParksMap({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tileLayerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const indexRef     = useRef<HTMLDivElement>(null);
+  const selectedRowRef = useRef<HTMLButtonElement>(null);
   const cardRef      = useRef<HTMLDivElement>(null);
   const touchStart          = useRef({ x:0, y:0 });
   const touchDir            = useRef<"h"|"v"|null>(null);
@@ -126,8 +146,15 @@ export default function ParksMap({
   const [mapStatus,    setMapStatus]    = useState<"loading"|"ready"|"error">("loading");
   const [mapError,     setMapError]     = useState("");
   const [selectedPark, setSelectedPark] = useState<Park|null>(null);
+  // Preview, not selection. Hovering or keyboard-focusing a row or a marker
+  // lights the other one and nothing else: no camera move, no strip change, no
+  // commitment. Selection is the persistent answer to "which park"; this is
+  // the transient answer to "which one am I pointing at", and where the two
+  // disagree selection wins visually.
+  const [hoveredId, setHoveredId] = useState<string|null>(null);
   const [carouselIdx,  setCarouselIdx]  = useState(0);
   const [cardState,    setCardState]    = useState<CardState>("hidden");
+  const [shortView,    setShortView]    = useState(false);
   const [slideDir,     setSlideDir]     = useState<"left"|"right"|null>(null);
   const [locateTip,    setLocateTip]    = useState(false);
   const [locateError,  setLocateError]  = useState("");
@@ -135,8 +162,18 @@ export default function ParksMap({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const zoomControlRef = useRef<any>(null);
 
+  // Measured here as well as in the map box's ResizeObserver below: the
+  // observer only reports once a reflow happens, so on the first paint of an
+  // already-short window the card would render full-height and clip before
+  // anything resized. This runs on mount and on every window resize; the
+  // observer still covers reflows the window never hears about (the list
+  // column appearing, the bar changing height).
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 900);
+    const check = () => {
+      setIsMobile(window.innerWidth < 900);
+      const h = containerRef.current?.clientHeight ?? 0;
+      if (h > 0) setShortView(h < SHORT_H);
+    };
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -205,8 +242,32 @@ export default function ParksMap({
       parks.forEach(park => {
         if (markerRefs.current[park.id]) return; // already added
         if (!park.lat || !park.lng) return;
-        const dot = L.divIcon({ className:"", html:`<div style="width:12px;height:12px;background:#888;border-radius:50%;border:2px solid rgba(136,136,136,0.3);transition:background .2s,transform .15s;"></div>`, iconSize:[12,12], iconAnchor:[6,6] });
-        markerRefs.current[park.id] = L.marker([park.lat,park.lng],{ icon:dot }).addTo(mapRef.current).on("click",()=>openPark(park));
+        // A survey point, not a pin: one circle, styled from a stylesheet
+        // rather than from inline strings, so default/hover/selected are three
+        // classes instead of six style assignments per marker per render.
+        const dot = L.divIcon({
+          className: "pms-marker",
+          html: `<span class="pms-marker-dot"></span>`,
+          iconSize: [22, 22], iconAnchor: [11, 11],
+        });
+        const m = L.marker([park.lat, park.lng], { icon: dot, keyboard: true })
+          .addTo(mapRef.current)
+          .on("click", () => openPark(park))
+          // Preview only — the map must not move and nothing must be selected.
+          .on("mouseover", () => setHoveredId(park.id))
+          .on("mouseout", () => setHoveredId(null));
+        markerRefs.current[park.id] = m;
+
+        const el: HTMLElement | undefined = m.getElement?.();
+        if (el) {
+          // Leaflet gives markers a tabindex but no accessible name, so a
+          // keyboard user met a row of unlabelled dots.
+          el.setAttribute("role", "button");
+          el.setAttribute("aria-label", `${park.name} skatepark`);
+          // Keyboard focus earns the same preview relationship as hover.
+          el.addEventListener("focus", () => setHoveredId(park.id));
+          el.addEventListener("blur", () => setHoveredId(null));
+        }
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,7 +283,11 @@ export default function ParksMap({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => { mapRef.current?.invalidateSize(); });
+    const ro = new ResizeObserver(() => {
+      mapRef.current?.invalidateSize();
+      const h = containerRef.current?.clientHeight ?? 0;
+      if (h > 0) setShortView(h < SHORT_H);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [mapStatus]);
@@ -233,9 +298,12 @@ export default function ParksMap({
     return () => clearTimeout(id);
   }, [isMobile]);
 
-  // On load: pick a random London park, zoom to it and select it
+  // On load: pick a random London park, zoom to it and select it — unless the
+  // map is being opened *at* a park, in which case the focus effect below owns
+  // the first view and a random pick would only fight it for the camera.
   useEffect(() => {
     if (mapStatus !== "ready" || !mapRef.current || parks.length === 0) return;
+    if (focus) return;
     const londonParks = parks.filter(p => p.location?.includes("London") && p.lat != null && p.lng != null);
     if (!londonParks.length) return;
     const park = londonParks[Math.floor(Math.random() * londonParks.length)];
@@ -278,17 +346,18 @@ export default function ParksMap({
   useEffect(() => {
     Object.entries(markerRefs.current).forEach(([id, marker]) => {
       const visible = filteredParks.some(p => p.id === id);
-      const el = marker.getElement?.()?.querySelector("div");
+      const el: HTMLElement | undefined = marker.getElement?.();
       if (!el) return;
       const sel = selectedPark?.id === id;
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#FF7948";
-      el.style.background    = sel ? accent : "#888";
-      el.style.transform     = sel ? "scale(1.8)" : "scale(1)";
-      el.style.boxShadow     = sel ? `0 0 0 5px ${accent}44` : "none";
-      el.style.opacity       = visible ? "1" : "0.15";
+      // Selection wins: a park that is both selected and hovered reads as
+      // selected, so pointing at the current park never demotes it.
+      el.classList.toggle("is-selected", sel);
+      el.classList.toggle("is-hovered", !sel && hoveredId === id);
+      el.classList.toggle("is-filtered-out", !visible);
+      el.setAttribute("aria-current", sel ? "true" : "false");
       el.style.pointerEvents = visible ? "auto" : "none";
     });
-  }, [selectedPark, filteredParks]);
+  }, [selectedPark, hoveredId, filteredParks]);
 
   const openPark = useCallback((park: Park) => {
     const idx = filteredParks.findIndex(p => p.id === park.id);
@@ -299,10 +368,47 @@ export default function ParksMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredParks, panTo]);
 
+  // Consume a focus request once. The effect re-runs as the map turns ready and
+  // the parks land, so the seq already handled is tracked rather than trusting
+  // it to fire exactly once.
+  const focusHandled = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focus || mapStatus !== "ready" || parks.length === 0) return;
+    if (focusHandled.current === focus.seq) return;
+    const park = parks.find(p => p.id === focus.id);
+    if (!park) return;
+    focusHandled.current = focus.seq;
+    openPark(park);
+  }, [focus, mapStatus, parks, openPark]);
+
+  // Attributes are not in the collapsed peek. Measured both ways at 390x844:
+  // with them the sheet is 199px, without it is 172px — 16% taller for a line
+  // that answers neither of the two questions the map is being asked ("where
+  // is it", "what does it look like"). 27px of map is a poor trade for it, and
+  // the expanded state shows them a tap away.
+  const peekDensity = "standard" as const;
+
   const dismiss = useCallback(() => {
     setCardState("hidden");
     setSelectedPark(null);
   }, []);
+
+  // A park picked on the map may be a park whose row is scrolled out of the
+  // index. Bring it back into view so the two halves keep agreeing about what
+  // is selected. `block: "nearest"` is what keeps this restrained: a row that
+  // is already visible is not moved at all, so clicking rows never scrolls the
+  // list under the pointer. Hover deliberately does not call this — an index
+  // that chases the cursor is unusable.
+  useEffect(() => {
+    const row = selectedRowRef.current;
+    if (!row || !selectedPark) return;
+    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedPark?.id]);
+
+  // Selecting a different park always returns the sheet to its collapsed
+  // state: the expanded sheet is a decision about one park, and carrying it
+  // over would bury the next park's map position behind a tall panel.
+  useEffect(() => { setCardState(s => (s === "hidden" ? s : "peek")); }, [selectedPark?.id]);
 
   const navigate = useCallback((dir: 1 | -1) => {
     const next = (carouselIdx + dir + filteredParks.length) % filteredParks.length;
@@ -333,7 +439,7 @@ export default function ParksMap({
     return () => clearTimeout(id);
   }, [locateError]);
 
-  // ── Touch: swipe down = dismiss, left/right = navigate between parks ──
+  // ── Touch: up = expand, down = collapse then dismiss, left/right = next park ──
   const onCardTouchStart = (e: React.TouchEvent) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     touchDir.current = null;
@@ -366,127 +472,335 @@ export default function ParksMap({
       if (dx < -50) navigate(1);
       else if (dx > 50) navigate(-1);
     } else if (finalDir === "v") {
-      if (dy > 40 && selectedPark) router.push(`/parks/${selectedPark.slug}`); // swipe up → park page
-      if (dy < -40) dismiss();                                                  // swipe down → dismiss
+      // Up opens the sheet rather than opening the park. Swiping up used to
+      // navigate straight to the park page, which made the gesture a
+      // commitment: there was no way to ask for more about a park without
+      // leaving the map. VIEW PARK in the expanded sheet is that commitment
+      // now, and it is a button rather than a gesture.
+      if (dy > 40) setCardState("expanded");
+      // Down steps back one state — expanded collapses to the peek, and the
+      // peek dismisses. Dismissing straight from expanded would throw away
+      // both the sheet and the selection on one gesture.
+      if (dy < -40) {
+        if (cardState === "expanded") setCardState("peek");
+        else dismiss();
+      }
     }
   };
 
-  // Shared bottom sheet — same content model and markup at every breakpoint,
-  // so mobile and desktop can't drift into two maintained card layouts.
+  // ── Mobile: photographic peek, expanding to detail ────────────────────
+  // Collapsed shows a shallow photographic strip over the identity block. The
+  // photograph is not decoration here: on a map the two questions are "where
+  // is it" and "what does it look like", and the terrain is how a reader
+  // answers the second. The old sheet answered it with a 192px image that ate
+  // 57% of the map; this answers it with an 80px crop that costs a quarter of
+  // that. See PEEK_IMAGE_H.
+  const expanded = cardState === "expanded";
   const floatingCard = selectedPark && (
-    <div style={{ position:"absolute", bottom:"calc(20px + env(safe-area-inset-bottom, 0px))", left:16, right:16, zIndex:25, display:"flex", flexDirection:"column", gap:8, isolation:"isolate" }}>
+    <div
+      className={`pms-sheet pms-peek${shortView && !expanded ? " pms-peek--short" : ""}`}
+      style={{ position:"absolute", left:0, right:0, bottom:0, zIndex:25, isolation:"isolate" }}
+    >
       {filteredParks.length > 1 && (
-        <div style={{ display:"flex", justifyContent:"center", gap:5 }}>
+        <div className="pms-dots">
           {getDotWindow(filteredParks.length, carouselIdx, DOT_WINDOW).map(i => (
-            <span key={i} style={{
-              width: i === carouselIdx ? 14 : 5, height:5, borderRadius:3,
-              background: i === carouselIdx ? "#fff" : "rgba(255,255,255,0.55)",
-              boxShadow:"0 1px 3px rgba(0,0,0,0.4)",
-              transition:"width 0.15s ease",
-            }} />
+            <span key={i} className={i === carouselIdx ? "pms-dot pms-dot-on" : "pms-dot"} />
           ))}
         </div>
       )}
       <div
         ref={cardRef}
-        className="fbs-card"
-        onClick={() => { if (didDragRef.current) return; if (selectedPark) router.push(`/parks/${selectedPark.slug}`); }}
+        className="pms-peek-body"
+        onClick={() => { if (didDragRef.current) return; if (!expanded) setCardState("expanded"); }}
         onTouchStart={onCardTouchStart}
         onTouchMove={onCardTouchMove}
         onTouchEnd={onCardTouchEnd}
         style={{
-          background: theme === "dark" ? "rgba(22,22,22,0.97)" : "rgba(248,246,242,0.97)",
-          WebkitBackdropFilter:"blur(16px)",
-          backdropFilter:"blur(16px)",
-          transform:"translateZ(0)",
-          WebkitTransform:"translateZ(0)",
-          borderRadius:12,
-          padding:"16px 18px 18px",
-          boxShadow:"0 8px 32px rgba(0,0,0,0.28)",
-          cursor:"pointer", userSelect:"none",
-          animation: slideDir ? `fbs-slide-${slideDir === "left" ? "l" : "r"} 0.22s ease both` : "fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both",
+          animation: slideDir
+            ? `fbs-slide-${slideDir === "left" ? "l" : "r"} 0.22s ease both`
+            : "fbs-card-in 0.28s cubic-bezier(0.32,0.72,0,1) both",
         }}
       >
-        {/* Swipe handle */}
-        <div style={{ width:32,height:3,background:"var(--border)",borderRadius:2,margin:"0 auto 14px" }} />
+        <div className="pms-peek-grip" aria-hidden />
 
-        <ParkCard park={selectedPark} idx={carouselIdx} variant="map" showLocation={false} showAddress />
-        <ParkCardThumbnail park={selectedPark} variant="map" />
-        <ParkCardCTA slug={selectedPark.slug} />
+        {expanded ? (
+          <>
+            <div className="pms-peek-id">
+              <ParkCard park={selectedPark} density="expanded" />
+            </div>
+            <ParkCardThumbnail park={selectedPark} variant="map" />
+            <ParkCardCTA slug={selectedPark.slug} />
+          </>
+        ) : (
+          <>
+            {/* Photograph first, and flush to the sheet's edges — a strip
+                across the top rather than a picture inside a card.
+                Dropped on a landscape phone: there the map canvas is only
+                ~175px, and an 80px strip plus the identity block was taller
+                than the map it sits on. Geography stays; the photograph is
+                what a reader can get by expanding. */}
+            {!shortView && <ParkCardThumbnail park={selectedPark} variant="peek" />}
+            <div className="pms-peek-id pms-peek-id--row">
+              <ParkCard park={selectedPark} density={peekDensity} />
+              <button
+                type="button"
+                className="pms-peek-expand"
+                aria-label="Show more about this park"
+                aria-expanded={false}
+                onClick={e => { e.stopPropagation(); setCardState("expanded"); }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 15l-6-6-6 6" /></svg>
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 
-  // Desktop split view — large image-led card anchored bottom-left of the map
-  // panel, synced with the list column instead of a swipeable bottom sheet.
+  // ── Desktop: bottom information strip ─────────────────────────────────
+  // Attached to the foot of the map rather than floating at its bottom-left.
+  // The old card sat directly against the index column, so the two read as one
+  // ~700px block down the left of the viewport and geography was pushed into
+  // the right half. A strip spans the map instead: it costs ~14% of the map's
+  // height instead of 55%, and because the axis is horizontal the park name is
+  // no longer competing with a fixed-width button for a 76px column.
   const splitCard = selectedPark && (
-    <div
-      ref={cardRef}
-      onClick={() => router.push(`/parks/${selectedPark.slug}`)}
-      style={{
-        position:"absolute", left:12, bottom:12, zIndex:25,
-        width:"clamp(280px, 24vw, 380px)",
-        background: theme === "dark" ? "rgba(22,22,22,0.97)" : "rgba(248,246,242,0.97)",
-        WebkitBackdropFilter:"blur(16px)",
-        backdropFilter:"blur(16px)",
-        borderRadius:12,
-        overflow:"hidden",
-        boxShadow:"0 8px 32px rgba(0,0,0,0.28)",
-        cursor:"pointer", userSelect:"none",
-        animation:"fbs-split-in 0.32s cubic-bezier(0.32,0.72,0,1) both",
-      }}
-    >
-      <ParkCardThumbnail park={selectedPark} variant="feature" />
-      <div style={{ padding:"12px 14px 14px" }}>
-        <ParkCard park={selectedPark} idx={carouselIdx} variant="feature" showTags={false} showLocation showAddress={false} showBrief />
-        <ParkCardCTA slug={selectedPark.slug} />
+    <div ref={cardRef} className={`pms-panel pms-strip${shortView ? " pms-strip--short" : ""}`}>
+      <div className="pms-strip-id">
+        <ParkCard park={selectedPark} density={shortView ? "standard" : "expanded"} />
       </div>
+      {/* Secondary, and the first two things to go when the strip narrows —
+          attributes, then the thumbnail. Name and geography never drop. */}
+      {!shortView && (
+        <div className="pms-strip-thumb">
+          <ParkCardThumbnail
+            park={selectedPark}
+            variant="strip"
+            onClick={() => router.push(`/parks/${selectedPark.slug}`)}
+          />
+        </div>
+      )}
+      <ParkCardCTA slug={selectedPark.slug} />
     </div>
   );
 
   return (
-    <div data-parks-page style={{ height: "100%" }}>
+    <div data-parks-page style={{ height: "100%", ["--pms-edge" as string]: shortView ? "14px" : "28px" }}>
       <style>{`
         @keyframes fbs-spin      { to { transform:rotate(360deg); } }
         @keyframes fbs-fade-up   { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes fbs-card-in   { from { transform:translateY(${PEEK_H + 20}px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        @keyframes fbs-card-in   { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
         @keyframes fbs-slide-l   { from { opacity:0; transform:translateX(28px);  } to { opacity:1; transform:translateX(0); } }
         @keyframes fbs-slide-r   { from { opacity:0; transform:translateX(-28px); } to { opacity:1; transform:translateX(0); } }
-        @keyframes fbs-split-in  { from { transform:translateY(232px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        @keyframes fbs-strip-in  { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
         .leaflet-container { background:var(--background) !important; }
         .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.4) !important; color:#888 !important; }
         .leaflet-control-attribution a { color:#aaa !important; }
+        /* Zoom is overlay UI on the map, not map imagery: it takes the page
+           gutter off the canvas's right edge, lining up with the satellite and
+           locate pair above it and the Explore/Grid toggle above them. The
+           bottom offset is the same clearance the detail card uses, so neither
+           can run off a short window. Attribution keeps Leaflet's own corner. */
+        .leaflet-bottom.leaflet-right .leaflet-control-zoom{
+          margin-right:var(--pda-gutter, 24px);
+          margin-bottom:var(--pms-edge, 28px);
+        }
+        /* ── Card scale, declared by the layout ────────────────────────────
+           The scale a park card is set at is a property of the box it has been
+           put in, so each surface states its own. ParkCard carries the language
+           and the defaults; these override only what differs. */
+        .pms-sheet{ --pcard-title-size: clamp(18px, 4.5vw, 22px); }
+        .pms-panel{
+          --pcard-title-size: clamp(18px, 1.5vw, 22px);
+          --pcard-place-size: 10px;
+          --pcard-place-tracking: .1em;
+          --pcard-mark-gap: 2px;
+          --pcard-place-gap: 4px;
+        }
+
+        /* ── Desktop: bottom information strip ─────────────────────────────
+           Attached to the foot of the map, spanning it. Sharp: no radius, no
+           shadow, no blur, no gradient — a hairline and a solid ground are
+           what separate it from the map, the same way every other edge on the
+           site is drawn. The floating card this replaces had all four, and sat
+           against the index column so the two read as one block down the left
+           of the viewport. */
+        .pms-strip{
+          position:absolute; left:0; right:0; bottom:0; z-index:25;
+          display:flex; align-items:center; gap:clamp(16px, 2vw, 32px);
+          padding:14px var(--pda-gutter, 24px);
+          background:var(--pda-bg);
+          border-top:1px solid var(--pda-line);
+          animation:fbs-strip-in .28s cubic-bezier(0.32,0.72,0,1) both;
+        }
+        /* The identity block takes the room. flex:1 with min-width:0 is what
+           stops the CTA and the thumbnail reserving width away from the park
+           name — the failure the 280px card had, where VIEW PARK got 112px and
+           the name got 76. Nothing here is flex-basis'd off content. */
+        .pms-strip-id{ flex:1 1 auto; min-width:0; }
+        /* The name wraps rather than ellipsises. A second line is honest; a
+           truncated park name is not, and this is the one thing on the strip
+           that must always be readable in full. */
+        .pms-strip .pcard-name{ white-space:normal; overflow:visible; }
+        .pms-strip-thumb{ flex:0 0 auto; height:72px; }
+        .pms-strip .pcard-cta-row{ flex:0 0 auto; margin:0; }
+
+        /* Drop order when the strip narrows: attributes first, then the
+           thumbnail. Never the name, never the geography. Keyed to the
+           viewport because the strip's own width is the map's, which is the
+           viewport less the 356px index column. */
+        @media (max-width: 1200px){ .pms-strip .pcard-tags{ display:none; } }
+        @media (max-width: 1050px){ .pms-strip-thumb{ display:none; } }
+
+        /* Short viewport — the same strip, tightened. Not a separate card:
+           the 280px mini-card that used to appear here was a second layout to
+           maintain and it truncated the name by 62%. */
+        .pms-strip--short{ padding:10px var(--pda-gutter, 24px); }
+
+        /* ── Mobile: photographic peek ─────────────────────────────────────
+           Full-bleed to the screen edges and square-cornered, so the
+           photograph reads as a strip across the sheet rather than a picture
+           inside a floating card. */
+        .pms-peek-body{
+          background:var(--pda-bg);
+          border-top:1px solid var(--pda-line);
+          padding-bottom:env(safe-area-inset-bottom, 0px);
+          cursor:pointer; user-select:none;
+          transition:transform .3s cubic-bezier(0.32,0.72,0,1);
+          --pcard-peek-image-h:${PEEK_IMAGE_H}px;
+        }
+        /* The grip. Overlaid on the photograph rather than given a row of its
+           own — it is the swipe affordance and it should not cost 17px of map. */
+        .pms-peek-grip{
+          position:absolute; top:8px; left:50%; transform:translateX(-50%);
+          width:32px; height:3px; border-radius:2px;
+          background:rgba(255,255,255,.6); z-index:2; pointer-events:none;
+        }
+        .pms-peek-id{ padding:11px var(--pda-gutter, 16px) 13px; }
+        /* Landscape phone: no photograph and a tighter block, so the sheet
+           cannot end up taller than the map canvas behind it. */
+        .pms-peek--short .pms-peek-id{ padding:8px var(--pda-gutter, 16px) 9px; }
+        .pms-peek--short .pms-peek-grip{ background:var(--pda-line); }
+        .pms-peek-id--row{ display:flex; align-items:center; gap:12px; }
+        .pms-peek-id--row .pcard{ flex:1 1 auto; min-width:0; }
+        .pms-peek-expand{
+          flex:0 0 auto; width:32px; height:32px; padding:0;
+          display:flex; align-items:center; justify-content:center;
+          background:none; border:none; cursor:pointer; color:var(--pda-muted);
+        }
+        .pms-peek-expand svg{ width:14px; height:14px; }
+        .pms-peek-expand:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; }
+        .pms-peek .pcard-cta-row{ margin:0 var(--pda-gutter, 16px) 16px; }
+        .pms-peek .pcard-thumb-map{ margin:0 var(--pda-gutter, 16px); }
+
+        /* Carousel dots sit above the sheet, on the map. */
+        .pms-dots{ display:flex; justify-content:center; gap:5px; padding-bottom:8px; }
+        .pms-dot{ width:5px; height:5px; border-radius:3px; background:rgba(255,255,255,.55); transition:width .15s ease; }
+        .pms-dot-on{ width:14px; background:#fff; }
+
+        @media (prefers-reduced-motion: reduce){
+          .pms-strip, .pms-peek-body{ animation:none; transition:none; }
+        }
         ::-webkit-scrollbar { display:none; }
-        .fbs-card { transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
 
         /* Desktop split view — list column stays synced with the map beside it */
         /* Desktop split view — list column stays synced with the map beside it.
            Deliberately the same row as the mobile accordion trigger: same
-           .pcard-archive content, same 20px/16px + 12px inset, same quiet grey
+           card content at the same 20px/16px + 12px inset, same quiet grey
            plate on hover, and the same coral rule along the bottom edge when
            selected as the accordion shows when open. No chevron here (nothing
            expands — a row selects its pin), and no filled coral box: coral is
            reserved for the postcode and that bottom rule. 300px so the longest
            name clears 18px without wrapping. */
-        .pms-index-list{ width:var(--pda-list-col, 300px); flex-shrink:0; min-height:0; height:100%; overflow-y:auto; border-right:1px solid var(--pda-line); }
+        /* Width is the column plus the gutter, with the gutter as padding: the
+           rows' text starts on the page gutter (level with the search field and
+           count above), the hairline lands at gutter + column, and the map takes
+           everything from there to the screen edge. */
+        .pms-index-list{
+          width:calc(var(--pda-list-col, 300px) + var(--pda-gutter, 24px));
+          padding-left:var(--pda-gutter, 24px);
+          flex-shrink:0; min-height:0; height:100%; overflow-y:auto;
+          border-right:1px solid var(--pda-line);
+        }
         .pms-index-row{
           position:relative;
           display:block; width:100%; text-align:left; background:none; border:none;
-          padding:20px 16px; cursor:pointer;
+          /* 12px, down from 20px: 105px rows read as deliberate at four parks
+             and as padding at forty. 89px still gives the three-line block its
+             air — the detail that used to justify the height moved to the
+             bottom strip in 5B. */
+          padding:12px 16px; cursor:pointer;
           border-bottom:1px solid var(--pda-line);
-          transition:background-color .18s ease;
+          transition:background-color .15s ease;
         }
-        /* Selected rule rides over the divider rather than replacing it, so the
-           row's height is identical selected or not — nothing nudges the list. */
+        /* .pcard-archive until the variant classes went; the row still owns
+           this indent, the card just no longer names itself after a variant. */
+        .pms-index-row .pcard{ padding-left:12px; }
+
+        /* ── One rule, three states ────────────────────────────────────────
+           Every state is the same horizontal divider changing colour. Preview
+           and selection were briefly drawn at different edges — a leading bar
+           for preview, a bottom rule for selection — and two rules meeting at
+           a corner read as a half-drawn box rather than as an index. Keeping
+           them on one edge makes the list a catalogue whose lines change
+           weight, not a control with parts that light up.
+
+           The rule rides over the divider on bottom:-1px rather than
+           replacing it, so a row is exactly as tall in every state and nothing
+           in the list ever nudges. */
         .pms-index-row::after{
           content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
-          background:var(--pda-accent); opacity:0;
-          transition:opacity .18s ease; pointer-events:none;
+          background:transparent;
+          transition:background-color .15s ease; pointer-events:none;
         }
-        .pms-index-row.pms-active::after{ opacity:1; }
-        .pms-index-row .pcard-archive{ padding-left:12px; }
-        .pms-index-row:hover{ background-color:var(--pda-hover-bg); }
+        /* Preview — pointing, not choosing. A brighter neutral, never accent:
+           orange is what selection means here, and a second orange would put
+           two answers to "which park" on screen at once. --pda-muted against
+           the divider's --pda-line is a clear step in both themes. */
+        .pms-index-row:hover::after,
+        .pms-index-row.pms-preview::after{ background:var(--pda-muted); }
+        .pms-index-row:hover, .pms-index-row.pms-preview{ background-color:var(--pda-hover-bg); }
+        /* Selected — the same rule in Scout orange. Declared after hover so a
+           row that is both selected and pointed at stays orange. */
+        .pms-index-row.pms-active::after{ background:var(--pda-accent); }
+        .pms-index-row.pms-active:hover::after{ background:var(--pda-accent); }
         .pms-index-row.pms-active{ background-color:var(--pda-hover-bg); }
+        /* Keyboard focus keeps a real ring — a full inset outline, not a
+           partial edge, so it never reads as one of the rule states and is not
+           communicated by colour alone. Same accent ring the CTA and the nav
+           links use. */
+        .pms-index-row:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:-2px; }
+
+        /* ── Markers ───────────────────────────────────────────────────────
+           A survey point: one circle, three states. The ring is the map's own
+           background colour, which is what keeps the dot legible over pale
+           streets, dark parkland and satellite imagery alike without a drop
+           shadow doing the work. */
+        .pms-marker{ display:flex; align-items:center; justify-content:center; }
+        .pms-marker .pms-marker-dot{
+          display:block; width:10px; height:10px; border-radius:50%;
+          background:var(--pda-fg); border:2px solid var(--pda-bg);
+          opacity:.72;
+          transition:width .14s ease, height .14s ease, opacity .14s ease, background-color .14s ease;
+        }
+        /* Preview — the same point, brought forward. No size jump large enough
+           to move the reader's eye off where it actually is. */
+        .pms-marker.is-hovered .pms-marker-dot{ width:14px; height:14px; opacity:1; }
+        /* Selected — Scout orange and a ring. The ring is a spread-only
+           box-shadow: no offset and no blur, so it is a drawn circle rather
+           than a shadow, and it holds against both themes. */
+        .pms-marker.is-selected .pms-marker-dot{
+          width:14px; height:14px; opacity:1;
+          background:var(--pda-accent);
+          box-shadow:0 0 0 4px color-mix(in srgb, var(--pda-accent) 30%, transparent);
+        }
+        .pms-marker.is-filtered-out .pms-marker-dot{ opacity:.14; }
+        .pms-marker:focus-visible{ outline:2px solid var(--pda-accent); outline-offset:2px; border-radius:50%; }
+        @media (prefers-reduced-motion: reduce){
+          .pms-marker .pms-marker-dot, .pms-index-row, .pms-index-row::after, .pms-index-row::before{ transition:none; }
+        }
       `}</style>
 
       {/* List column and map canvas are always both mounted — only the
@@ -496,22 +810,41 @@ export default function ParksMap({
           container and markers stop tracking real positions. */}
       <div style={{ display:"flex", height:"100%", minHeight:0, overflow:"hidden" }}>
         {!isMobile && (
-          <div className="pms-index-list">
-            {filteredParks.map((park, idx) => (
-              <button
-                key={park.id}
-                type="button"
-                className={`pms-index-row${selectedPark?.id === park.id ? " pms-active" : ""}`}
-                onClick={() => { if (park.lat && park.lng) openPark(park); }}
-              >
-                <ParkCard park={park} idx={idx} variant="archive" showTags={false} showLocation showAddress={false} />
-              </button>
-            ))}
+          <div className="pms-index-list" ref={indexRef} aria-label="Park index">
+            {filteredParks.map(park => {
+              const isSelected = selectedPark?.id === park.id;
+              return (
+                <button
+                  key={park.id}
+                  type="button"
+                  ref={isSelected ? selectedRowRef : undefined}
+                  className={`pms-index-row${isSelected ? " pms-active" : ""}${!isSelected && hoveredId === park.id ? " pms-preview" : ""}`}
+                  aria-current={isSelected ? "true" : undefined}
+                  onClick={() => { if (park.lat && park.lng) openPark(park); }}
+                  // Preview only. Deliberately not onClick's job and
+                  // deliberately not the map's: no camera move, no selection.
+                  onMouseEnter={() => setHoveredId(park.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onFocus={() => setHoveredId(park.id)}
+                  onBlur={() => setHoveredId(null)}
+                >
+                  <ParkCard park={park} density="standard" />
+                </button>
+              );
+            })}
           </div>
         )}
 
         <div style={{ position:"relative", flex:1, height:"100%", minHeight:0, touchAction:"none" }}>
-          <div ref={containerRef} style={{ position:"absolute", inset:0, zIndex:0 }} />
+          {/* Leaflet gives the container a tabindex but no name, so a keyboard
+              user landed on an unlabelled scrollable region before reaching the
+              markers inside it. */}
+          <div
+            ref={containerRef}
+            role="application"
+            aria-label="Map of skateparks. Use Tab to reach each park marker."
+            style={{ position:"absolute", inset:0, zIndex:0 }}
+          />
 
           {mapStatus === "loading" && (
             <div style={{ position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:5,background:"var(--background)" }}>
@@ -530,21 +863,21 @@ export default function ParksMap({
             <>
               {/* Satellite — search and the List/Map toggle now live in the
                   always-visible header above the map, not floating here. */}
-              <div style={{ position:"absolute", top:16, right:16, zIndex:21 }}>
+              <div style={{ position:"absolute", top:16, right:"var(--pda-gutter, 24px)", zIndex:21 }}>
                 <button onClick={() => setSatellite(v => !v)} title="Satellite" style={{ width:44, height:44, borderRadius:"50%", background: satellite ? "#141414" : (theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff"), border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : (theme === "dark" ? "#fff" : "#141414") }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m11 19-1.106-.552a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0l4.212 2.106a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619V12"/><path d="M15 5.764V12"/><path d="M18 15v6"/><path d="M21 18h-6"/><path d="M9 3.236v15"/></svg>
                 </button>
               </div>
 
               {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
-              <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:16, zIndex:21, transition:"bottom 0.3s" }}>
+              <div style={{ position:"absolute", bottom: selectedPark ? (cardRef.current?.offsetHeight || PEEK_H) + 40 : 20, right:"var(--pda-gutter, 24px)", zIndex:21, transition:"bottom 0.3s" }}>
                 {(locateTip || locateError) && (
                   <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                     {locateError || "Recenter map"}
                   </div>
                 )}
                 <button onClick={nearMe} title="Recenter map" style={{ width:44, height:44, borderRadius:"50%", background: theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff", border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: theme === "dark" ? "#fff" : "#141414" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/></svg>
                 </button>
               </div>
 
@@ -553,10 +886,10 @@ export default function ParksMap({
           ) : (
             <>
               {/* Satellite + Locate — floating side by side, top-right of the map canvas */}
-              <div style={{ position:"absolute", top:20, right:20, zIndex:12, display:"flex", gap:8 }}>
+              <div style={{ position:"absolute", top:20, right:"var(--pda-gutter, 24px)", zIndex:12, display:"flex", gap:8 }}>
                 <button onClick={()=>setSatellite(v=>!v)} title="Satellite"
                   style={{ width:38, height:38, borderRadius:4, background: satellite ? "var(--accent)" : "var(--card)", border:`1px solid ${satellite ? "var(--accent)" : "var(--border)"}`, boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : "var(--foreground)" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m11 19-1.106-.552a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0l4.212 2.106a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619V12"/><path d="M15 5.764V12"/><path d="M18 15v6"/><path d="M21 18h-6"/><path d="M9 3.236v15"/></svg>
                 </button>
                 <div style={{ position:"relative" }}>
                   {(locateTip || locateError) && (
@@ -565,7 +898,7 @@ export default function ParksMap({
                     </div>
                   )}
                   <button onClick={nearMe} title="Recenter map" style={{ width:38, height:38, borderRadius:4, background:"var(--card)", border:"1px solid var(--border)", boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--foreground)" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/></svg>
                   </button>
                 </div>
               </div>

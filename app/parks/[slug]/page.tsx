@@ -83,7 +83,7 @@ export default async function ParkPage({ params, searchParams }: { params: Promi
   const [{ data: park }, { data: catalogue }] = await Promise.all([
     db
       .from("parks")
-      .select("*, viewer_settings, model_file_mobile, model_file_low, preload_image_url")
+      .select("*, viewer_settings, preload_image_url")
       .eq("slug", slug)
       .eq("published", true)
       .single(),
@@ -148,11 +148,9 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
   // by slug and returns null for any park not on the CDN, so it generalises
   // without needing the name. Any park whose row has no model_file but whose
   // scan is uploaded now resolves the same way Bloblands did.
-  const modelFile = resolveModelUrl(park.model_file, slug, "high")
-    ?? modelUrl(slug, "high");
+  // One model. See lib/assets.ts for why the high/low pair went.
+  const modelFile = resolveModelUrl(park.model_file, slug) ?? modelUrl(slug);
   // Low/mobile fall back to the high-res model when no low export exists.
-  const modelFileLow = resolveModelUrl(park.model_file_low, slug, "low") ?? undefined;
-  const modelFileMobile = resolveModelUrl(park.model_file_mobile, slug, "low") ?? undefined;
 
   return (
     <article>
@@ -160,8 +158,6 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <ParkHeroShell
         modelFile={modelFile}
-        modelFileLow={modelFileLow}
-        modelFileMobile={modelFileMobile}
         heroImage={park.hero_image}
         preloadImageUrl={park.preload_image_url ?? `/images/parks/${slug}/glb-preload.png`}
         cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}

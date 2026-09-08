@@ -28,10 +28,16 @@ type Variant = "accent" | "ghost";
 
 type Props = {
   label: string;
-  /** Renders a Link. Mutually exclusive with onClick in practice. */
+  /** Renders a Link. */
   href?: string;
-  /** Renders a button. Use for CTAs that open something in place. */
-  onClick?: () => void;
+  /** Runs on activation, in both forms. On its own it renders a <button> for
+   *  CTAs that open something in place; alongside `href` it runs before the
+   *  navigation, which is what the park cards need — they sit inside a
+   *  click-to-navigate card and have to stop the event reaching it, or the
+   *  parent handler pushes the same route a second time. It used to be
+   *  documented as mutually exclusive with href and silently dropped in the
+   *  Link branch, which is why ParkCard carried its own <a> instead. */
+  onClick?: (e: React.MouseEvent) => void;
   variant?: Variant;
 };
 
@@ -53,7 +59,7 @@ export default function CTAButton({ label, href, onClick, variant = "accent" }: 
   );
 
   if (href) {
-    return <Link href={href} className={className}>{content}</Link>;
+    return <Link href={href} className={className} onClick={onClick}>{content}</Link>;
   }
   return <button type="button" className={className} onClick={onClick}>{content}</button>;
 }

@@ -9,9 +9,14 @@ import { flushSync } from "react-dom";
 // lands back in the same view.
 
 export type ExploreMode = "explore" | "grid";
-export type GridDensity = "large" | "medium" | "small";
+export type GridDensity = "large" | "medium";
 
-export const DENSITIES: GridDensity[] = ["large", "medium", "small"];
+// Two modes, not three. Large is "looking at parks", Medium is "scanning
+// them"; the old Small was neither — at 7 columns the photograph stopped being
+// recognisable at about the same width the name stopped being readable, so
+// there was no width at which it was the right tool. See coerceDensity for
+// what happens to the links and sessions that still name it.
+export const DENSITIES: GridDensity[] = ["large", "medium"];
 
 const MODE_PARAM = "mode";
 const DENSITY_PARAM = "density";
@@ -40,8 +45,20 @@ function writeStore(patch: Stored) {
 function isMode(v: string | null): v is ExploreMode {
   return v === "explore" || v === "grid";
 }
-function isDensity(v: string | null): v is GridDensity {
-  return v === "large" || v === "medium" || v === "small";
+/**
+ * A density from an untrusted source — a URL someone shared, or a session
+ * written by an older build.
+ *
+ * "small" was the third density until Phase 6B removed it. Rather than
+ * rejecting it (which would silently drop the reader back to the default) or
+ * erroring, it resolves to medium: it was the denser of the two survivors, so
+ * a link that asked for "as much as possible" still gets the denser sheet.
+ * Anything else unrecognised returns null and lets the caller fall back.
+ */
+function coerceDensity(v: string | null | undefined): GridDensity | null {
+  if (v === "large" || v === "medium") return v;
+  if (v === "small") return "medium";
+  return null;
 }
 
 function readUrl(): { mode: ExploreMode | null; density: GridDensity | null } {
@@ -51,7 +68,7 @@ function readUrl(): { mode: ExploreMode | null; density: GridDensity | null } {
   // links written before ?mode=grid existed still open the Grid.
   const mode = isMode(raw) ? raw : q.get("grid") === "1" ? "grid" : null;
   const d = q.get(DENSITY_PARAM);
-  return { mode, density: isDensity(d) ? d : null };
+  return { mode, density: coerceDensity(d) };
 }
 
 // history.replaceState rather than router.replace: this only ever changes how
@@ -95,7 +112,10 @@ export function useExploreState() {
     // URL wins over the session — an explicit link should never be overridden
     // by what this tab was last looking at.
     const nextMode = url.mode ?? stored.mode ?? "explore";
-    const nextDensity = url.density ?? stored.density ?? "medium";
+    // The stored value goes through the same coercion as the URL: sessionStorage
+    // is JSON, so its `density` is only typed by assertion and a session
+    // written before 6B still says "small".
+    const nextDensity = url.density ?? coerceDensity(stored.density) ?? "medium";
     modeRef.current = nextMode;
     densityRef.current = nextDensity;
     setModeState(nextMode);

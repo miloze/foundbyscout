@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import ParkModelClient from "./ParkModelClient";
 import ParkHeroMobile from "./ParkHeroMobile";
-import { isPhone, getModelTierOverride } from "@/lib/device";
 
 type Props = {
   modelFile: string;
-  modelFileLow?: string;
-  modelFileMobile?: string;
   heroImage?: string;
   preloadImageUrl?: string;
   cameraPos?: [number, number, number];
@@ -40,31 +37,59 @@ type Props = {
   allowZoom?: boolean;
   /** First pointer or wheel gesture on the model. */
   onInteract?: () => void;
+  /** The GLB is parsed and on screen. Drives the entry affordance — see
+   *  ParkHeroShell: nothing may be explored before this fires. */
+  onReady?: () => void;
+  /** The viewer threw and the still is showing instead. */
+  onFailed?: () => void;
 };
 
 export default function ParkHeroViewer({
-  modelFile, modelFileLow, modelFileMobile, heroImage, preloadImageUrl,
+  modelFile, heroImage, preloadImageUrl,
   cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, forceViewer,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   grayscale, onZoomChange, inOverlay, spinning, allowRotate, allowZoom, onInteract,
+  onReady, onFailed,
 }: Props) {
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.innerWidth < 768 || new URLSearchParams(window.location.search).has('mobile');
-  });
+  // ── Server and first client render must agree ─────────────────────────
+  // Both of these used to be `useState` initialisers reading `window`, which
+  // is a server/client branch inside render and therefore a hydration
+  // mismatch: the server has no window and returned the desktop branch, while
+  // the client returned whatever `innerWidth` happened to be. React logs
+  // "Hydration failed… the tree will be regenerated on the client" and throws
+  // the server tree away — and the tree it throws away contains the WebGL
+  // canvas, which is mounted through `dynamic(ssr:false)` and does not
+  // survive being torn down and rebuilt cleanly.
+  //
+  // This was confirmed from the error's own component stack: server rendered
+  // the desktop viewer branch, client rendered <ParkHeroMobile>.
+  //
+  // It matters most on iPad, where `innerWidth` at hydration is not
+  // necessarily the settled layout width — Safari reports a transient value
+  // while its toolbars resolve — so a tablet can hydrate as one branch and
+  // immediately re-render as the other.
+  //
+  // `mounted` is the fix: the still is what BOTH the server and the first
+  // client pass render, so they agree by construction. The live viewer is an
+  // upgrade applied after mount. Desktop loses nothing — ParkModel paints the
+  // same still over the canvas until the GLB resolves anyway — and phones
+  // never momentarily mount a viewer they are not supposed to have.
+  const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Track which model file is active (may swap to low on timeout)
-  const [activeDesktopModel, setActiveDesktopModel] = useState(() => {
-    if (typeof window === 'undefined') return modelFile;
-    const override = getModelTierOverride();
-    const wantsLow = override ? override === 'low' : isPhone();
-    if (wantsLow && modelFileLow) return modelFileLow;
-    return modelFile;
-  });
+  // The one extra render this costs is the entire point: it is what makes the
+  // server's tree and the first client tree identical. The rule against setting
+  // state synchronously in an effect is guarding against cascading renders;
+  // this runs once, with an empty dependency list, and cannot cascade.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
-  const [modelLoaded, setModelLoaded] = useState(false);
-
-  const handleLoad = useCallback(() => setModelLoaded(true), []);
+  // `modelLoaded` was tracked here only so the 7-second tier swap could decide
+  // whether to give up on the high model. With one model there is nothing to
+  // swap to, so the flag has no reader — ParkModel keeps its own, which is what
+  // fades the preload still out.
 
   useEffect(() => {
     const forceMobile = new URLSearchParams(window.location.search).has('mobile');
@@ -74,29 +99,25 @@ export default function ParkHeroViewer({
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Timeout fallback: if high model is slow, drop to low after 7s
-  useEffect(() => {
-    if (modelLoaded) return;
-    if (activeDesktopModel !== modelFile) return; // already on low
-    if (!modelFileLow) return;
-
-    const timeout = setTimeout(() => {
-      setActiveDesktopModel(modelFileLow);
-    }, 7000);
-    return () => clearTimeout(timeout);
-  }, [modelLoaded, activeDesktopModel, modelFile, modelFileLow]);
+  // The 7-second "swap to the low model" timeout lived here. It is gone with
+  // the low model itself — and it was actively harmful: changing modelFile
+  // mid-load changes useGLTF's key AND ViewerErrorBoundary's resetKey, so it
+  // tore down an in-flight download and started a different one rather than
+  // letting the first finish. On the iPad that turned one slow load into two
+  // failures, and the second is the error that surfaced.
 
   const preloadSrc = preloadImageUrl;
 
-  // ── Mobile: static image + tap-to-expand modal ───────────────────────────
-  if (isMobile && !forceViewer) {
+  // ── Still: phones, and every surface before mount ────────────────────────
+  // `!mounted` is not a mobile case — it is the one tree the server and the
+  // first client pass both produce. See the note on the state above.
+  if ((!mounted || isMobile) && !forceViewer) {
     return (
       <div style={{ position: "absolute", inset: 0, filter: grayscale ? "grayscale(1)" : "none", transition: "filter 0.4s ease" }}>
         <ParkHeroMobile
           heroImage={preloadSrc || heroImage}
           parkName=""
           modelFile={modelFile}
-          modelFileMobile={modelFileMobile}
           cameraPos={cameraPos}
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}
@@ -111,15 +132,10 @@ export default function ParkHeroViewer({
     );
   }
 
-  // ── Desktop / forced viewer: 3D model ───────────────────────────────────
-  // On mobile this is the tap-to-expand viewer, so keep it to the lightest
-  // export available. The old expression only used the mobile file when one
-  // existed and otherwise fell through to the desktop model — and no park
-  // currently has `model_file_mobile` set, so phones were being handed the
-  // high-res export wherever there was no low one (wandle-park, crystal-palace).
-  const finalModelFile = (forceViewer && isMobile)
-    ? (modelFileMobile || modelFileLow || modelFile)
-    : activeDesktopModel;
+  // ── Desktop / tablet / opened viewer: the production model ──────────────
+  // Every device that gets a live scan gets the same file. On a phone this is
+  // only reached through forceViewer — the hero there is a still and never
+  // requests a GLB, so the download happens when someone asks for the scan.
 
   return (
     <>
@@ -130,9 +146,10 @@ export default function ParkHeroViewer({
           allowRotate={allowRotate}
           allowZoom={allowZoom}
           onInteract={onInteract}
-          modelFile={finalModelFile}
+          onLoad={onReady}
+          onFailed={onFailed}
+          modelFile={modelFile}
           preloadImage={preloadSrc}
-          onLoad={handleLoad}
           cameraPos={cameraPos}
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}

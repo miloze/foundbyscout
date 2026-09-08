@@ -23,6 +23,10 @@ type Props = {
   fallback: ReactNode;
   /** Changing this clears the error and remounts — e.g. a new model URL. */
   resetKey?: string;
+  /** Fired when the viewer throws, so the page can say so in its own words.
+   *  The error itself stays in the console; the UI only needs to know that the
+   *  scan is unavailable. */
+  onFailed?: () => void;
 };
 
 type State = { failed: boolean; resetKey?: string };
@@ -45,6 +49,7 @@ export default class ViewerErrorBoundary extends Component<Props, State> {
     // Left as a console error on purpose — there is no error reporting wired
     // up, and swallowing this silently is how a broken viewer goes unnoticed.
     console.error("[viewer] failed to render, showing fallback:", error);
+    this.props.onFailed?.();
   }
 
   render() {

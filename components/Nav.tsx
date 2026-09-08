@@ -2,26 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useNavOverlay } from "./NavOverlay";
 
+// One destination. ABOUT was removed with its page: it linked to /about,
+// which never existed and 404'd, and Scout has no second section to name.
+// The archive is the site, so the bar says so and nothing else.
 const links = [
   { href: "/parks", label: "PARKS" },
-  { href: "/about", label: "ABOUT" },
 ];
 
-// Theme switch. The track is a neutral warm grey that inverts between modes —
-// deliberately not --accent, which read as a live "on" state rather than a
-// control. The thumb stays white in both modes and carries state by position:
-// left in light, right in dark. A hairline border plus a soft shadow keep the
-// white thumb legible against the light track.
-const TRACK_W = 40, TRACK_H = 22, THUMB = 16, PAD = 2;
-// Track borders sit inside the 40px box, so the travel is the box minus the
-// thumb, both pads and both 1px borders.
-const THUMB_TRAVEL = TRACK_W - THUMB - PAD - 2;
+// Section matching, not URL equality. An individual park belongs to the parks
+// collection, so PARKS stays lit on /parks/bloblands — the bar says which part
+// of the site you are in, not which document you have open. Exact matching is
+// what left every park page with no active state at all.
+function isCurrentSection(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
-function ThemeSwitch({ theme, onToggle }: { theme: string; onToggle: () => void }) {
+// Theme toggle. A flat rounded square: the icon carries the state on its own,
+// showing the mode a press moves *to* - a moon while the site is light, a sun
+// while it is dark.
+//
+// Fill is --card rather than --background. With no border and no shadow the
+// fill is the only thing separating the control from the bar behind it, and
+// --background is that bar's exact colour in both modes, so the button would
+// read as a floating icon rather than a control. --card is already the
+// palette's "one step off the page" surface in both themes, so this adds no
+// new colour.
+//
+// Icons are inline SVG. Nothing else here pulls in an icon package and two
+// glyphs do not earn the dependency.
+const TOGGLE_BOX = 44;
+
+function ThemeToggle({ theme, onToggle }: { theme: string; onToggle: () => void }) {
   const dark = theme === "dark";
   return (
     <button
@@ -29,36 +46,48 @@ function ThemeSwitch({ theme, onToggle }: { theme: string; onToggle: () => void 
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
       style={{
-        width: TRACK_W, height: TRACK_H,
-        borderRadius: TRACK_H / 2,
-        background: dark ? "#3a3733" : "#dcd8d2",
-        border: `1px solid ${dark ? "#4a453f" : "#c7c1b8"}`,
-        position: "relative",
+        width: TOGGLE_BOX, height: TOGGLE_BOX,
+        borderRadius: 13,
+        background: "var(--card)",
+        color: "var(--foreground)",
+        border: "none",
+        display: "flex", alignItems: "center", justifyContent: "center",
         cursor: "pointer",
-        transition: "background 0.2s, border-color 0.2s",
+        transition: "background 0.2s, color 0.2s",
         flexShrink: 0,
         padding: 0,
       }}
     >
-      <span style={{
-        position: "absolute",
-        top: PAD,
-        left: dark ? THUMB_TRAVEL : PAD,
-        width: THUMB, height: THUMB,
-        borderRadius: "50%",
-        background: "#fff",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.28)",
-        transition: "left 0.2s",
-      }} />
+      {dark ? <SunIcon /> : <MoonIcon />}
     </button>
+  );
+}
+
+// currentColor throughout, so both glyphs inherit the button's --foreground
+// and flip with the theme without carrying a colour of their own.
+function MoonIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
   );
 }
 
 export default function Nav() {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
   const { theme, toggle } = useTheme();
-  const { overlay } = useNavOverlay();
+  const { overlay, overlayTone } = useNavOverlay();
   const headerRef = useRef<HTMLElement>(null);
   const logoRef = useRef<HTMLAnchorElement>(null);
 
@@ -143,6 +172,7 @@ export default function Nav() {
     <div className="fixed top-0 left-0 right-0 w-full" style={{ zIndex: 30 }}>
       <header ref={headerRef} style={{ position: "relative", zIndex: 20, borderBottom: "none" }} className="w-full">
         <nav
+          aria-label="Primary"
           className="flex items-center justify-end"
           style={{
             background: overlay ? "transparent" : "var(--background)",
@@ -155,64 +185,43 @@ export default function Nav() {
             transition: "background 0.2s, border-color 0.2s",
           }}
         >
-          {/* Desktop links + toggles */}
-          <ul className="hidden md:flex items-center gap-8">
-            {links.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", color: pathname === link.href ? "var(--accent)" : "var(--muted)" }}
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-            <li>
-              <ThemeSwitch theme={theme} onToggle={toggle} />
-            </li>
+          {/* One row at every width. The links used to be `hidden md:flex`,
+              with a hamburger and a drop-down panel taking over below 768 —
+              so on a phone the only destination in the site was behind a
+              24x15px glyph while the theme toggle sat beside it as a 44x44
+              filled square. With a single destination there is nothing a menu
+              could usefully hold, so the button, the panel, the panel's own
+              second copy of the theme toggle and the open/close state are all
+              gone rather than restyled. */}
+          <ul className="flex items-center" style={{ gap: 4 }}>
+            {links.map((link) => {
+              const current = isCurrentSection(pathname, link.href);
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    // Over a photograph the bar is transparent and the scrim is
+                    // faded, so the label sits on the image and --foreground
+                    // stops describing what is behind it. See .fbs-nav-link--on-photo.
+                    className={`fbs-nav-link${overlay && overlayTone === "photo" ? " fbs-nav-link--on-photo" : ""}`}
+                    aria-current={current ? "page" : undefined}
+                  >
+                    <span className="fbs-nav-link__label">{link.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
 
-          {/* Mobile: toggle + hamburger */}
-          <div className="md:hidden flex items-center gap-4">
-            <ThemeSwitch theme={theme} onToggle={toggle} />
-            <button
-              className="flex flex-col gap-1.5 p-1"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Toggle menu"
-            >
-              <span className="block w-6 h-px" style={{ background: overlay ? "#fff" : "var(--foreground)", boxShadow: overlay ? "0 1px 3px rgba(0,0,0,0.4)" : "none" }} />
-              <span className="block w-6 h-px" style={{ background: overlay ? "#fff" : "var(--foreground)", boxShadow: overlay ? "0 1px 3px rgba(0,0,0,0.4)" : "none" }} />
-              <span className="block w-4 h-px" style={{ background: overlay ? "#fff" : "var(--foreground)", boxShadow: overlay ? "0 1px 3px rgba(0,0,0,0.4)" : "none" }} />
-            </button>
+          {/* Outside the list, not an <li> in it: the toggle changes how the
+              site looks, it is not somewhere you can go, and sitting in the
+              navigation list it was announced as one. */}
+          <div className="fbs-nav-utility">
+            <span className="fbs-nav-rule" aria-hidden="true" />
+            <ThemeToggle theme={theme} onToggle={toggle} />
           </div>
         </nav>
 
-        {/* Mobile menu — drops inline below the nav bar, right-aligned to match burger position */}
-        {menuOpen && (
-          <div className="md:hidden" style={{
-            position: "absolute", top: "100%", right: 0,
-            background: "var(--background)", borderBottom: "1px solid var(--border)",
-            borderLeft: "1px solid var(--border)",
-            padding: "8px 0", minWidth: 140,
-            zIndex: 50,
-          }}>
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                style={{
-                  display: "block", padding: "10px 20px",
-                  fontFamily: "var(--font-mono)", fontSize: 11,
-                  textTransform: "uppercase", letterSpacing: "0.1em",
-                  color: pathname === link.href ? "var(--accent)" : "var(--foreground)",
-                }}
-                onClick={() => setMenuOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        )}
       </header>
 
       {/* Scrim — a full-width band of the page background across the top, so
@@ -259,17 +268,17 @@ export default function Nav() {
         className="logo-overhang"
         style={{
           position: "absolute",
-          // Dropped from 10 to open real space above the mark. The postcode
-          // badge centres its row on --logo-top / --logo-h, so it travels
-          // down with the logo and the two keep reading as one lockup
-          // instead of two independently-tuned positions.
+          // 56 everywhere the homepage lockup exists: the postcode badge
+          // centres its row on --logo-top / --logo-h so it travels with the
+          // mark, and raising the pair puts the badge through the PARKS/ABOUT
+          // row — measured at 1517 wide, top:40 overlapped it by 18px.
           //
-          // 56 rather than 30 so the badge clears the 50px nav bar entirely.
-          // At 30 the badge's top edge landed at y=28, overlapping the
-          // PARKS/ABOUT row's 12–38 band with only 20px of horizontal gap
-          // between them; the two read as crowded even though their boxes
-          // never actually intersect.
-          top: 56,
+          // /parks has no badge and does have a floor to protect: its sticky
+          // bar pads itself down to --logo-bottom, so every pixel above the
+          // mark is a pixel off the bottom of the map and off the detail card
+          // anchored to it. 40 there buys the map 16px with nothing to trade
+          // against it.
+          top: pathname?.startsWith("/parks") ? 40 : 56,
           left: "clamp(16px, 4vw, 56px)",
           zIndex: 30,
           display: "block",

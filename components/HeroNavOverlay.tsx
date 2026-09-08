@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useNavOverlay } from "./NavOverlay";
+import { useNavOverlay, type OverlayTone } from "./NavOverlay";
 
 // Turns the nav transparent while a full-bleed hero is behind it, so the image
 // runs to the top of the viewport and the logo floats on the photograph rather
@@ -11,7 +11,7 @@ import { useNavOverlay } from "./NavOverlay";
 // size of that hero and watches it: while any of the hero is still below the
 // nav, the nav stays transparent; once it has scrolled away the nav goes solid
 // again so body content never slides under a see-through bar.
-export default function HeroNavOverlay() {
+export default function HeroNavOverlay({ tone = "themed" }: { tone?: OverlayTone } = {}) {
   const ref = useRef<HTMLDivElement>(null);
   const { setOverlay } = useNavOverlay();
 
@@ -19,12 +19,12 @@ export default function HeroNavOverlay() {
     // Set immediately as well as via the observer: at scroll-0 the hero is
     // always behind the nav, and waiting for the first IO callback would show
     // a solid bar for a frame before it turns transparent.
-    setOverlay(true);
+    setOverlay(true, tone);
 
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      ([entry]) => setOverlay(entry.isIntersecting),
+      ([entry]) => setOverlay(entry.isIntersecting, tone),
       { rootMargin: "-60px 0px 0px 0px", threshold: 0 }
     );
     io.observe(el);
@@ -32,7 +32,7 @@ export default function HeroNavOverlay() {
       io.disconnect();
       setOverlay(false); // leaving the page must not strand a transparent nav
     };
-  }, [setOverlay]);
+  }, [setOverlay, tone]);
 
   return <div ref={ref} aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />;
 }
