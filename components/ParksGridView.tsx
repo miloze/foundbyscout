@@ -194,6 +194,26 @@ export default function ParksGridView({
            the sheet below still runs to the screen. */
         .pgv-controls{
           display:flex; justify-content:flex-end; align-items:center;
+          /* The one hairline on this surface, and it runs to the screen rather
+             than to the gutter.
+
+             The row and the sheet had no edge in common: the pill is contained
+             and the photographs are full-bleed, so the control floated in a
+             band that belonged to neither. This line is full-bleed because the
+             sheet is — it is the sheet's leading edge, drawn — and everything
+             below it is therefore read as the sheet and the one control that
+             governs it, rather than as more of the search bar above.
+
+             It goes at the top and not the bottom for a reason the tiles state
+             themselves: nothing is drawn on a photograph, and a rule under this
+             row would land exactly on the first row's top edge. It would also
+             say the opposite of what is wanted — that the control and the sheet
+             are separate things.
+
+             There is no second rule. It has no partner below the sheet and must
+             not be given one: a parallel pair stops being an edge and becomes a
+             box around the photographs. */
+          border-top:1px solid var(--pda-line);
           /* The top padding is not decorative: .pda-bar above is sticky at
              z-index 25, so anything of this row that reaches into the bar's box
              is covered by it — including the button's extended hit area, which
