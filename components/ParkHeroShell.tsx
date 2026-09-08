@@ -572,7 +572,7 @@ export default function ParkHeroShell({
       {(prevPark || nextPark || topCluster) && (
         <ViewerControlBar className="fbs-hero-bar">
           {(prevPark || nextPark) && (
-            <ViewerCluster variant="spaced" label="Catalogue navigation" className="fbs-hero-navgroup">
+            <ViewerCluster variant="joined" label="Catalogue navigation" className="fbs-hero-navgroup">
               {prevPark && (
                 <ViewerClusterButton
                   href={`/parks/${prevPark.slug}`}
@@ -801,10 +801,34 @@ export default function ParkHeroShell({
            border, radius, fill, blur, colour or timing. */
         .fbs-hero-bar{
           position:absolute;
-          top:calc(var(--nav-height, 44px) + 24px);
-          right:var(--content-padding);
+          /* TRIAL — moved from top:nav+24 to the bottom band, so the scan is
+             bracketed by one row rather than orbited by two groups at
+             unrelated corners: notation on the left edge, controls on the
+             right, both on the same baseline.
+
+             Carries .contained's geometry rather than a plain right offset.
+             The metadata is inside a 1400px max-width container, so past that
+             width its right edge stops travelling while a viewport-relative
+             offset keeps going — measured at 1440, right:var(--content-padding)
+             put the bar 12px outside the edge it is supposed to share.
+             Mirroring the container is what makes the two agree at every width
+             instead of at the one that happened to be tested.
+
+             Stretched full width and flex-end rather than right-anchored,
+             which is why it must not take pointer events: the empty half lies
+             over the scan and the viewer is drag-to-rotate. The clusters take
+             them back. .fbs-hero-content does the same thing for the same
+             reason. */
+          bottom:calc(var(--frame-inset) + 14px);
+          left:0; right:0;
+          max-width:var(--content-max-width);
+          margin-inline:auto;
+          padding-inline:var(--content-padding);
+          justify-content:flex-end;
+          pointer-events:none;
           z-index:6;
         }
+        .fbs-hero-bar .vc-cluster{ pointer-events:auto; }
         /* Below the breakpoint the header is already logo + nav + toggle, and
            Miles has flagged crowding as a real risk. Desktop and tablet only
            until the phone treatment is designed — deliberately not a guess.

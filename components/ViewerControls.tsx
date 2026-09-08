@@ -276,10 +276,19 @@ export const VIEWER_CONTROLS_CSS = `
        targets fully clear of each other. */
     .vc-cluster--spaced{ --vc-gap:12px; }
     .vc-bar{ --vc-group-gap:24px; }
-    /* Joined clusters draw one continuous plate, so the buttons carry the
-       target at full size rather than extending past a visible edge. */
-    .vc-cluster--joined .vc-btn{ --vc-btn:44px; }
-    .vc-cluster--joined .vc-btn::after{ content:none; }
+    /* On a coarse pointer the visible control IS the target, in every variant.
+       This used to apply to joined clusters alone, because their overflow:hidden
+       clips an oversized ::after so their buttons had to carry the size
+       themselves. Spaced buttons stayed 34px with an invisible 44px box, which
+       was fine while every cluster on a surface was the same variant — and
+       stopped being fine the moment one was not: the hero now joins its
+       catalogue stepper and spaces its tool toggles, and the two sat 10px apart
+       in height on iPad, one plate visibly taller than the other beside it.
+
+       Sizing every control the same way removes the variant from the question.
+       The ::after is left in place and simply stops doing anything, since
+       max(100%, 44px) on a 44px button is the button. */
+    .vc-btn, .vc-readout{ --vc-btn:44px; }
   }
 
   /* ── States ────────────────────────────────────────────────────────────
