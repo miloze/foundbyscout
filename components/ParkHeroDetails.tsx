@@ -162,7 +162,12 @@ export default function ParkHeroDetails({
              without anything visibly breaking. */
           display: inline-block;
           font-family: var(--font-display), Arial, sans-serif;
-          font-weight: 300;
+          /* 500 for the reason given on the home hero's title in
+             ParkHeroMeta: 'MSCHN Medium' sits first in --font-display and is a
+             single-face local family, so 300 was silently rendering Medium
+             wherever MSCHN is installed and Light everywhere else. These two
+             names morph into each other, so they hold the same weight. */
+          font-weight: 500;
           /* Italic, matching the home hero exactly. Without it this rendered
              MSCHN's upright cut — a real second face, not a fallback, since
              colors_and_type.css declares normal and italic @font-face blocks

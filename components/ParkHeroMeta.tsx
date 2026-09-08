@@ -68,8 +68,19 @@ export default function ParkHeroMeta({ catalogueId, name, address, postcode, ope
           their own and do nothing unless an ancestor sets data-hero-entrance,
           which only the home hero does on a first visit — see
           components/HeroEntrance. */}
+      {/* 500, not 300. --font-display starts with 'MSCHN Medium', a locally
+          installed static cut, so on a machine that has the MSCHN family this
+          element matched a single-face family and font-weight did nothing —
+          it rendered Medium whatever was declared. Every other device fell
+          through to the variable webfont and honoured the 300, which is why
+          the name was Medium on desktop and Light on iPad off one stylesheet.
+          Measured: the VF's italic at wght 500 is 527.9px on BLOBLANDS at
+          100px, exactly the installed Medium's width, so this is the weight
+          desktop was already showing rather than a new decision.
+          Keep in step with .fbs-title in ParkHeroDetails — the two names morph
+          into each other and a weight change mid-flight is visible. */}
       <div className="fbs-he-title" style={{
-        fontFamily: "var(--font-display), Arial, sans-serif", fontWeight: 300,
+        fontFamily: "var(--font-display), Arial, sans-serif", fontWeight: 500,
         fontStyle: "italic",
         fontSize: "clamp(3.5rem, 11vw, 9rem)",
         lineHeight: 0.9, color: "#fff",
