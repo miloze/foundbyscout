@@ -10,6 +10,7 @@ import { postcodeDistrict } from "@/lib/postcode";
 import {
   FOUND_OBJECTS, DEFAULT_FOUND_OBJECT, type FoundObjectPark,
 } from "@/lib/foundObjects";
+import { featureUrl } from "@/lib/assets";
 
 /**
  * FOUND OBJECT — the archive exhibiting a single scanned form.
@@ -156,6 +157,10 @@ export default function FoundObject({ parks }: { parks: FoundObjectPark[] }) {
   if (!entry || !key) return null;
   const feature = FOUND_OBJECTS[key];
   const { park, place } = entry;
+  // Non-null in practice: FOUND_OBJECT_SLUGS is already filtered on this, so a
+  // park with no scan on the CDN never reaches the query, let alone this line.
+  const src = featureUrl(key);
+  if (!src) return null;
 
   // The entrance is two attributes and nothing else: everything it moves is
   // opacity, and the grid, the layout and the model's own framing and motion
@@ -233,9 +238,9 @@ export default function FoundObject({ parks }: { parks: FoundObjectPark[] }) {
 
         {mounted && !failed && (
           <div className="fbs-fo-canvas" aria-hidden="true">
-            <ViewerErrorBoundary fallback={null} resetKey={feature.src} onFailed={() => { setFailed(true); markReady(); }}>
+            <ViewerErrorBoundary fallback={null} resetKey={src} onFailed={() => { setFailed(true); markReady(); }}>
               <Stage
-                src={feature.src}
+                src={src}
                 word={park.name}
                 motion={feature.motion}
                 scale={feature.scale}

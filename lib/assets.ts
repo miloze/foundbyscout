@@ -58,6 +58,37 @@ export function modelUrl(slug: string): string | null {
   return path ? `${CDN_BASE}/parks/${path}` : null;
 }
 
+/**
+ * The homepage found-object scans.
+ *
+ * Separate from CDN_MODELS because they are separate objects: a park's model is
+ * the whole site, its feature is one thing standing in it, and a park can have
+ * either without the other. Same bucket and same `parks/{folder}/{file}` shape,
+ * so nothing new had to be learned about the layout to add one.
+ *
+ * These lived in /public until now, which is why the module shipped and the
+ * homepage stage came up empty: .gitignore excludes *.glb, so the files were
+ * never in the repo and never on the deploy. Serving them from R2 is what the
+ * rest of the site already does, and it is the only version of this that works
+ * in production.
+ */
+const CDN_FEATURES: Record<string, string> = {
+  "bloblands": "bloblands/feature.glb",
+  "stockwell": "stockwell/feature.glb",
+};
+
+/**
+ * A park's found-object scan on R2, or null if it has not been uploaded.
+ *
+ * Null is the useful answer rather than a local path: a feature that is not on
+ * the CDN cannot be exhibited, and the caller drops the park from the eligible
+ * set instead of mounting a stage around a 404.
+ */
+export function featureUrl(slug: string): string | null {
+  const path = CDN_FEATURES[slug];
+  return path ? `${CDN_BASE}/parks/${path}` : null;
+}
+
 // Paths written before the R2 migration, e.g. /images/parks/acton/model.glb,
 // .../model-500k.glb, .../bloblands-1m.glb. Nothing serves these any more.
 const LEGACY_MODEL_PATH = /^\/?images\/parks\/[^/]+\/[^/]+\.glb$/i;

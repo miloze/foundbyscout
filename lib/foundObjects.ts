@@ -20,6 +20,8 @@
  * no selection logic, no cycling.
  */
 
+import { featureUrl } from "@/lib/assets";
+
 export type FoundObjectMotion = "orbit" | "pingpong";
 
 export type FoundObjectFeature = {
@@ -31,10 +33,6 @@ export type FoundObjectFeature = {
   /** Art direction on the size the model's bounds imply: 1 is the geometry's
    *  own answer, above 1 bigger, below 1 smaller. */
   scale: number;
-  /** Served from /public: same-origin, so it is reachable from a phone on the
-   *  LAN during testing, where R2's CORS allow-list is not. Production should
-   *  resolve through lib/assets like every other model. */
-  src: string;
 };
 
 export const FOUND_OBJECTS: Record<string, FoundObjectFeature> = {
@@ -42,17 +40,27 @@ export const FOUND_OBJECTS: Record<string, FoundObjectFeature> = {
     feature: "Volcano",
     motion: "orbit",
     scale: 1,
-    src: "/images/parks/bloblands/feature.glb",
   },
   stockwell: {
     feature: "Ledge",
     motion: "orbit",
     scale: 1,
-    src: "/images/parks/stockwell/feature.glb",
   },
 };
 
-export const FOUND_OBJECT_SLUGS = Object.keys(FOUND_OBJECTS);
+/**
+ * The parks that can actually be exhibited: configured here *and* carrying a
+ * scan on the CDN.
+ *
+ * Both halves are load-bearing. The records above say what a feature is and how
+ * it behaves, which is editorial; whether its GLB has been uploaded is an
+ * operational fact that lives with every other asset question in lib/assets. A
+ * park missing from either side is simply not shown, which is the difference
+ * between a module that exhibits three parks and one that exhibits four with a
+ * hole in it.
+ */
+export const FOUND_OBJECT_SLUGS =
+  Object.keys(FOUND_OBJECTS).filter(slug => featureUrl(slug) !== null);
 
 /** What the homepage shows with no query string. `?object=<slug>` overrides. */
 export const DEFAULT_FOUND_OBJECT = "stockwell";
