@@ -27,7 +27,29 @@ const STORE_KEY = "fbs-parks-explore";
 // map never mounts for a frame on ?mode=grid — so swap by environment.
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-type Stored = { mode?: ExploreMode; density?: GridDensity; scrollY?: number; reveal?: number };
+/** Where a park page was opened from, and which park it was.
+ *
+ *  The slug is the whole point of storing it. Recording only "you were last in
+ *  Map" makes every park page claim you came from the map — including one
+ *  reached from the home page an hour later in the same tab — and a "Back to
+ *  map" that lies about where you have been is worse than not offering one.
+ *  Matching the slug means the control appears exactly when this park was the
+ *  one opened from the directory, and falls back to "View on map" otherwise. */
+export type DirectoryOrigin = { mode: ExploreMode; slug: string };
+
+/** Enough of the map to put a reader back where they were looking.
+ *  `selectedSlug` rather than the row id: ids are database keys and the store
+ *  outlives a deploy, whereas a slug is the same thing the URL is made of. */
+export type MapSnapshot = {
+  lat: number; lng: number; zoom: number;
+  selectedSlug: string | null;
+  listScroll: number;
+};
+
+type Stored = {
+  mode?: ExploreMode; density?: GridDensity; scrollY?: number; reveal?: number;
+  search?: string; map?: MapSnapshot; origin?: DirectoryOrigin;
+};
 
 function readStore(): Stored {
   try {
@@ -40,6 +62,64 @@ function writeStore(patch: Stored) {
   try {
     sessionStorage.setItem(STORE_KEY, JSON.stringify({ ...readStore(), ...patch }));
   } catch { /* private mode / quota — state degrades to URL only */ }
+}
+
+// ── Returning from a park page ───────────────────────────────────────────
+// All of this rides in the same session record as mode/density/scroll, so
+// there is one key to reason about and one thing to clear.
+
+/** Called as a park link in the directory is followed. */
+export function rememberDirectoryOrigin(mode: ExploreMode, slug: string) {
+  writeStore({ origin: { mode, slug } });
+}
+
+/** The origin, but only if it is about `slug`. Anything else is treated as no
+ *  origin at all — see DirectoryOrigin. */
+export function readDirectoryOrigin(slug: string): DirectoryOrigin | null {
+  const o = readStore().origin;
+  return o && o.slug === slug && isMode(o.mode) ? o : null;
+}
+
+/**
+ * Carry a park's entry context onto the park being stepped to.
+ *
+ * The park page has its own previous/next, and without this the return control
+ * changed meaning as you used it: you arrive from the map on Bloblands and get
+ * "Back to map", step once, and the origin's slug no longer matches so the
+ * control silently becomes "View on map" — a different label pointing at a
+ * different kind of destination, for a reader who has not left the chain of
+ * pages the map started.
+ *
+ * Only carried when there is something to carry. A park reached directly, then
+ * stepped away from, still has no directory behind it and still gets the
+ * labelled fallback — which is the whole reason the slug match exists.
+ */
+export function carryDirectoryOrigin(fromSlug: string, toSlug: string) {
+  const o = readDirectoryOrigin(fromSlug);
+  if (o) writeStore({ origin: { mode: o.mode, slug: toSlug } });
+}
+
+export function saveMapSnapshot(map: MapSnapshot) { writeStore({ map }); }
+
+/** The stored map view, or null. Guards every field: this is JSON from a
+ *  previous build's session, and a half-written record must not be able to
+ *  send Leaflet to NaN. */
+export function readMapSnapshot(): MapSnapshot | null {
+  const m = readStore().map;
+  if (!m) return null;
+  const ok = [m.lat, m.lng, m.zoom].every(n => typeof n === "number" && Number.isFinite(n));
+  if (!ok) return null;
+  return {
+    lat: m.lat, lng: m.lng, zoom: m.zoom,
+    selectedSlug: typeof m.selectedSlug === "string" ? m.selectedSlug : null,
+    listScroll: typeof m.listScroll === "number" && m.listScroll >= 0 ? m.listScroll : 0,
+  };
+}
+
+export function saveSearch(search: string) { writeStore({ search }); }
+export function readSearch(): string {
+  const q = readStore().search;
+  return typeof q === "string" ? q : "";
 }
 
 function isMode(v: string | null): v is ExploreMode {

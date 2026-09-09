@@ -42,6 +42,10 @@ type Props = {
   /** Sits opposite the field rows on the same baseline — the hero's control
    *  cluster. Omitted in the viewer, which carries its own controls. */
   rightSlot?: ReactNode;
+  /** Sits above the title, inside the hero's bottom-left group — the return
+   *  link. A slot rather than a prop of its own so this component keeps
+   *  owning the group's rhythm and nothing else has to know the margins. */
+  leadSlot?: React.ReactNode;
 };
 
 // A plain function, not a component declared in the body of another one:
@@ -53,7 +57,7 @@ function named(name: string | undefined, children: ReactNode) {
 }
 
 export default function ParkHeroDetails({
-  name, catalogueId, address, postcode, lat, lng, scanned, slug, compact, rightSlot,
+  name, catalogueId, address, postcode, lat, lng, scanned, slug, compact, rightSlot, leadSlot,
 }: Props) {
   // Title only. See lib/view-transitions — this is the park-to-park slide,
   // not the retired home-to-park morph.
@@ -83,6 +87,7 @@ export default function ParkHeroDetails({
           the only reason either exists: the park-to-park slide, set by the
           header's prev/next buttons. The home-to-park morph this name once
           also served is gone. See markParkNavDirection and app/globals.css. */}
+      {leadSlot && <div className="fbs-hero-lead">{leadSlot}</div>}
       <div className={compact ? "fbs-title-row fbs-title-row--compact" : "fbs-title-row"}>
         {named(titleName, <>
           <span className="fbs-title">{name}</span>
@@ -123,18 +128,16 @@ export default function ParkHeroDetails({
           <span className="fbs-field-tag fbs-field-tag--chip">{locationChain}</span>
         )}
 
-        {(scannedText || hasCoords) && (
+        {/* The scan date moved to the park facts. It describes how old the
+            model is — a useful thing to know, and not one that needs to
+            compete with the park's name for the reader's first glance. What
+            stays here is the surface estimate, which is the only line in this
+            block that is about right now. */}
+        {hasCoords && (
           <div className="fbs-field-line">
-            {scannedText && (
-              named(vtDetail?.scanned, <>
-                <span className="fbs-field-tag fbs-field-tag--chip">Scanned: {scannedText}</span>
-              </>)
-            )}
-            {hasCoords && (
-              <div className="fbs-cond-desktop">
-                <ParkWeather lat={lat!} lng={lng!} />
-              </div>
-            )}
+            <div className="fbs-cond-desktop">
+              <ParkWeather lat={lat!} lng={lng!} />
+            </div>
           </div>
         )}
       </div>
@@ -146,6 +149,21 @@ export default function ParkHeroDetails({
           so this renders identically wherever it is mounted. Mounting it twice
           only restates the same rules. */}
       <style>{`
+        /* The return link's row. Tight to the title beneath it — they are one
+           group, and the gap that separated them was the thing that made the
+           link read as page furniture rather than as part of the park's
+           identity block. The negative left margin is the link's own padding
+           being pulled back so its text, not its touch target, lines up with
+           the title's left edge. */
+        .fbs-hero-lead {
+          /* No negative margin here. The two return variants need different
+             pull-backs — an arrow centred in a 44px square sits further into
+             its own box than a label that starts at the box's edge — so each
+             one carries its own, in ParkReturnLink where the box is defined. */
+          margin: 0 0 6px;
+          pointer-events: auto;
+        }
+
         /* --- Title -------------------------------------------------------- */
         .fbs-title-row {
           --fbs-title-size: clamp(34px, 5.5vw, 60px);

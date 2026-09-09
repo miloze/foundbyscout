@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParkCard, PARK_CARD_CSS } from "./ParkCard";
 import { filterParks, getParkImageCandidates, useParksIndex, type ParkIndexRow } from "./parksIndex";
-import { DENSITIES, useGridScrollRestore, useUrlParam, type GridDensity } from "./parksGridState";
+import { DENSITIES, useGridScrollRestore, useUrlParam, type GridDensity, rememberDirectoryOrigin } from "./parksGridState";
 import { debugAllowed } from "@/lib/debugMode";
+import { ParkCutout, parkHasCutout } from "./ParkCard";
 // Type-only, so lib/parkImages (which reads the filesystem) never reaches the
 // browser bundle — the audit arrives over /api/dev/park-images instead.
 import type { ParkAudit, SlotAudit } from "@/lib/parkImages";
@@ -159,15 +160,18 @@ export default function ParksGridView({
              not move between densities — a per-density ratio would recompose
              every photograph on the way down.
 
-             16:10 is the ratio every other surface the directory asset feeds
-             already uses — the accordion drawer figure and both map card
-             thumbnails. Chosen by eye over 2:1 and 4:3, and it means the whole
-             system now displays park photography at one ratio, so a frame
-             composed for any surface reads the same on all of them. Only the
-             feature card differs, at 16:9.
+             16:9, which is the cutouts' own source canvas. The sheet was
+             16:10 — the ratio the directory *photograph* is exported at — and
+             that was right while every tile held a photograph. Now most hold a
+             transparent cutout whose canvas is 16:9, and matching the two
+             means the artwork area wastes no height and needs no second crop.
 
-             Keep in step with .pcard-thumb-map if that ratio ever moves. */
-          --pgv-ratio: 16 / 10;
+             One ratio for every tile, not one per asset type: a sheet where
+             cutout tiles and photograph tiles were different shapes would run
+             ragged and the captions would stop lining up across a row. The few
+             remaining photographs take a slightly tighter crop instead, which
+             is a crop they already survive on the feature card. */
+          --pgv-ratio: 16 / 9;
           font-family:var(--pda-font-ui);
         }
 
@@ -279,12 +283,97 @@ export default function ParksGridView({
           content-visibility:auto;
         }
         .pgv-frame img{
-          object-fit:cover;
+          /* contain, not cover. A photographic fallback shows the whole
+             photograph and lets the frame's own ground show around it where
+             the ratios differ — a contact sheet that crops its plates to fit
+             is not showing you the plate. The frame's dimensions are unchanged
+             either way, so the caption below it does not move.
+
+             This also settles a latent conflict: .pcard-cutout img already
+             asked for contain at identical specificity, so which of the two won
+             depended on the order the two components happened to inject their
+             stylesheets. They now agree. */
+          object-fit:contain;
           /* No filter. Park photography runs in colour, matching the homepage
              thumbnail strip — the b/w treatment read as too grungy against the
              current palette. The interactive B&W toggles (hero/3D viewer,
              gallery) are a separate concern and are untouched. */
+          transition:filter .45s var(--pda-ease);
+        }
+
+        /* ── The cutout in a tile ──────────────────────────────────────────
+           Contained by its *silhouette*, not by its image. The exports carry
+           between 7% and 22% empty alpha across the width and between 20% and
+           37% down it, so fitting the image to the frame would draw Bloblands
+           visibly smaller than Crystal Palace for a difference a reader cannot
+           see. The two clauses below are the same "contain" rule applied to
+           the ink: make the silhouette 88% of the frame's width, unless that
+           would take it past 80% of the height, in which case the height wins.
+           For the four current assets the width clause binds, so every park
+           spans the same width and differs only in its true depth.
+
+           Centred rather than stood on the floor: the map preview bottom-
+           anchors its cutout because there it is an object on a shelf, and
+           here it is a plate in a contact sheet. The translate is in percent
+           of the element's own box, which is what lets the ink's centre — not
+           the image's — land on the frame's centre for an export that is not
+           centred (Stockwell's is at 0.449/0.426). */
+        .pgv-frame .pcard-cutout{
+          --img-w:min(calc(88% / var(--ink-w)), calc(80% / var(--ink-h)));
+          /* The box takes the source canvas's ratio rather than a literal
+             16 / 9 (see lib/parkMapArt). Both clauses above are fractions *of
+             the file*, so they only place the silhouette correctly while the
+             box and the file are the same shape — re-encode an asset at a
+             different canvas ratio and a hardcoded 16 / 9 would letterbox it
+             inside its own box and hang the park off centre. */
+          width:var(--img-w); height:auto; aspect-ratio:var(--src-aspect);
+          left:50%; top:50%; bottom:auto;
+          transform:translate(calc(var(--ink-cx) * -100%), calc(var(--ink-cy) * -100%));
           transition:transform .45s var(--pda-ease);
+        }
+        .pgv-frame .pcard-cutout img{ position:static; width:100%; height:100%; }
+        @media (hover: hover){
+          /* The same 1.02 lift the photographs get, composed onto the centring
+             translate rather than replacing it. */
+          .pgv-tile:hover .pgv-frame .pcard-cutout{
+            transform:translate(calc(var(--ink-cx) * -100%), calc(var(--ink-cy) * -100%)) scale(1.02);
+          }
+        }
+
+        /* ── The open cue ──────────────────────────────────────────────────
+           The site's opening arrow, at the size the tile can afford. It sits
+           inside the frame and is drawn on nothing — position, opacity and a
+           4px nudge only — so the tile never changes size and no caption
+           moves when a reader crosses it.
+
+           Two behaviours, chosen by whether the device can hover at all
+           rather than by width. With a pointer it is absent until the tile is
+           hovered or focused, because a sheet of forty permanent arrows is
+           noise. Without one there is no hover to reveal it, so a smaller
+           version is always there — a touch reader otherwise gets no cue that
+           the tile opens anything. */
+        .pgv-open{
+          position:absolute; right:10px; bottom:8px;
+          font-family:var(--pda-font-display), Arial, sans-serif;
+          line-height:1; color:var(--pda-accent);
+          pointer-events:none;
+          /* Orange on a photograph is a strong hue contrast and a weak
+             luminance one; these hold its edge without a plate behind it. */
+          text-shadow:0 1px 3px rgba(0,0,0,.55), 0 2px 12px rgba(0,0,0,.4);
+        }
+        @media (hover: hover){
+          .pgv-open{
+            font-size:38px; opacity:0; transform:translateX(-4px);
+            transition:opacity .18s var(--pda-ease), transform .18s var(--pda-ease);
+          }
+          .pgv-tile:hover .pgv-open{ opacity:1; transform:none; }
+        }
+        /* Keyboard focus gets exactly what hover gets, on every device — the
+           rule sits outside the hover query so a focus ring is never the only
+           thing telling a keyboard reader which tile they are on. */
+        .pgv-tile:focus-visible .pgv-open{ opacity:1; transform:none; }
+        @media (hover: none){
+          .pgv-open{ font-size:22px; opacity:.92; }
         }
 
         /* ── The caption ───────────────────────────────────────────────────
@@ -326,8 +415,17 @@ export default function ParksGridView({
         @media (hover: hover){
           /* The one hover response, and the ceiling for it. Enough to confirm
              the frame is a control; identity is already on screen and does not
-             move. */
-          .pgv-tile:hover .pgv-frame img{ transform:scale(1.02); }
+             move.
+
+             Brightness rather than the 1.02 scale the cutouts get, and the
+             reason is the contain above: a contained photograph already touches
+             the frame on its binding axis, so *any* scale over 1 pushes that
+             edge outside and crops the picture — the exact thing this pass
+             exists to stop. A cutout has room to grow because it is sized to
+             88% of the frame, so it keeps the scale. Two responses rather than
+             one is a real inconsistency, and it is the honest one: the tiles
+             are different objects and only one of them has room to move. */
+          .pgv-tile:hover .pgv-frame img{ filter:brightness(1.06); }
         }
 
         /* ── Density: scale, and only scale ────────────────────────────────
@@ -436,7 +534,11 @@ export default function ParksGridView({
 
         @media (prefers-reduced-motion: reduce){
           .pgv-frame img{ transition-duration:.01ms; }
-          .pgv-tile:hover .pgv-frame img{ transform:none; }
+          .pgv-open{ transition:none; }
+          .pgv-frame .pcard-cutout{ transition:none; }
+          .pgv-tile:hover .pgv-frame .pcard-cutout{
+            transform:translate(calc(var(--ink-cx) * -100%), calc(var(--ink-cy) * -100%));
+          }
         }
 
         /* Column count per breakpoint. Written from the COLS table above so the
@@ -520,10 +622,19 @@ function GridTile({ park, idx, density, missing }: {
   const candidates = useMemo(() => getParkImageCandidates(park), [park]);
   const [attempt, setAttempt] = useState(0);
   const src = candidates[attempt];
+  // A cutout wins over the photograph, and over the missing-asset notice: a
+  // park with a scan does not have a missing directory export problem worth
+  // showing here. Unless the cutout's own file fails, in which case the tile
+  // falls the rest of the way down the chain rather than showing a hole.
+  const [cutoutFailed, setCutoutFailed] = useState(false);
+  const cutout = parkHasCutout(park) && !cutoutFailed;
 
   return (
     <Link
       href={`/parks/${park.slug}`}
+      // So the park page can offer "Back to grid" and land on the tile this
+      // reader was actually looking at — see rememberDirectoryOrigin.
+      onClick={() => rememberDirectoryOrigin("grid", park.slug)}
       className="pgv-tile"
       // Viewport prefetch across a full sheet would fire a request per tile.
       prefetch={false}
@@ -536,7 +647,19 @@ function GridTile({ park, idx, density, missing }: {
             otherwise fall back to the park's hero and look perfectly fine,
             which is exactly the case this is meant to catch: the directory
             export is the missing asset, not the photography. */}
-        {missing ? (
+        {cutout ? (
+          /* The same asset the map preview uses, framed by the same rule: the
+              silhouette is what gets sized, not the image around it, so a park
+              carrying more empty alpha than another does not render smaller
+              for it. See .pgv-frame .pcard-cutout below. */
+          <ParkCutout
+            park={park}
+            // Matches the photograph's rule below: the first row or so is what
+            // a reader sees before scrolling, and the rest can wait.
+            loading={idx < 8 ? "eager" : "lazy"}
+            onError={() => setCutoutFailed(true)}
+          />
+        ) : missing ? (
           <MissingImage slot={missing} />
         ) : src ? (
           <Image
@@ -554,6 +677,11 @@ function GridTile({ park, idx, density, missing }: {
         ) : (
           <div className="pgv-plate" />
         )}
+        {/* The one thing drawn on the frame, and only while the tile is the
+            one being pointed at or focused. Decorative: the whole tile is
+            already a link whose accessible name is the caption, so this must
+            not announce itself as a second control. */}
+        <span className="pgv-open" aria-hidden>→</span>
       </div>
 
       {/* The same ParkCard the accordion row and the map list render, in the

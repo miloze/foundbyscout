@@ -66,16 +66,26 @@ export default function RootLayout({
                   © 2026 Scout
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-                  {/* /about and /contact are gone: neither page ever existed,
-                      so both links 404'd. Scout has one section, and the footer
-                      now says the same thing the header does rather than
-                      listing the pages a site is conventionally expected to
-                      have. Not replaced with anything. */}
-                  {[["Parks", "/parks"]].map(([label, href]) => (
-                    <a key={href} href={href} style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", textDecoration: "none" }}>
-                      {label}
-                    </a>
-                  ))}
+                  {/* No navigation links here at all now.
+                
+                      "Parks" is gone because the header carries it on every
+                      page, permanently and in the same place — a second copy
+                      at the foot was the footer repeating the nav rather than
+                      doing anything of its own.
+
+                      /about and /contact are still absent, and deliberately:
+                      neither route exists (app/ has no about or contact), so a
+                      link to either would 404. They are a decision about what
+                      pages Scout has, not about what the footer lists — build
+                      the page and the link follows.
+
+                      Privacy is the same shape of question and is being
+                      settled separately: what a privacy link has to say
+                      depends on what the site actually collects, so it is not
+                      guessed at here.
+
+                      What is left is the copyright line and the one social
+                      account, which is the whole of what this footer knows. */}
                   <a href="https://instagram.com/foundbyscout" target="_blank" rel="noopener noreferrer"
                     style={{ color: "var(--muted)", display: "flex", alignItems: "center", transition: "color 0.15s" }}
                     aria-label="Instagram">

@@ -14,9 +14,6 @@ const n = (v: unknown[]): [number, number, number] => [+v[0]!, +v[1]!, +v[2]!];
 
 useGLTF.setDecoderPath("/draco/");
 
-// Session-scoped (not per-park) — once a visitor engages with any viewer
-// this tab session, the drag hint shouldn't nag them again until a fresh visit.
-const HINT_DISMISSED_KEY = "fbs-viewer-hint-dismissed";
 
 
 // Keep original PBR materials — ambient-only lighting gives a flat
@@ -414,11 +411,6 @@ export default function ParkModel({
     document.addEventListener("visibilitychange", sync);
     return () => document.removeEventListener("visibilitychange", sync);
   }, []);
-  // ssr:false component (dynamic-imported), so reading sessionStorage in the
-  // initializer is safe — this never runs server-side.
-  const [hintDismissed, setHintDismissed] = useState(() => {
-    try { return sessionStorage.getItem(HINT_DISMISSED_KEY) === "1"; } catch { return false; }
-  });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef  = useRef<any>(null);
   const preloadRef   = useRef<HTMLImageElement>(null);
@@ -430,10 +422,6 @@ export default function ParkModel({
   // front of the visitor; the timing spec asks for the angle to survive both
   // transitions, so state is simply left alone.
 
-  const dismissHint = useCallback(() => {
-    setHintDismissed(true);
-    try { sessionStorage.setItem(HINT_DISMISSED_KEY, "1"); } catch { /* ignore */ }
-  }, []);
 
 
 
@@ -627,29 +615,14 @@ export default function ParkModel({
         </div>
       )}
 
-      {/* ── Drag hint icon — only once the model is interactive; dismisses on
-          the first pointerdown on the canvas, not a timer; stays dismissed
-          for the rest of the session ────────────────────────────────────── */}
-      {!pingPong && !debug && (
-        <div
-          aria-hidden
-          style={{
-            position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-            zIndex: 5, pointerEvents: "none",
-            color: "rgba(255,255,255,0.45)",
-            opacity: modelLoaded && !hintDismissed ? 1 : 0,
-            transition: "opacity 200ms ease",
-          }}
-        >
-          <svg width="40" height="24" viewBox="0 0 40 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4 16c6-6 12-9 16-9s10 3 16 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-            <circle className="fbs-hint-dot" cx="12" cy="10" r="4" fill="currentColor" />
-          </svg>
-        </div>
-      )}
-
+      {/* The drag hint that used to sit here — a curved path with a dot
+          sliding along it — is gone. ParkHeroShell and ParkViewerModal both
+          already state the interaction in words, device-appropriately ("Drag
+          to rotate · Pinch to zoom" / "Scroll to zoom · Drag to rotate"), so
+          the icon was a second, vaguer telling of the same thing. Those
+          instructions are the ones to change if this needs saying again. */}
       {/* ── Canvas — filter on wrapper div, not on canvas itself ───────── */}
-      <div style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }} onPointerDown={dismissHint}>
+      <div style={{ position: "absolute", inset: 0, filter, transition: "filter 0.4s ease" }}>
       <Canvas
         frameloop={pageVisible ? "always" : "never"}
         camera={{ position: canvasStart, fov, near: 0.5, far: 400 }}
@@ -737,18 +710,6 @@ export default function ParkModel({
         }
         @media (prefers-reduced-motion: reduce){
           .fbs-loading-note{ animation: none; opacity: 0.8; }
-        }
-        @keyframes fbs-hint-drag {
-          0%, 100% { transform: translateX(-6px); }
-          50%      { transform: translateX(6px); }
-        }
-        .fbs-hint-dot {
-          animation: fbs-hint-drag 2s ease-in-out infinite;
-          transform-box: fill-box;
-          transform-origin: center;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .fbs-hint-dot { animation: none; }
         }
       `}</style>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fixtureCount, makeFixtureParks } from "@/lib/devParkFixtures";
 
 // ── Read-only parks index ────────────────────────────────────────────────
 // Added for the Grid view, which needed a parks list without touching the two
@@ -50,7 +51,13 @@ export function useParksIndex() {
         .then(({ data, error }) => {
           if (cancelled) return;
           if (error || !data) { setStatus("error"); return; }
-          setParks(data as ParkIndexRow[]);
+          const real = data as ParkIndexRow[];
+          // Dev-only, and only when the URL asks. The grid needs these more
+          // than the map does: every published park has artwork now, so the
+          // photographic tile, the empty plate and the broken-cutout fallback
+          // are otherwise unreachable. See lib/devParkFixtures.
+          const n = fixtureCount(window.location.search);
+          setParks(n ? [...real, ...(makeFixtureParks(n, real.length + 1) as unknown as ParkIndexRow[])] : real);
           setStatus("ready");
         });
     }).catch(() => { if (!cancelled) setStatus("error"); });

@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { PARK_CARD_CSS } from "./ParkCard";
-import { useExploreState } from "./parksGridState";
+import { useExploreState, saveSearch, readSearch, useUrlParam } from "./parksGridState";
 
 const ParksMap = lazy(() => import("./ParksMap"));
 // Grid replaces the map entirely rather than sitting beside it, so it is never
@@ -99,6 +99,13 @@ export default function ParksDirectoryAccordion() {
     return () => ro.disconnect();
   }, []);
 
+  // Search survives a park visit alongside mode, density and scroll. Restored
+  // after mount rather than in the useState initialiser: this route is
+  // prerendered, so a first render that read sessionStorage would not match the
+  // server's.
+  useEffect(() => { setSearch(readSearch()); }, []);
+  useEffect(() => { saveSearch(search); }, [search]);
+
   useEffect(() => {
     import("@supabase/supabase-js").then(({ createClient }) => {
       const db = createClient(
@@ -112,6 +119,23 @@ export default function ParksDirectoryAccordion() {
         .then(({ data }) => { if (data) setParks(data as ParkRow[]); });
     });
   }, []);
+
+  // ?park=<slug> opens the map on that park. It is what the park page's
+  // "View on map" points at for a reader with no directory history — a direct
+  // visit, a shared link, a new tab — so that control lands on the park being
+  // read rather than on the random pick the map would otherwise make.
+  // Consumed once: the seq counter means re-running would re-centre the map
+  // under someone who had since panned away.
+  const parkParam = useUrlParam("park");
+  const parkParamUsed = useRef(false);
+  useEffect(() => {
+    if (!parkParam || parkParamUsed.current || parks.length === 0) return;
+    const park = parks.find(p => p.slug === parkParam);
+    if (!park) return;            // unknown slug: leave the map to its own devices
+    parkParamUsed.current = true;
+    setMode("explore");
+    setFocus({ id: park.id, seq: ++focusSeq.current });
+  }, [parkParam, parks, setMode]);
 
   const displayedParks = useMemo(() => {
     const q = search.trim().toLowerCase();

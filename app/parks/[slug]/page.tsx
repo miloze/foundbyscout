@@ -2,6 +2,7 @@ import EditorialGallery, { GalleryRow } from "@/components/EditorialGallery";
 import EditorialSection from "@/components/editorial/EditorialSection";
 import ScoutNotes from "@/components/editorial/ScoutNotes";
 import FooterWordmark from "@/components/FooterWordmark";
+import Reveal from "@/components/Reveal";
 import OpenScanButton from "@/components/OpenScanButton";
 import FloatingAsset from "@/components/FloatingAsset";
 import Link from "next/link";
@@ -155,6 +156,11 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
   return (
     <article>
 
+      {/* The return control is inside the hero now, above the park title —
+          see ParkHeroShell's leadSlot. It had a row of its own here, which
+          pushed the hero down by its full height for a link that reads better
+          as part of the park's identity block. */}
+
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <ParkHeroShell
         modelFile={modelFile}
@@ -191,6 +197,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           The facts sidebar sits beside the editorial rather than beside the
           photos: it puts the practical answers next to the copy that provokes
           them, and it frees the gallery to take the full width below. */}
+      <Reveal>
       <div className="park-editorial-band">
         <div>
           {/* Introduction — the existing description[], unchanged data */}
@@ -216,6 +223,7 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
             openingTimes={park.opening_times}
             builtBy={park.built_by ?? park.builder}
             opened={park.opened}
+            scanned={park.scanned}
             gettingThere={park.getting_there}
             address={park.address}
             postcode={park.postcode}
@@ -239,10 +247,12 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           )}
         </div>
       </div>
+      </Reveal>
 
       {/* ── PHOTOS — imagery runs edge to edge, its label stays in the
              reading column so the eyebrow keeps the same left edge as every
              other section heading on the page. ─────────────────────────── */}
+      <Reveal>
       <section style={{ paddingTop: 64, paddingBottom: 64, borderBottom: "1px solid var(--border)" }}>
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 16 }}>Photos</p>
         {galleryRows.length > 0
@@ -252,9 +262,10 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
           : <div style={{ background: "var(--card)", height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>No photos yet</span></div>
         }
       </section>
+      </Reveal>
 
       {/* ── SCOUT NOTES — the editorial closer ─────────────────────────── */}
-      <ScoutNotes notes={editorial.notes} />
+      <Reveal><ScoutNotes notes={editorial.notes} /></Reveal>
 
       <FooterWordmark />
 

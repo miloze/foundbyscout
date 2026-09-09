@@ -276,6 +276,10 @@ type Props = {
   openingTimes?: string | null;
   builtBy?: string | null;
   opened?: string | null;
+  /** When the 3D scan was captured. Moved here from the hero: it dates the
+   *  model, which belongs with the park's other facts rather than beside the
+   *  name where it competed for a first glance. */
+  scanned?: string | null;
   gettingThere?: string | null;
   /** Street address lines. The hero only carries area + postcode, so the full
    *  address still has to live somewhere — it sits under the prose. */
@@ -285,7 +289,7 @@ type Props = {
 };
 
 export default function ParkFacts({
-  glance, openingTimes, builtBy, opened, gettingThere, address, postcode, transport,
+  glance, openingTimes, builtBy, opened, scanned, gettingThere, address, postcode, transport,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -297,6 +301,10 @@ export default function ParkFacts({
   // every other row in this block is prose.
   const openedText = formatFieldDateLong(opened);
   if (openedText)   factRows.push({ icon: "calendar_month", label: "Opened",        value: openedText });
+  // Validated the same way, for the same reason: the column can hold anything,
+  // and a row reading "Scanned  NA" is worse than no row.
+  const scannedText = formatFieldDateLong(scanned);
+  if (scannedText)  factRows.push({ icon: "3d_rotation",    label: "Scanned",       value: scannedText });
 
   const addressLines = (address ?? []).filter(Boolean);
   const links = transport ?? [];

@@ -4,10 +4,15 @@
 //
 // Reveal model: progress is driven by how close you are to the *bottom of the
 // document*, not by the element merely entering the viewport — "the more you
-// are at the bottom, the more visible it is". The mark starts fully below its
-// clip box and slides up, so the first thing you see is a cropped top edge. It
-// travels slower than the page scrolls, which is what gives it the parallax
-// feel against everything above it.
+// are at the bottom, the more visible it is".
+//
+// It fades. It used to slide up out of its own clip box, which read as a
+// parallax trick rather than as the page settling, and put the mark in motion
+// at exactly the moment a reader has stopped looking for motion. Opacity says
+// the same thing — this arrives as you reach the end — without anything
+// travelling. The clip box keeps its derived aspect ratio either way, so the
+// block's height is identical at every point of the reveal and nothing below
+// or above it moves.
 //
 // Previously this rendered the word as text and measured a `#footer-spacer`
 // element by id that exists nowhere in the app — so `update()` bailed on every
@@ -89,7 +94,7 @@ export default function FooterWordmark({
     if (!clip || !mark) return;
 
     if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      mark.style.transform = "translateY(0%)";
+      mark.style.opacity = "1";
       return;
     }
 
@@ -102,7 +107,7 @@ export default function FooterWordmark({
       // The reveal spans the last (height × windowFactor) pixels of the page.
       const span = Math.max(1, clip.getBoundingClientRect().height * windowFactor);
       const progress = Math.min(1, Math.max(0, 1 - remaining / span));
-      mark.style.transform = `translateY(${((1 - progress) * 100).toFixed(2)}%)`;
+      mark.style.opacity = progress.toFixed(3);
     };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
 
@@ -160,8 +165,11 @@ export default function FooterWordmark({
           maskPosition: "center",
           WebkitMaskSize: "100% 100%",
           maskSize: "100% 100%",
-          transform: "translateY(100%)",
-          willChange: "transform",
+          // Starts invisible rather than displaced. The initial value has to
+          // be the hidden end of the reveal, or the mark flashes at full
+          // strength for the frame before the first scroll handler runs.
+          opacity: 0,
+          willChange: "opacity",
         }}
       />
     </div>

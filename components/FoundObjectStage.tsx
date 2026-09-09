@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useStore, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -157,20 +157,83 @@ const WORD_MAX_HEIGHT = 0.4;
  */
 const WORD_DEPTH = 1;
 
+/**
+ * The camera's distance from the origin, and now a constant.
+ *
+ * It used to be solved per object: the camera moved until that object's
+ * silhouette filled the frame. That is the same picture as holding the camera
+ * still and scaling the object — scaling the world about the camera's target
+ * and scaling the camera's distance are the same projection — and the
+ * difference matters the moment two objects share the stage. A camera fitted
+ * to one of them frames the other wrongly, so the incoming object would have
+ * arrived at the wrong size and snapped to the right one on landing, which is
+ * exactly the scale change the motion brief rules out.
+ *
+ * So the camera is fixed and each object is fitted to it instead. The value is
+ * arbitrary — every object is normalised against it — and the framing rule,
+ * its convergence loop and FRAMING are unchanged, so what lands on screen for
+ * a single object is what landed before.
+ */
+const CAM_DIST = 6;
+
+/** The slide. Short, and flat: no spring, no overshoot, no bounce. */
+const SLIDE_MS = 350;
+/**
+ * Extra travel past the frame's own width, so an object is fully outside the
+ * visible area before it stops rather than clipping at the edge with a corner
+ * still showing. Measured from the frame, not from the object's slot.
+ */
+const SLIDE_CLEARANCE = 1.25;
+
 const SPEED = (Math.PI * 2) / REVOLUTION_S;
+
+/** Flat ease-in-out. Symmetric, no undershoot below 0 or past 1 — the two
+ *  places a cubic can produce the elasticity this is replacing. */
+function easeInOut(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 export type Motion = "orbit" | "pingpong";
 
 // ── Model ─────────────────────────────────────────────────────────────────
-function Model({ src, onReady }: { src: string; onReady: (o: THREE.Object3D) => void }) {
+function Model({ src, onReady, sizeKey }: {
+  src: string;
+  onReady: (o: THREE.Object3D) => void;
+  /** Changes when the canvas is resized. The fit is to the frame, and the
+   *  frame's aspect decides what fits in it, so a resize has to re-run it —
+   *  otherwise an object fitted in portrait stays fitted for portrait after
+   *  the tablet is turned. */
+  sizeKey: string;
+}) {
   const { scene } = useGLTF(src);
+
+  /**
+   * A clone, and this is load-bearing rather than tidiness.
+   *
+   * useGLTF caches by URL and hands every caller the same Object3D. That was
+   * survivable while one object was ever on the stage; it stopped being so the
+   * moment a step puts two there, because the arriving object is mounted in the
+   * incoming slot and then re-mounted in the current one when the step lands.
+   * For one commit the same node is claimed by two parents, three.js detaches
+   * it from the first as the second adds it, and the order the two run in
+   * decides where the object ends up — which is exactly what it looked like:
+   * the ledge arrived correctly, then reappeared above and left of the frame
+   * after a there-and-back.
+   *
+   * clone(true) copies the node graph and shares the geometries, materials and
+   * textures by reference, so this costs a few hundred objects rather than a
+   * second copy of a 5MB scan. It also means the fit below writes to a node
+   * nothing else can be holding, so two slots showing the same park — which a
+   * larger collection will allow — cannot fight over one transform.
+   */
+  const object = useMemo(() => scene.clone(true), [scene]);
 
   useEffect(() => {
     // Photogrammetry exports arrive with transparency and depth settings that
     // drop faces at grazing angles — the same fix the park viewers apply. The
     // culling one matters here: Stockwell's materials are single-sided and its
     // meshes carry no NORMAL attribute, so without this it renders as holes.
-    scene.traverse(child => {
+    object.traverse(child => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -183,10 +246,10 @@ function Model({ src, onReady }: { src: string; onReady: (o: THREE.Object3D) => 
         mat.needsUpdate = true;
       });
     });
-    onReady(scene);
-  }, [scene, onReady]);
+    onReady(object);
+  }, [object, onReady, sizeKey]);
 
-  return <primitive object={scene} />;
+  return <primitive object={object} />;
 }
 
 // ── The word ──────────────────────────────────────────────────────────────
@@ -209,7 +272,20 @@ function Model({ src, onReady }: { src: string; onReady: (o: THREE.Object3D) => 
  * White in the texture, tinted by the material, so following the theme is one
  * colour assignment rather than a re-render of the type.
  */
-function ParkWord({ text, radius, depth }: { text: string; radius: number; depth: number }) {
+function ParkWord({ text, back, matRef, startAt = 1 }: {
+  text: string;
+  /** How far behind the origin the plane hangs, in world units. Passed in
+   *  rather than derived from a radius here, because with two objects on the
+   *  stage the word belongs to neither of them. */
+  back: number;
+  /** The Scene animates opacity through this during a crossfade — sixty
+   *  React renders a second to fade a title would re-render the scene graph
+   *  for something one number can do. */
+  matRef?: React.RefObject<THREE.MeshBasicMaterial | null>;
+  /** What the plane starts at. The incoming title begins invisible so the
+   *  crossfade has somewhere to come from. */
+  startAt?: number;
+}) {
   const store = useStore();
   const size = useThree(s => s.size);
   const dpr = useThree(s => s.viewport.dpr);
@@ -245,7 +321,6 @@ function ParkWord({ text, radius, depth }: { text: string; radius: number; depth
     if (!m || !tex) return;
     const camera = store.getState().camera as THREE.PerspectiveCamera;
 
-    const back = radius * depth;
     const dist = camera.position.length() + back;
     const worldH = 2 * dist * Math.tan(((FOV_DEG * Math.PI) / 180) / 2);
     const worldW = worldH * (size.width / size.height);
@@ -264,7 +339,7 @@ function ParkWord({ text, radius, depth }: { text: string; radius: number; depth
     m.position.copy(forward.multiplyScalar(back));
     m.quaternion.copy(camera.quaternion);
     invalidate();
-  }, [store, tex, radius, depth, size.width, size.height, invalidate]);
+  }, [store, tex, back, size.width, size.height, invalidate]);
 
   if (!tex) return null;
 
@@ -276,6 +351,8 @@ function ParkWord({ text, radius, depth }: { text: string; radius: number; depth
           word is genuinely behind it. depthWrite off because the plane is
           transparent and has no business occluding anything itself. */}
       <meshBasicMaterial
+        ref={matRef}
+        opacity={startAt}
         map={tex.map}
         color={colour}
         transparent
@@ -386,99 +463,104 @@ async function buildWordTexture(text: string, targetPx: number) {
 
 // ── Camera ────────────────────────────────────────────────────────────────
 /**
- * Frames the cylinder the object sweeps through a full turn, rather than the
- * silhouette it happens to present at rest — otherwise a wide object clips its
- * own corners a few seconds in. Recomputed on resize because the horizontal
- * fit depends on the aspect ratio, and this box is a very different shape at
- * 1440 and at 390.
+ * One camera, set from the viewport and never from the object.
+ *
+ * The fit that used to live here has not gone away — it moved into fitObject
+ * below, which solves the same convergence for the object's scale instead of
+ * for the camera's distance. Same sampling, same FRAMING, same answer on
+ * screen; the difference is that the answer is now a property of each object
+ * rather than of the stage, so two of them can be on it at once and neither
+ * changes size while it travels.
  */
-function Framing({ radius, halfHeight, scale }: {
-  radius: number; halfHeight: number; scale: number;
-}) {
-  // Reached through the store rather than as a hook return: the camera has to
-  // be mutated (R3F offers no declarative way to set a derived position), and
-  // the compiler rightly objects to writing through a hook's value.
+function FixedCamera() {
   const store = useStore();
   const size = useThree(s => s.size);
   const invalidate = useThree(s => s.invalidate);
 
   useEffect(() => {
-    if (radius <= 0) return;
     const camera = store.getState().camera as THREE.PerspectiveCamera;
     const elev = (ELEVATION_DEG * Math.PI) / 180;
-    const vFov = (FOV_DEG * Math.PI) / 180;
-    const aspect = size.width / size.height;
-    const drop = halfHeight * 2 * OBJECT_DROP;
-
-    /**
-     * The fit is measured, not derived from a formula.
-     *
-     * It used to be analytic — radius*sin(elev) + halfHeight*cos(elev) — which
-     * is an orthographic answer to a perspective question. The camera looks
-     * down at 20 degrees, so the near edge of a wide object is closer to it
-     * than the far edge and projects further from centre: the silhouette sits
-     * lower in frame than its own centre suggests. On the ledge that was 64px
-     * of unaccounted drift at 1440, and it spent the entire bottom margin —
-     * measured clearance was 12px at the bottom against 147px at the top.
-     *
-     * So instead: sample the rim of the cylinder the object sweeps, project
-     * those points through the real camera, and read the screen box back.
-     * Then correct the distance for the extent and the aim for the centre, and
-     * repeat. It converges in a few passes, runs once per resize, and is right
-     * for any silhouette rather than for the one it was tuned against.
-     */
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i < 48; i++) {
-      const a = (i / 48) * Math.PI * 2;
-      const x = Math.cos(a) * radius;
-      const z = Math.sin(a) * radius;
-      pts.push(new THREE.Vector3(x, halfHeight - drop, z));
-      pts.push(new THREE.Vector3(x, -halfHeight - drop, z));
-    }
-
     camera.fov = FOV_DEG;
-    camera.aspect = aspect;
-
-    // A rough starting point; the loop below does the actual work.
-    let dist = (radius * 2) / Math.tan(vFov / 2);
-    let aim = 0;
-    const v = new THREE.Vector3();
-
-    for (let pass = 0; pass < 5; pass++) {
-      camera.near = Math.max(0.01, dist * 0.02);
-      camera.far = (dist + radius * 4) * 4;
-      camera.position.set(0, dist * Math.sin(elev) + aim, dist * Math.cos(elev));
-      camera.lookAt(0, aim, 0);
-      camera.updateMatrixWorld();
-      camera.updateProjectionMatrix();
-
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const p of pts) {
-        v.copy(p).project(camera);
-        if (v.x < minX) minX = v.x;
-        if (v.x > maxX) maxX = v.x;
-        if (v.y < minY) minY = v.y;
-        if (v.y > maxY) maxY = v.y;
-      }
-
-      // Normalised device coordinates: the frame is -1..1 on both axes, so the
-      // half-extent the object needs is directly comparable to 1.
-      const need = Math.max((maxX - minX) / 2, (maxY - minY) / 2);
-      // Bring the vertical centre of what is actually drawn onto the frame's
-      // centre, in world units along the camera's own up axis.
-      aim += ((maxY + minY) / 2) * (dist * Math.tan(vFov / 2)) / Math.cos(elev);
-      dist *= (need * FRAMING) / scale;
-    }
-
-    camera.near = Math.max(0.01, dist * 0.02);
-    camera.far = (dist + radius * 4) * 4;
-    camera.position.set(0, dist * Math.sin(elev) + aim, dist * Math.cos(elev));
-    camera.lookAt(0, aim, 0);
+    camera.aspect = size.width / size.height;
+    camera.near = Math.max(0.01, CAM_DIST * 0.02);
+    // Deep enough to hold an object that has travelled a frame-width sideways
+    // as well as the word plane hanging behind it.
+    camera.far = CAM_DIST * 12;
+    camera.position.set(0, CAM_DIST * Math.sin(elev), CAM_DIST * Math.cos(elev));
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
     invalidate();
-  }, [store, size.width, size.height, radius, halfHeight, scale, invalidate]);
+  }, [store, size.width, size.height, invalidate]);
 
   return null;
+}
+
+/** How wide the frame is in world units at the origin's depth, which is how
+ *  far an object has to travel to be gone. */
+function frameWidth(aspect: number): number {
+  const vFov = (FOV_DEG * Math.PI) / 180;
+  return 2 * CAM_DIST * Math.tan(vFov / 2) * aspect;
+}
+
+/**
+ * The scale and vertical offset that put this object in the frame the way the
+ * camera fit used to.
+ *
+ * The method is the one the camera fit used and the reasoning behind it is
+ * unchanged: sample the rim of the cylinder the object sweeps, project those
+ * points through the real camera, read the screen box back, and correct. It is
+ * measured rather than derived because the camera looks down at 20 degrees and
+ * the near edge of a wide object projects further from centre than an
+ * orthographic formula predicts — on the ledge that was 64px of drift.
+ *
+ * What changed is the unknown. It used to move the camera until the object
+ * fitted; it now scales the object until it fits a camera that cannot move.
+ */
+function fitObject(
+  camera: THREE.PerspectiveCamera,
+  radius: number,
+  halfHeight: number,
+  artScale: number,
+): { scale: number; dy: number } {
+  const vFov = (FOV_DEG * Math.PI) / 180;
+  const elev = (ELEVATION_DEG * Math.PI) / 180;
+
+  // Unit rim, scaled inside the loop — so the samples cost one multiply per
+  // pass rather than a rebuild.
+  const rim: [number, number, number][] = [];
+  for (let i = 0; i < 48; i++) {
+    const a = (i / 48) * Math.PI * 2;
+    rim.push([Math.cos(a) * radius, halfHeight, Math.sin(a) * radius]);
+    rim.push([Math.cos(a) * radius, -halfHeight, Math.sin(a) * radius]);
+  }
+
+  // Starts from the object's own world size so a 4-unit scan and a 10-unit one
+  // both begin near the answer rather than converging from opposite ends.
+  let scale = radius > 0 ? 1 / radius : 1;
+  let dy = 0;
+  const v = new THREE.Vector3();
+
+  for (let pass = 0; pass < 6; pass++) {
+    const drop = halfHeight * 2 * OBJECT_DROP * scale;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [x, y, z] of rim) {
+      v.set(x * scale, y * scale + dy - drop, z * scale).project(camera);
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    }
+    const need = Math.max((maxX - minX) / 2, (maxY - minY) / 2);
+    if (need <= 0) break;
+    // Move what is actually drawn onto the frame's centre. The object moves now
+    // rather than the camera's aim, so the correction is the same magnitude
+    // with the opposite sign.
+    dy -= ((maxY + minY) / 2) * (CAM_DIST * Math.tan(vFov / 2)) / Math.cos(elev);
+    scale *= (artScale / FRAMING) / need;
+  }
+
+  return { scale, dy };
 }
 
 // ── Turntable ─────────────────────────────────────────────────────────────
@@ -542,46 +624,184 @@ function Turntable({ target, running, motion }: {
 }
 
 // ── Scene ─────────────────────────────────────────────────────────────────
-function Scene({ src, word, motion, scale, running, reduced, onLoaded }: {
-  src: string; word: string; motion: Motion; scale: number;
-  running: boolean; reduced: boolean; onLoaded?: () => void;
-}) {
-  const spin = useRef<THREE.Group>(null);
-  const invalidate = useThree(s => s.invalidate);
-  const [fit, setFit] = useState({ radius: 0, halfHeight: 0 });
 
-  /**
-   * Centres the object on the turntable's axis and measures what it sweeps.
-   *
-   * The GLBs are authored around their own origins, not their centroids, so
-   * turning one as-authored swings it through an arc instead of rotating it on
-   * the spot. Everything here is measured from the loaded scene rather than
-   * hardcoded, which is why the same code frames Bloblands (4.2 units across,
-   * Z-up with a correcting node quaternion) and Stockwell (10 units across,
-   * already Y-up, two meshes) without a per-object number.
-   */
+/** One exhibit: which scan, which name, and how it behaves. */
+export type StageSlot = {
+  key: string;
+  src: string;
+  word: string;
+  motion: Motion;
+  /** Art direction on the size the geometry implies; see DEFAULT_OBJECT_SCALE. */
+  scale?: number;
+};
+
+/**
+ * A scan, fitted to the fixed camera and turning on its own axis.
+ *
+ * Its own group, so the slide can move the track underneath it without
+ * touching the rotation — the turntable spins the inner group, the track
+ * translates the outer one, and neither has to know about the other.
+ */
+function ObjectSlot({ slot, x, running, reduced, onReady }: {
+  slot: StageSlot;
+  /** Where this slot sits on the track, in world units. */
+  x: number;
+  running: boolean;
+  reduced: boolean;
+  onReady: (key: string) => void;
+}) {
+  const store = useStore();
+  const size = useThree(s => s.size);
+  const invalidate = useThree(s => s.invalidate);
+  const spin = useRef<THREE.Group>(null);
+  const [fitted, setFitted] = useState(false);
+
   const handleReady = useCallback((obj: THREE.Object3D) => {
+    // Measured from the object back at its own origin and its own scale, not
+    // from wherever the last mount left it. useGLTF caches the parsed scene by
+    // URL and hands back the same Object3D every time, so once the module could
+    // be browsed this had to be idempotent: without the reset, stepping away
+    // and back re-centred an already-centred scene and re-scaled an
+    // already-scaled one, and the object walked out of frame a step at a time.
+    obj.position.set(0, 0, 0);
+    obj.scale.set(1, 1, 1);
+    obj.updateMatrixWorld(true);
+
     const box = new THREE.Box3().setFromObject(obj);
     const centre = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
+    const dims = box.getSize(new THREE.Vector3());
+    // The turn is about Y, so the swept radius is the diagonal of the
+    // horizontal footprint — not half the largest dimension.
+    const radius = Math.hypot(dims.x, dims.z) / 2;
+    const halfHeight = dims.y / 2;
 
-    obj.position.sub(centre);
-    // Below the word's centre line. Applied to the model inside the turntable
-    // group so the group still rotates about its own axis rather than orbiting
-    // an offset one.
-    obj.position.y -= size.y * OBJECT_DROP;
+    const camera = store.getState().camera as THREE.PerspectiveCamera;
+    const { scale, dy } = fitObject(
+      camera, radius, halfHeight, slot.scale ?? DEFAULT_OBJECT_SCALE);
 
-    setFit({
-      // The turn is about Y, so the swept radius is the diagonal of the
-      // horizontal footprint — not half the largest dimension.
-      radius: Math.hypot(size.x, size.z) / 2,
-      halfHeight: size.y / 2,
-    });
+    // Centred on the turntable's axis first — the GLBs are authored around
+    // their own origins, not their centroids, so turning one as-authored
+    // swings it through an arc instead of rotating it on the spot. Then
+    // dropped below the word's centre line, and scaled: position is in the
+    // parent's units, so the centring offset scales with the object.
+    obj.position.copy(centre).multiplyScalar(-1);
+    obj.position.y -= dims.y * OBJECT_DROP;
+    obj.position.multiplyScalar(scale);
+    obj.scale.setScalar(scale);
 
-    if (spin.current) spin.current.rotation.y = reduced ? STATIC_ANGLE : 0;
-    onLoaded?.();
+    const group = spin.current;
+    if (group) {
+      group.position.y = dy;
+      group.rotation.y = reduced ? STATIC_ANGLE : 0;
+    }
+    setFitted(true);
+    onReady(slot.key);
     invalidate();
-  }, [reduced, onLoaded, invalidate]);
+    // Not size-dependent: it reads the camera when it runs, and the camera is
+    // already current. What re-runs it on resize is Model's own sizeKey.
+  }, [store, slot.key, slot.scale, reduced, onReady, invalidate]);
+
+  return (
+    <group position-x={x}>
+      <group ref={spin}>
+        <Suspense fallback={null}>
+          <Model src={slot.src} onReady={handleReady} sizeKey={`${size.width}x${size.height}`} />
+        </Suspense>
+      </group>
+      <Turntable
+        target={spin}
+        motion={slot.motion}
+        running={running && !reduced && fitted}
+      />
+    </group>
+  );
+}
+
+function Scene({
+  current, incoming, dir, running, reduced, onReady, onSlideEnd,
+}: {
+  current: StageSlot;
+  /** The object being stepped to, mounted a frame-width off the edge and held
+   *  there until both it and the outgoing one can move together. Null when
+   *  the stage is settled. */
+  incoming: StageSlot | null;
+  /** 1 stepping forward — the incoming object enters from the right and the
+   *  outgoing one leaves to the left. -1 reverses both. */
+  dir: 1 | -1;
+  running: boolean;
+  reduced: boolean;
+  onReady?: (key: string) => void;
+  onSlideEnd?: () => void;
+}) {
+  const size = useThree(s => s.size);
+  const invalidate = useThree(s => s.invalidate);
+  const track = useRef<THREE.Group>(null);
+  const curMat = useRef<THREE.MeshBasicMaterial>(null);
+  const incMat = useRef<THREE.MeshBasicMaterial>(null);
+  const [ready, setReady] = useState<Record<string, boolean>>({});
+
+  const aspect = size.height > 0 ? size.width / size.height : 1;
+  const travel = frameWidth(aspect) * SLIDE_CLEARANCE;
+
+  const markReady = useCallback((key: string) => {
+    setReady(r => (r[key] ? r : { ...r, [key]: true }));
+    onReady?.(key);
+  }, [onReady]);
+
+  // Both fitted and both drawable before anything moves. Starting the slide on
+  // one of them means the other arrives mid-travel, which is the stale layer
+  // the brief rules out.
+  const pairReady = !!ready[current.key] && (!incoming || !!ready[incoming.key]);
+
+  /**
+   * The slide.
+   *
+   * Both objects are already in the scene, already the right size and already
+   * turning before this runs; it only translates the track they share. So they
+   * travel together at one speed and neither changes shape, size or rotation
+   * on the way — the flat ease is the only thing shaping the motion.
+   *
+   * The word planes are deliberately not on the track. They are the ground the
+   * objects cross rather than passengers on it, so they hold still and
+   * crossfade.
+   */
+  useEffect(() => {
+    const group = track.current;
+    if (!group || !incoming || !pairReady) return;
+
+    const to = -dir * travel;
+    let raf = 0;
+    const t0 = performance.now();
+
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - t0) / SLIDE_MS);
+      const e = easeInOut(t);
+      group.position.x = to * e;
+      if (curMat.current) curMat.current.opacity = 1 - e;
+      if (incMat.current) incMat.current.opacity = e;
+      invalidate();
+      if (t < 1) { raf = requestAnimationFrame(frame); return; }
+      onSlideEnd?.();
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [incoming, pairReady, dir, travel, invalidate, onSlideEnd]);
+
+  /**
+   * Back to rest, in the same commit that drops the outgoing object.
+   *
+   * A step ends with the track one frame-width off centre and the object that
+   * arrived declared at that same offset, so zeroing both together is a no-op
+   * on screen. A layout effect is what keeps it one: a paint between the two
+   * would show the new object sitting a screen away from where it belongs.
+   */
+  useLayoutEffect(() => {
+    const group = track.current;
+    if (!group || incoming) return;
+    group.position.x = 0;
+    if (curMat.current) curMat.current.opacity = 1;
+    invalidate();
+  }, [incoming, current.key, invalidate]);
 
   const lights = useMemo(() => (
     <>
@@ -594,41 +814,60 @@ function Scene({ src, word, motion, scale, running, reduced, onLoaded }: {
     </>
   ), []);
 
+  // Behind everything the objects do, and taken from the frame rather than
+  // from whichever object happens to be showing — with two of them on the
+  // stage the word belongs to neither.
+  const back = frameWidth(aspect) * 0.25 * WORD_DEPTH;
+
   return (
     <>
       {lights}
+      <FixedCamera />
 
-      {/* Drawn before the word, and opaque, so it owns the depth buffer where
-          it stands. */}
-      <group ref={spin}>
-        <Suspense fallback={null}>
-          <Model src={src} onReady={handleReady} />
-        </Suspense>
+      {/* Drawn before the words, and opaque, so they own the depth buffer where
+          they stand and the type is genuinely behind them rather than masked. */}
+      <group ref={track}>
+        <ObjectSlot
+          key={current.key}
+          slot={current}
+          x={0}
+          running={running}
+          reduced={reduced}
+          onReady={markReady}
+        />
+        {incoming && (
+          <ObjectSlot
+            key={incoming.key}
+            slot={incoming}
+            x={dir * travel}
+            running={running}
+            reduced={reduced}
+            onReady={markReady}
+          />
+        )}
       </group>
 
-      {fit.radius > 0 && <ParkWord text={word} radius={fit.radius} depth={WORD_DEPTH} />}
-
-      <Framing radius={fit.radius} halfHeight={fit.halfHeight} scale={scale} />
-      <Turntable target={spin} motion={motion} running={running && !reduced && fit.radius > 0} />
+      <ParkWord key={current.key} text={current.word} back={back} matRef={curMat} />
+      {incoming && (
+        <ParkWord key={incoming.key} text={incoming.word} back={back} matRef={incMat} startAt={0} />
+      )}
     </>
   );
 }
 
 // ── Export ────────────────────────────────────────────────────────────────
 export default function FoundObjectStage({
-  src, word, motion, scale = DEFAULT_OBJECT_SCALE, running, reduced, onLoaded,
+  current, incoming, dir, running, reduced, onReady, onSlideEnd,
 }: {
-  src: string;
-  /** The park name, set in the scene behind the object. */
-  word: string;
-  motion: Motion;
-  /** Art direction on the derived size: above 1 bigger, below 1 smaller. */
-  scale?: number;
+  current: StageSlot;
+  incoming: StageSlot | null;
+  dir: 1 | -1;
   /** On screen, and allowed to move. */
   running: boolean;
   /** prefers-reduced-motion — hold a good angle instead of turning. */
   reduced: boolean;
-  onLoaded?: () => void;
+  onReady?: (key: string) => void;
+  onSlideEnd?: () => void;
 }) {
   return (
     <Canvas
@@ -648,13 +887,13 @@ export default function FoundObjectStage({
       }}
     >
       <Scene
-        src={src}
-        word={word}
-        motion={motion}
-        scale={scale}
+        current={current}
+        incoming={incoming}
+        dir={dir}
         running={running}
         reduced={reduced}
-        onLoaded={onLoaded}
+        onReady={onReady}
+        onSlideEnd={onSlideEnd}
       />
     </Canvas>
   );

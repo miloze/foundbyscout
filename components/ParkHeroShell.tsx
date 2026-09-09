@@ -8,12 +8,14 @@ import { ParkGlanceHeroOverlay, type ParkGlance } from "./ParkFacts";
 import ParkWeather from "./ParkWeather";
 import ParkViewerModal from "./ParkViewerModal";
 import ParkHeroDetails from "./ParkHeroDetails";
+import ParkReturnLink from "./ParkReturnLink";
 import {
   BwIcon, ArIcon, ExitIcon, PrevIcon, NextIcon,
   ViewerControlBar, ViewerCluster, ViewerClusterButton, ViewerClusterDivider, ViewerReadout,
   VIEWER_CONTROLS_CSS,
 } from "./ViewerControls";
 import { markParkNavDirection } from "@/lib/view-transitions";
+import { carryDirectoryOrigin } from "./parksGridState";
 import { catalogueIndexLabel } from "@/lib/catalogue";
 import { lockPageScroll } from "@/lib/scrollLock";
 import CTAButton from "./CTAButton";
@@ -578,7 +580,11 @@ export default function ParkHeroShell({
                   href={`/parks/${prevPark.slug}`}
                   label={`Previous park: ${prevPark.name}`}
                   icon={<PrevIcon />}
-                  onClick={() => markParkNavDirection("prev")}
+                  // The way back travels with you — see carryDirectoryOrigin.
+                  onClick={() => {
+                    markParkNavDirection("prev");
+                    carryDirectoryOrigin(slug, prevPark.slug);
+                  }}
                 />
               )}
               {indexLabel && (
@@ -591,7 +597,10 @@ export default function ParkHeroShell({
                   href={`/parks/${nextPark.slug}`}
                   label={`Next park: ${nextPark.name}`}
                   icon={<NextIcon />}
-                  onClick={() => markParkNavDirection("next")}
+                  onClick={() => {
+                    markParkNavDirection("next");
+                    carryDirectoryOrigin(slug, nextPark.slug);
+                  }}
                 />
               )}
             </ViewerCluster>
@@ -665,6 +674,48 @@ export default function ParkHeroShell({
           edge. paddingBlock only — the horizontal inset comes from
           .contained's padding-inline, and a `padding` shorthand here would
           override it. */}
+      <div className="fbs-hero-scrim" aria-hidden />
+
+      {/* ── Scan controls, top-right ──────────────────────────────────────
+          Colour and Explore 3D as one group, because they are one subject:
+          both change how the park's scan is presented. They were at the foot
+          of the hero among the address and the scan date, which put an action
+          in a row of statements and left the bottom-left group carrying two
+          jobs.
+
+          Only on the sheet-layout breakpoints. Desktop already has its corner
+          cluster in the viewer bar (topCluster) and the brief for this pass is
+          mobile — rearranging a desktop that nobody has reviewed would be
+          changing something that is not being asked about. */}
+      {isMobile && (!topCluster || modelFile) && (
+        <div className="fbs-hero-scan">
+          <ViewerCluster variant="joined" label="Scan controls">
+            <ViewerClusterButton
+              label={bw ? "Show the scan in colour" : "Show the scan in black and white"}
+              icon={<BwIcon filled={!bw} />}
+              active={!bw}
+              onClick={() => setBw(b => !b)}
+            />
+            {modelFile && (
+              <>
+                <ViewerClusterDivider />
+                {/* Labelled, not a bare glyph. This is the only way into the
+                    scan on a phone — the hero there is a still, and the still
+                    has no handler — and an audit once found it as an
+                    unlabelled 44px cube sitting among the metadata chips, with
+                    nothing on the page saying a 3D scan existed at all. */}
+                <ViewerClusterButton
+                  label="Explore 3D"
+                  icon={<ArIcon />}
+                  showLabel
+                  onClick={() => setOpen3D(true)}
+                />
+              </>
+            )}
+          </ViewerCluster>
+        </div>
+      )}
+
       <div className="fbs-hero-content contained" style={{
         position: "absolute",
         bottom: 0, left: 0, right: 0,
@@ -688,6 +739,10 @@ export default function ParkHeroShell({
           lng={lng}
           scanned={scanned}
           slug={slug}
+          // The way back, in the park's own identity group rather than in a
+          // row of its own above the hero. See ParkReturnLink for why it is
+          // here at all and what decides its label.
+          leadSlot={<ParkReturnLink slug={slug} hasCoords={hasCoords} />}
           rightSlot={<>
             {hasCoords && (
               <div className="fbs-cond-mobile">
@@ -695,40 +750,11 @@ export default function ParkHeroShell({
               </div>
             )}
 
-            {/* Only the fallback now. The colour toggle lives in the corner
-                wherever that corner exists; this pill carries it for the cases
-                that have no corner cluster — mobile, and any park without the
-                viewer gated on — so colour never becomes unreachable. */}
-            {(!topCluster || (isMobile && modelFile)) && (
-              <ViewerCluster variant="joined" label="Scan controls">
-                {!topCluster && (
-                  <ViewerClusterButton
-                    label={bw ? "Show the scan in colour" : "Show the scan in black and white"}
-                    icon={<BwIcon filled={!bw} />}
-                    active={!bw}
-                    onClick={() => setBw(b => !b)}
-                  />
-                )}
-                {isMobile && modelFile && (
-                  <>
-                    {!topCluster && <ViewerClusterDivider />}
-                    {/* Labelled, not a bare glyph. This is the only way into
-                        the scan on a phone — the hero there is a still, and
-                        the still has no handler — and the audit found it as an
-                        unlabelled 44px cube sitting among the metadata chips,
-                        with nothing on the page saying a 3D scan existed at
-                        all. The icon stays; the words are what make it an
-                        entry point rather than a fourth chip. */}
-                    <ViewerClusterButton
-                      label="Explore 3D"
-                      icon={<ArIcon />}
-                      showLabel
-                      onClick={() => setOpen3D(true)}
-                    />
-                  </>
-                )}
-              </ViewerCluster>
-            )}
+            {/* The scan controls used to sit here, among the metadata. They
+                are image controls, not metadata, and they now live in the
+                hero's top-right corner — see .fbs-hero-scan below. What is
+                left in this slot is the weather, which is a fact about the
+                park like the chips beside it. */}
           </>}
         />
       </div>
@@ -945,7 +971,56 @@ export default function ParkHeroShell({
            things you can actually click take events back. Everything else
            lets the drag through to the canvas underneath. */
         .fbs-hero-content .fbs-field-tag,
+        .fbs-hero-content .fbs-hero-lead,
         .fbs-hero-content .fbs-hm-right { pointer-events: auto; }
+
+        /* ── Bottom scrim ──────────────────────────────────────────────────
+           One gradient under the whole bottom-left group rather than a plate
+           behind each part of it. The title carries itself on size and the
+           metadata chips have their own dark backings, but the return link is
+           11px of white on whatever this park's scan happens to be — and these
+           scans are greyscale, several of them pale concrete corner to corner.
+           A shadow alone left it sitting in the image rather than on it.
+
+           Sized to the copy, not to the hero: it reaches 42% up, which is past
+           the tallest the group gets, and it is transparent above that, so the
+           scan itself is untouched in the part of the frame anyone is looking
+           at. z-index 2 is the slot the hero's own comments already reserved
+           for a scrim, between the media at 0 and the copy at 5. Pointer
+           transparent, so drags still reach the model through it. */
+        .fbs-hero-scrim{
+          position:absolute; left:0; right:0; bottom:0; height:42%;
+          z-index:2; pointer-events:none;
+          background:linear-gradient(to top,
+            rgba(0,0,0,.52) 0%, rgba(0,0,0,.30) 22%, rgba(0,0,0,0) 100%);
+        }
+
+        /* ── Scan controls, top-right ──────────────────────────────────────
+           Cleared of the site header, not just of the hero's own frame. The
+           hero is pulled up under the fixed nav, so its top is the nav's
+           bottom — and the logo hangs *below* the bar, to --logo-bottom. The
+           frame inset alone would have put this cluster under the mark. Same
+           pair the return link and the directory bar measure from.
+
+           Right edge on --frame-inset so it lines up with the hero's own
+           margin rather than with the text column, which is where the eye
+           reads a corner control against. */
+        .fbs-hero-scan{
+          position:absolute; z-index:5;
+          /* Measured from the viewport's top, not from the nav's bottom: the
+             hero is pulled all the way up so that its own top *is* y=0, and
+             subtracting the nav height put this cluster at y=27 — inside the
+             bar, under the PARKS link. --logo-bottom is the lowest the header
+             reaches (the mark hangs below the bar), so clearing that clears
+             both. */
+          top:calc(var(--logo-bottom, 81px) + 14px);
+          right:var(--frame-inset);
+          /* The hero band it sits in is pointer-transparent; opt back in. */
+          pointer-events:auto;
+        }
+        /* Never wider than half the hero, so a long label cannot reach across
+           and sit over the park name on a narrow phone. */
+        .fbs-hero-scan .vc-cluster{ max-width:min(62vw, 320px); }
       `}</style>
     </div>
 
