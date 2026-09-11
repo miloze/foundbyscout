@@ -154,7 +154,7 @@ export default function ParksGridView({
              harness there is no .pda-root to inherit from. The control row
              below is the only thing that reads it — the photographic sheet
              itself stays full-bleed. */
-          --pda-gutter: clamp(16px, 4vw, 56px);
+          --pda-gutter: var(--frame-inset);
           /* One ratio for every density. The handover asks for equal
              photographic hierarchy with only scale changing, so the crop must
              not move between densities — a per-density ratio would recompose
@@ -357,9 +357,13 @@ export default function ParksGridView({
           font-family:var(--pda-font-display), Arial, sans-serif;
           line-height:1; color:var(--pda-accent);
           pointer-events:none;
-          /* Orange on a photograph is a strong hue contrast and a weak
-             luminance one; these hold its edge without a plate behind it. */
-          text-shadow:0 1px 3px rgba(0,0,0,.55), 0 2px 12px rgba(0,0,0,.4);
+          /* No text-shadow. Two were stacked here — a 3px contact shadow and a
+             12px bloom — on the reasoning that orange on a photograph is a
+             strong hue contrast and a weak luminance one. In practice the
+             bloom read as a smudge under the glyph rather than as an edge, and
+             the arrow is a hover-revealed cue on the reader's own tile, not
+             something that has to survive being glanced at. It sits on the
+             photograph unaided. */
         }
         @media (hover: hover){
           .pgv-open{

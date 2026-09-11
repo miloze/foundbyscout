@@ -87,15 +87,15 @@ export default function ParkReturnLink({
           font-family:var(--font-display), Arial, sans-serif;
           font-size:23px; line-height:1;
         }
-        /* Orange on a greyscale scan is a strong hue contrast but a weak
-           luminance one, and several of these scans are pale concrete corner
-           to corner. The hero's bottom scrim does most of the work; these
-           tighten each mark's own edge so it holds on the brightest of them
-           without needing a plate behind it. */
-        .fbs-return__arrow,
-        .fbs-return__label{
-          text-shadow:0 1px 3px rgba(0,0,0,.6), 0 2px 12px rgba(0,0,0,.45);
-        }
+        /* No text-shadow — see the standing rule in app/colors_and_type.css.
+           Two were stacked here, a 3px contact shadow and a 12px bloom, on the
+           reasoning that orange on a greyscale scan is a strong hue contrast
+           and a weak luminance one and that several scans are pale concrete
+           corner to corner. The hero's bottom scrim is what actually carries
+           this mark; the shadows were tightening its edge on the brightest
+           frames. If that turns out not to be enough on a pale scan, it is a
+           readability problem to raise on its own terms — not one to answer
+           with a shadow, an outline or a glow. */
         .fbs-return__label{
           font-family:var(--font-mono);
           font-size:11px; font-weight:500;

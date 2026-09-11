@@ -2,12 +2,13 @@
 
 import dynamic from "next/dynamic";
 import ViewerErrorBoundary from "./ViewerErrorBoundary";
+import type { CameraBounds } from "@/lib/heroCamera";
 
 const ParkModel = dynamic(() => import("./ParkModel"), { ssr: false });
 
 export default function ParkModelClient({
   modelFile, preloadImage, onLoad, cameraPos, cameraTarget, modelRotation,
-  pingPong, autoRotate, debug, onZoomChange, loadingBackground, spinning, allowRotate, allowZoom, onInteract,
+  autoRotate, debug, onZoomChange, loadingBackground, spinning, allowRotate, allowZoom, showLoadingNote, onInteract, onDrag, stopOnInteract, cameraBounds,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
   grayscale, onFailed,
 }: {
@@ -18,7 +19,6 @@ export default function ParkModelClient({
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  pingPong?: [[number,number,number],[number,number,number]];
   autoRotate?: boolean;
   debug?: boolean;
   ambientIntensity?: number;
@@ -31,7 +31,13 @@ export default function ParkModelClient({
   spinning?: boolean;
   allowRotate?: boolean;
   allowZoom?: boolean;
+  showLoadingNote?: boolean;
   onInteract?: () => void;
+  onDrag?: () => void;
+  stopOnInteract?: boolean;
+  /** Per-park orbit window for an ENCLOSED park — see CameraBounds in
+   *  lib/heroCamera. Undefined outdoors, where it changes nothing. */
+  cameraBounds?: CameraBounds | null;
 }) {
   // If the model can't render, the hero keeps the preload image it was already
   // showing — the still frame the viewer fades out of. The page loses the
@@ -61,13 +67,17 @@ export default function ParkModelClient({
       <ParkModel
         modelFile={modelFile} preloadImage={preloadImage} onLoad={onLoad}
         cameraPos={cameraPos} cameraTarget={cameraTarget} modelRotation={modelRotation}
-        pingPong={pingPong} autoRotate={autoRotate} debug={debug}
+        autoRotate={autoRotate} debug={debug}
         ambientIntensity={ambientIntensity} directionalIntensity={directionalIntensity}
         environmentPreset={environmentPreset} environmentIntensity={environmentIntensity}
         grayscale={grayscale} onZoomChange={onZoomChange}
         loadingBackground={loadingBackground}
         spinning={spinning} allowRotate={allowRotate} allowZoom={allowZoom}
+        showLoadingNote={showLoadingNote}
         onInteract={onInteract}
+        onDrag={onDrag}
+        stopOnInteract={stopOnInteract}
+        cameraBounds={cameraBounds}
       />
     </ViewerErrorBoundary>
   );

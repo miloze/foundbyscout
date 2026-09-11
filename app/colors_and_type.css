@@ -23,9 +23,29 @@
    Optimisation left on the table: the file is a 345KB unsubsetted TTF that
    compresses to ~141KB over the wire. Converting to woff2 and subsetting to
    latin would take it well below that. */
+/* format('truetype'), not format('truetype-variations').
+
+   'truetype-variations' is a legacy format token. Chrome accepts it, which is
+   why the desktop was fine; Safari does not recognise it, and a source whose
+   format string it cannot parse is skipped entirely — so on iOS the MSCHN
+   family never loaded and --font-display fell through to Rubik. That is the
+   upright grotesque appearing where the italic display face should be, and the
+   looser fit that comes with it: measured, 'BLOBLANDS' at 100px is 529px in
+   MSCHN and 596px in Rubik.
+
+   'truetype' is understood everywhere and does not disable the variable axes —
+   a variable TTF declared this way still honours font-weight and the italic
+   axis below. Verified in-browser: loading this file under both format tokens
+   produces glyphs identical to the installed 'MSCHN Medium' (529px on the same
+   string), so nothing about the rendering changes where it already worked.
+
+   The first family in --font-display is 'MSCHN Medium', a locally installed
+   static cut. That only exists on machines with the family installed, so it
+   masks this bug on the design machine and nowhere else — which is why it
+   surfaced only on the phone and tablet. */
 @font-face {
   font-family: 'MSCHN';
-  src: url('/fonts/MSCHNVF.ttf') format('truetype-variations');
+  src: url('/fonts/MSCHNVF.ttf') format('truetype');
   font-weight: 300 700;
   font-style: normal;
   font-display: swap;
@@ -33,7 +53,7 @@
 
 @font-face {
   font-family: 'MSCHN';
-  src: url('/fonts/MSCHNVF.ttf') format('truetype-variations');
+  src: url('/fonts/MSCHNVF.ttf') format('truetype');
   font-weight: 300 700;
   font-style: italic;
   font-variation-settings: 'ital' 1;
@@ -221,6 +241,72 @@ a {
   --content-padding: clamp(16px, 4vw, 56px);
   --section-gap:     clamp(40px, 8vw, 80px);
 
+  /* The frame's side inset — the one vertical edge every fixed or full-bleed
+     element in the chrome aligns to.
+
+     .contained is a centred max-width column, so above 1400px of usable width
+     its inner edge stops being --content-padding and becomes
+     `centring margin + padding`. Anything that sets --content-padding directly
+     — the nav bar, the floating logo, the /parks sticky gutter — therefore
+     tracked the body column at narrow widths and drifted ~19px outside it on a
+     wide desktop. This is that column's inner edge written as a length, so a
+     fixed-position element can sit on it without being inside .contained.
+
+     --vw is the viewport's inner width, published by Nav.tsx; it falls back to
+     100vw for the first paint, exactly as .full-bleed does. Below the
+     max-width this collapses to --content-padding, so nothing changes at the
+     widths where the column is gutter-bound. */
+  /* The frame's height — one rule for the homepage hero and the park page's
+     viewer, so a navigation between them does not resize the window you are
+     looking through.
+
+     They were sized on different axes: the hero was width-driven at
+     max(420px, --vw * 9/16) and the park viewer was height-driven at 78vh.
+     Measured at 1453x941 that is 809px against 734px, and the two move in
+     opposite directions as the window changes shape — a wide short window grew
+     one and shrank the other.
+
+     The homepage composition is the reference and is not enlarged to meet the
+     viewer. Two caps sit on the ratio. 100svh caps the frame's *preferred*
+     size against the window — it is not a guarantee that nothing exceeds the
+     viewport, because the 420px floor and the content minimums still win where
+     they are larger, and a short window can still need scrolling. svh is the
+     small viewport height, the value measured with browser chrome shown, which
+     is the stable one to cap against. 900px stops the frame running away on a
+     tall desktop, where 1920x1080 left 59% of it as empty air above the title.
+     420px remains the floor.
+
+     The vh line before it is the fallback for engines without svh; where svh
+     resolves, the second declaration wins.
+
+     The homepage takes this as a *minimum*, so a wrapped title still grows the
+     frame. The park page takes it as a height, as its 78vh was. */
+  /* The intermediate band. 16:9 off the width is right on a desktop and right
+     on a phone, and too short in between: at 768 the frame came to 424px while
+     the composition wanted 467 for a two-line name, so the badge sat 8px off
+     the title and the homepage grew past the frame while the park page could
+     not follow it.
+
+     3:4 in that band, capped at 506px — which is 16:9 of 900px, so the two
+     expressions meet exactly there and the frame is *continuous*: no step at a
+     breakpoint, because there is no breakpoint. Below about 560px the 3:4 term
+     falls under the 420px floor on its own, so the approved phone frame is
+     untouched; above 900px the 16:9 term is the larger and takes over again.
+
+     max() of the two, then the caps: whichever ratio wants more height in this
+     band wins, and the caps still bound the result. */
+  --frame-height: max(420px, min(
+    max(calc(var(--vw, 100vw) * 9 / 16), min(calc(var(--vw, 100vw) * 3 / 4), 506px)),
+    100vh, 900px));
+  --frame-height: max(420px, min(
+    max(calc(var(--vw, 100vw) * 9 / 16), min(calc(var(--vw, 100vw) * 3 / 4), 506px)),
+    100svh, 900px));
+
+  --frame-inset: max(
+    var(--content-padding),
+    calc((var(--vw, 100vw) - var(--content-max-width)) / 2 + var(--content-padding))
+  );
+
   /* Grid gaps */
   --gap-tight: 2px;
   --gap-sm:    0.75rem;
@@ -251,6 +337,39 @@ a {
   /* FBS uses no box-shadows. Depth via bg color difference only. */
   --shadow-none: none;
 }
+
+/* ── Text shadows: none, anywhere ─────────────────────────────────────────
+   STANDING RULE. No text in Scout carries a shadow — not headings, labels,
+   links, buttons, captions or typographic arrows, in either theme, at any
+   breakpoint. That covers `text-shadow`, `filter: drop-shadow()` applied to
+   text or to a box that only contains text, and any utility or inline style
+   doing the same by another name.
+
+   And no substitutes: a shadow removed here is not to come back as an
+   outline, a stroke or a glow. Those are the same effect wearing a different
+   property name.
+
+   What this does not touch: shadows on images, on the map's own chrome, or on
+   any container that is not simply a wrapper around type.
+
+   Removed under this rule, with the arguments each one was carrying:
+     · .fbs-title (ParkHeroDetails) — a 24px bloom under the park name.
+     · .fbs-loading-note (ParkModel) — a 10px bloom under "Loading scan…".
+     · .fbs-return__arrow / __label (ParkReturnLink) — a stacked 3px contact
+       shadow and 12px bloom, for orange over pale concrete.
+     · .pgv-open (ParksGridView) — the same stacked pair under the grid tile's
+       arrow.
+   Each was there for legibility over photography. If one of those surfaces
+   turns out to be genuinely hard to read without it, that is a readability
+   problem to raise on its own terms and solve with contrast, placement or a
+   plate — not by reinstating the shadow.
+
+   There are no exceptions. components/GlitchText.tsx carried a
+   chromatic-aberration `text-shadow` — an RGB-split offset pair that was the
+   component's whole purpose rather than a legibility aid. It had no importers,
+   static or dynamic, and no other export worth keeping, so the component was
+   deleted rather than kept as a carve-out: an unreferenced file holding a
+   banned treatment is how the treatment comes back. */
 
 /* ── Component Primitives ────────────────────────────── */
 

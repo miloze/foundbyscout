@@ -8,7 +8,6 @@ type Props = {
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
   ambientIntensity?: number;
   directionalIntensity?: number;

@@ -40,7 +40,50 @@ export type HeroLimits = {
   maxDistance: number;
   minPolar:    number;
   maxPolar:    number;
+  /** Radians. ±Infinity — OrbitControls' own default — for an open-air park,
+   *  where there is nothing behind the scan to orbit into. */
+  minAzimuth:  number;
+  maxAzimuth:  number;
 };
+
+// ── Enclosed parks ────────────────────────────────────────────────────────
+// Most scans are outdoors: there is no "outside" to see, so free orbit is
+// safe and these are all null. An interior — Southbank's undercroft, and
+// whatever gets scanned next — has a ceiling, a back wall and an open side,
+// and photogrammetry gives it no exterior. Orbit too high or too far round and
+// the viewer is looking at the back of the room's shell, which reads as a
+// broken model rather than as a place.
+//
+// The fix is OrbitControls' own angle limits rather than anything that
+// inspects geometry: the camera simply cannot be dragged past the window, it
+// stops at the edge, and it can always be dragged back. Raycasting the camera
+// against the mesh each frame is the escalation if a rectangular window cannot
+// be made to fit a particular room — not the starting point.
+//
+// DEGREES, not radians. These are tuned by eye against the scan in the same
+// pass as camera_pos, and the debug panel reports the live angles in the same
+// unit so a good frame can be read off and pasted. The `Deg` suffix is load
+// bearing: `minAzimuthAngle` is an OrbitControls prop name and anyone reading
+// it would reasonably assume radians, which is a silent 57x error.
+export type CameraBounds = {
+  minAzimuthDeg?: number | null;
+  maxAzimuthDeg?: number | null;
+  minPolarDeg?:   number | null;
+  maxPolarDeg?:   number | null;
+  /** Overrides the 10–70 house range. A room has a far wall, so zooming out
+   *  has to stop before the camera reaches it. */
+  minDistance?:   number | null;
+  maxDistance?:   number | null;
+};
+
+const RAD = (deg: number) => deg * Math.PI / 180;
+export const DEG = (rad: number) => rad * 180 / Math.PI;
+
+/** Does this park bound its azimuth on both sides? That is the question the
+ *  automatic rotation asks: a park with a full circle to play with rotates one
+ *  way forever, a bounded one has to turn round at the ends. */
+export const hasAzimuthSweep = (L: HeroLimits) =>
+  Number.isFinite(L.minAzimuth) && Number.isFinite(L.maxAzimuth) && L.maxAzimuth > L.minAzimuth;
 
 export const DEFAULT_HERO_LIMITS: HeroLimits = {
   panLimit:    PAN_LIMIT,
@@ -50,6 +93,8 @@ export const DEFAULT_HERO_LIMITS: HeroLimits = {
   maxDistance: HERO_MAX_DISTANCE,
   minPolar:    HERO_MIN_POLAR,
   maxPolar:    HERO_MAX_POLAR,
+  minAzimuth:  -Infinity,
+  maxAzimuth:   Infinity,
 };
 
 export const polarOf = (v: THREE.Vector3) => {
@@ -65,11 +110,15 @@ export const polarOf = (v: THREE.Vector3) => {
 //
 // HARD_MAX_POLAR is the exception and is applied last: no stored value gets to
 // put the camera under the deck.
-export function limitsForAuthoredFrame(camPos: THREE.Vector3, target: THREE.Vector3): HeroLimits {
+export function limitsForAuthoredFrame(
+  camPos: THREE.Vector3,
+  target: THREE.Vector3,
+  bounds?: CameraBounds | null,
+): HeroLimits {
   const v     = camPos.clone().sub(target);
   const dist  = v.length();
   const polar = polarOf(v);
-  return {
+  const base: HeroLimits = {
     panLimit:    Math.max(PAN_LIMIT, Math.abs(target.x), Math.abs(target.z)),
     targetMinY:  Math.min(TARGET_MIN_Y, target.y),
     targetMaxY:  Math.max(TARGET_MAX_Y, target.y),
@@ -77,6 +126,33 @@ export function limitsForAuthoredFrame(camPos: THREE.Vector3, target: THREE.Vect
     maxDistance: Math.max(HERO_MAX_DISTANCE, dist),
     minPolar:    Math.max(0, Math.min(HERO_MIN_POLAR, polar)),
     maxPolar:    Math.min(HARD_MAX_POLAR, Math.max(HERO_MAX_POLAR, polar)),
+    minAzimuth:  -Infinity,
+    maxAzimuth:   Infinity,
+  };
+  if (!bounds) return base;
+
+  // Authored bounds REPLACE the house numbers rather than widening them, which
+  // is the opposite of how the frame above is treated — and deliberately so.
+  // Widening exists to guarantee the composed opening frame is reachable; that
+  // is a floor on the visitor's range. These are a ceiling on it, and a ceiling
+  // that can be widened by the very frame it is meant to contain would be no
+  // ceiling at all. If a park's stored camera_pos sits outside its own bounds
+  // the debug panel says so, which is the right place to find out.
+  //
+  // HARD_MAX_POLAR still wins: no stored value puts the camera under the deck.
+  const n = (x: number | null | undefined) => (x == null ? null : x);
+  return {
+    ...base,
+    minAzimuth:  n(bounds.minAzimuthDeg) != null ? RAD(bounds.minAzimuthDeg!) : base.minAzimuth,
+    maxAzimuth:  n(bounds.maxAzimuthDeg) != null ? RAD(bounds.maxAzimuthDeg!) : base.maxAzimuth,
+    minPolar:    n(bounds.minPolarDeg)   != null
+      ? THREE.MathUtils.clamp(RAD(bounds.minPolarDeg!), 0, HARD_MAX_POLAR)
+      : base.minPolar,
+    maxPolar:    n(bounds.maxPolarDeg)   != null
+      ? THREE.MathUtils.clamp(RAD(bounds.maxPolarDeg!), 0, HARD_MAX_POLAR)
+      : base.maxPolar,
+    minDistance: n(bounds.minDistance)   != null ? bounds.minDistance! : base.minDistance,
+    maxDistance: n(bounds.maxDistance)   != null ? bounds.maxDistance! : base.maxDistance,
   };
 }
 
@@ -111,6 +187,9 @@ export function heroFrame(
   const sph = new THREE.Spherical().setFromVector3(pos.clone().sub(tgt));
   sph.radius = THREE.MathUtils.clamp(sph.radius, L.minDistance, L.maxDistance);
   sph.phi    = THREE.MathUtils.clamp(sph.phi,    L.minPolar,    L.maxPolar);
+  // Azimuth only bites on an enclosed park; open air leaves these at ±Infinity
+  // and clamp() is then the identity.
+  sph.theta  = THREE.MathUtils.clamp(sph.theta,  L.minAzimuth,  L.maxAzimuth);
   sph.makeSafe();
 
   const out = tgt.clone().add(new THREE.Vector3().setFromSpherical(sph));

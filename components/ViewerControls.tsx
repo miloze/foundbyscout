@@ -55,6 +55,26 @@ export function ArIcon() {
   );
 }
 
+// Automatic rotation, reporting state the way BwIcon does: the icon says what
+// the model is doing, the label says what pressing it will do.
+//
+// The arc is in both states, so the control keeps one identity; what changes is
+// a whole glyph, not a colour. That is deliberate — the accent this takes while
+// rotating is `is-active` doing its usual job, and it must not be the only
+// thing separating the two states for anyone who cannot see it.
+//   rotating — the arc closes with an arrowhead: it is turning.
+//   paused   — the arc is open and two bars sit in it: it is stopped.
+export function OrbitIcon({ rotating }: { rotating: boolean }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01" />
+      {rotating
+        ? <polyline points="18.5 1.5 18.5 6.5 13.5 6.5" />
+        : <><path d="M10 9v6" /><path d="M14 9v6" /></>}
+    </svg>
+  );
+}
+
 // Exit, everywhere. This replaced ArExitIcon — a wireframe cube with a slash
 // through it — which the 7A audit found unreadable: a negated cube says "turn
 // off 3D", not "leave this view", and sitting in a plate beside a half-filled

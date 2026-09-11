@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Coords from "./Coords";
 import { formatFieldDate } from "@/lib/fieldDate";
+import { parkAreaLabel } from "@/lib/parkArea";
 import ParkWeather from "./ParkWeather";
 import { catalogueMark } from "@/lib/catalogue";
 import ViewTransitionBoundary from "./ViewTransitionBoundary";
@@ -31,6 +32,10 @@ type Props = {
   name: string;
   catalogueId?: string;
   address?: string[];
+  /** The park's own area label — see lib/parkArea, not a line of `address`. */
+  area?: string | null;
+  /** Fallback where the area has not been filled in. */
+  borough?: string | null;
   postcode?: string;
   lat?: number;
   lng?: number;
@@ -57,7 +62,7 @@ function named(name: string | undefined, children: ReactNode) {
 }
 
 export default function ParkHeroDetails({
-  name, catalogueId, address, postcode, lat, lng, scanned, slug, compact, rightSlot, leadSlot,
+  name, catalogueId, address, area, borough, postcode, lat, lng, scanned, slug, compact, rightSlot, leadSlot,
 }: Props) {
   // Title only. See lib/view-transitions — this is the park-to-park slide,
   // not the retired home-to-park morph.
@@ -69,7 +74,9 @@ export default function ParkHeroDetails({
   // counting against a sequence that is not here. The prev/next cluster in
   // ParkHeroShell is the one place that total is true — see lib/catalogue.
   const mark = catalogueMark(catalogueId);
-  const areaName = address && address.length > 1 ? address[1] : address?.[0];
+  // The area field, not address[1] — see lib/parkArea for why position in a
+  // postal address cannot answer this. `address` is unchanged.
+  const areaName = parkAreaLabel(area, borough);
   const locationChain = [areaName, "London", postcode].filter(Boolean).join(", ").toUpperCase();
   const hasCoords = lat != null && lng != null;
   // Null unless the stored value is genuinely a date, so an unscanned park
@@ -195,7 +202,11 @@ export default function ParkHeroDetails({
           font-size: var(--fbs-title-size);
           line-height: 0.88;
           color: #fff;
-          text-shadow: 0 2px 24px rgba(0,0,0,0.25);
+          /* No text-shadow. Scout carries none on any text — see the standing
+             rule in app/colors_and_type.css. This title also morphs into the
+             home hero's, which had already dropped its own for softening the
+             italic's edges, so the two now match rather than one arriving with
+             a shadow the other does not have. */
           text-transform: uppercase;
           letter-spacing: 0em;
           /* Names the title to the slide rules in globals.css without pinning a
@@ -241,12 +252,17 @@ export default function ParkHeroDetails({
           gap: 8px;
           flex-wrap: wrap;
         }
-        /* Box metrics are the home hero's .fbs-hp-chip, to the pixel: 11px
-           type on a 16.5px line box, 3px of vertical inset and 8px of
+        /* 11px type on a 16.5px line box, 3px of vertical inset and 8px of
            horizontal. The 1px border is counted as part of the inset rather
            than added to it, so the filled and outlined variants are the same
-           height as each other and as the home chips. Change padding and
-           border together or the match breaks. */
+           height as each other. Change padding and border together or that
+           match breaks.
+
+           These were the home hero's .fbs-hp-chip to the pixel. They are not
+           any more: that chip tightened to 2px/6px so it would stop competing
+           with the CTA beside it in the home hero's stacked layout, a problem
+           this page's tags do not have. The two are independent now — do not
+           re-sync them without a reason of this page's own. */
         .fbs-field-tag {
           display: inline-flex;
           align-items: center;

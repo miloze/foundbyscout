@@ -62,6 +62,13 @@ export default function HeroEntrance() {
       [data-hero-entrance] .fbs-he-img {
         animation: fbs-he-wipe 450ms var(--he-ease) 0ms backwards;
       }
+      /* The crosshair lattice is part of the photograph's surface, not an
+         element arriving on top of it, so it takes the image's own wipe on the
+         image's own timing — otherwise it sits fully drawn over the page
+         background while the picture is still opening behind it. */
+      [data-hero-entrance] .fbs-he-grid {
+        animation: fbs-he-wipe 450ms var(--he-ease) 0ms backwards;
+      }
       [data-hero-entrance] .fbs-he-badge {
         animation: fbs-he-snap 1ms steps(1, end) 300ms backwards;
       }
@@ -85,6 +92,7 @@ export default function HeroEntrance() {
          re-specify here. */
       @media (prefers-reduced-motion: reduce) {
         [data-hero-entrance] .fbs-he-img,
+        [data-hero-entrance] .fbs-he-grid,
         [data-hero-entrance] .fbs-he-badge,
         [data-hero-entrance] .fbs-he-title,
         [data-hero-entrance] .fbs-he-chip,

@@ -192,7 +192,7 @@ type TransportItem = { type: string; name: string; detail: string };
 type SocialItem    = { platform: string; url: string; label: string };
 
 type FormState = {
-  name: string; postcode: string; borough: string; location: string;
+  name: string; postcode: string; borough: string; location: string; area: string;
   type: string; surface: string; surface_note: string;
   is_free: boolean; is_covered: boolean; published: boolean;
   sort_order: number;
@@ -217,8 +217,25 @@ type FormState = {
   camera_pos: string; camera_target: string; model_rotation: string;
 };
 
+// The six per-park camera constraints. Degrees for the angles — the unit the
+// debug panel reports and the unit a room is reasoned about in.
+type BoundKey =
+  | "minAzimuthDeg" | "maxAzimuthDeg"
+  | "minPolarDeg"   | "maxPolarDeg"
+  | "minDistance"   | "maxDistance";
+
+const BOUND_FIELDS: { key: BoundKey; label: string; hint: string }[] = [
+  { key: "minAzimuthDeg", label: "Azimuth min", hint: "degrees — how far left it can turn" },
+  { key: "maxAzimuthDeg", label: "Azimuth max", hint: "degrees — how far right it can turn" },
+  { key: "minPolarDeg",   label: "Polar min",   hint: "degrees — 0 is straight down from above" },
+  { key: "maxPolarDeg",   label: "Polar max",   hint: "degrees — higher is lower to the ground" },
+  { key: "minDistance",   label: "Distance min", hint: "closest zoom — blank uses 10" },
+  { key: "maxDistance",   label: "Distance max", hint: "furthest zoom — blank uses 70" },
+];
+
+
 const EMPTY: FormState = {
-  name: "", postcode: "", borough: "", location: "",
+  name: "", postcode: "", borough: "", location: "", area: "",
   type: "Bowl", surface: "", surface_note: "",
   is_free: true, is_covered: false, published: false,
   sort_order: 0,
@@ -281,6 +298,22 @@ export default function EditParkPage() {
     environmentIntensity: 0.85,
   });
 
+  // ── Camera bounds — enclosed parks only ──────────────────────────────────
+  // Held as STRINGS so "unset" and "0" stay different things: 0° is a perfectly
+  // good azimuth limit, and a number-typed state would have to use null to mean
+  // empty and then fight the input over it. Blank saves as null, which is the
+  // outdoor-park case and changes nothing.
+  //
+  // Saved inside viewer_settings (a jsonb column that already exists and
+  // already round-trips through this form) rather than as six new columns —
+  // see the note in the save handler.
+  const [bounds, setBounds] = useState<Record<BoundKey, string>>({
+    minAzimuthDeg: "", maxAzimuthDeg: "",
+    minPolarDeg:   "", maxPolarDeg:   "",
+    minDistance:   "", maxDistance:   "",
+  });
+  const boundsAreSet = Object.values(bounds).some(v => v.trim() !== "");
+
   const slotFileInputRef   = useRef<HTMLInputElement>(null);
   const slotUploadIndexRef = useRef<number>(-1);
 
@@ -293,6 +326,7 @@ export default function EditParkPage() {
           name:              park.name ?? "",
           postcode:          park.postcode ?? "",
           borough:           park.borough ?? "",
+          area:              park.area ?? "",
           location:          park.location ?? "",
           type:              park.type ?? "Bowl",
           surface:           park.surface ?? "",
@@ -347,6 +381,17 @@ export default function EditParkPage() {
           model_rotation: numArrToStr(park.model_rotation),
         });
         if (park.viewer_settings) setViewerSettings(vs => ({ ...vs, ...park.viewer_settings }));
+        // Numbers back to strings, null/absent back to blank.
+        const cb = park.viewer_settings?.cameraBounds;
+        if (cb) {
+          setBounds(b => {
+            const next = { ...b };
+            for (const { key } of BOUND_FIELDS) {
+              next[key] = cb[key] == null ? "" : String(cb[key]);
+            }
+            return next;
+          });
+        }
         setEditorial(fromEditorialJson(park.editorial));
         if (Array.isArray(park.slot_ratios)) setSlotRatios(park.slot_ratios);
         if (Array.isArray(park.slot_order))  setSlotOrder(park.slot_order);
@@ -438,7 +483,27 @@ export default function EditParkPage() {
       slot_ratios:     slotRatios,
       slot_order:      slotOrder,
       gallery_rows:    galleryRows,
-      viewer_settings: viewerSettings,
+      // Camera bounds ride inside viewer_settings rather than in six columns of
+      // their own. That is a deliberate choice and the reason is operational:
+      // viewer_settings is an existing jsonb column that already round-trips
+      // through this form, so an enclosed park can be tuned and saved today,
+      // with no migration to write, run and remember to run against the right
+      // Supabase project. (010_park_area.sql is sitting in the repo unapplied,
+      // which is exactly the failure this avoids.) If these ever want to be
+      // real columns — for querying, or for a NOT NULL constraint — the shape
+      // is already right and the move is a copy, not a redesign.
+      //
+      // Blank means unset means null means "outdoor park, behave as before".
+      viewer_settings: {
+        ...viewerSettings,
+        cameraBounds: boundsAreSet
+          ? Object.fromEntries(BOUND_FIELDS.map(({ key }) => {
+              const raw = bounds[key].trim();
+              const num = raw === "" ? null : Number(raw);
+              return [key, num == null || Number.isNaN(num) ? null : num];
+            }))
+          : null,
+      },
       // Assembled into one object here — the PATCH route forwards the raw body
       // into .update(), so loose keys that aren't columns would 400 the save.
       editorial:       toEditorialJson(editorial),
@@ -678,6 +743,17 @@ export default function EditParkPage() {
                 <Input value={form.borough} onChange={v => upd("borough", v)} placeholder="Bromley" />
               </div>
               <div>
+                {/* The label both heroes show. Empty falls back to the borough
+                    above rather than to a line of the address — see
+                    lib/parkArea. Left blank on every row by migration 010
+                    rather than back-filled from address[1], which is a street
+                    for Wandle Park, Crystal Palace and Folkstone Gardens. */}
+                <FieldLabel>Area</FieldLabel>
+                <Input value={form.area} onChange={v => upd("area", v)} placeholder="West Norwood" />
+              </div>
+              <div>
+                {/* The broad region, used by the directory's filter — not the
+                    hero label. */}
                 <FieldLabel>Location label</FieldLabel>
                 <Input value={form.location} onChange={v => upd("location", v)} placeholder="South London" />
               </div>
@@ -1262,6 +1338,43 @@ export default function EditParkPage() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* 10b. CAMERA BOUNDS — enclosed parks */}
+        <section>
+          <SectionHead>Camera bounds</SectionHead>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 20, lineHeight: 1.8 }}>
+            Leave every field blank for an outdoor park — that is the normal case and the viewer
+            behaves exactly as it always has. Fill them in for an enclosed one (Southbank&apos;s
+            undercroft), where orbiting too high or too far round shows the back of the room&apos;s
+            shell. The camera then stops at the edge of the window instead of passing through it,
+            and can always be dragged back.
+            <br /><br />
+            One set of numbers governs both: dragging clamps to them, and the automatic rotation
+            turns round at the azimuth ends rather than running past them.
+            <br /><br />
+            To find the values, open the park with <code>?debug=1</code> — the bounds are lifted
+            there — swing the camera to the furthest each way the room can stand, and read the
+            azimuth, polar and distance off the panel. They are printed in the same units as these
+            fields.
+          </p>
+          <div style={G3}>
+            {BOUND_FIELDS.map(({ key, label, hint }) => (
+              <div key={key}>
+                <FieldLabel hint={hint}>{label}</FieldLabel>
+                <Input
+                  value={bounds[key]}
+                  onChange={v => setBounds(b => ({ ...b, [key]: v }))}
+                  placeholder="—"
+                />
+              </div>
+            ))}
+          </div>
+          {boundsAreSet && (
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--accent)", letterSpacing: "0.04em", marginTop: 14, lineHeight: 1.8 }}>
+              Bounds active. Any field left blank keeps the house default for that axis.
+            </p>
+          )}
         </section>
 
         {/* 11. EDITORIAL */}

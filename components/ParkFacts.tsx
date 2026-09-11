@@ -57,10 +57,11 @@ export type TransportLink = {
 // share glanceCards() and ParkGlanceGrid, so the cards themselves can never
 // drift apart — only the frame around them changes.
 //
-// The `as GlancePlacement` is load-bearing for the same reason it is in
-// ParkHeroMeta's CHIP_VARIANT: without it TypeScript narrows the constant to
-// its initialiser and the comparison against the other value reads as
-// provably false, which `next build` rejects even though `next dev` does not.
+// The `as GlancePlacement` is load-bearing, not decoration: without it
+// TypeScript narrows the constant to its initialiser and the comparison against
+// the other value reads as provably false, which `next build` rejects even
+// though `next dev` does not. (ParkHeroMeta's CHIP_VARIANT carried the same
+// note; that constant is gone, so this is now the only place it applies.)
 type GlancePlacement = "sidebar" | "hero";
 export const GLANCE_PLACEMENT = "sidebar" as GlancePlacement;
 

@@ -20,7 +20,11 @@ import HomeLogoHandoff from "@/components/HomeLogoHandoff";
 // production, so the guarantee is stated rather than inferred.
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const db = createServerClient();
 
   // Read on the server so the first painted frame is already right: a returning
@@ -38,6 +42,27 @@ export default async function Home() {
   //
   // postcode is in the strip's columns for the secondary field-notation line
   // ("SE24 / SOUTH LONDON"). Columns are still named rather than *.
+type HeroPark = {
+  slug: string;
+  name: string;
+  type: string | null;
+  address: string[] | null;
+  /** Optional: absent until migration 010 has been applied. See lib/parkArea. */
+  area?: string | null;
+  borough: string | null;
+  postcode: string | null;
+  opened: string | null;
+  scanned: string | null;
+  catalogue_id: string | null;
+  hero_image: string | null;
+  is_free: boolean | null;
+  is_covered: boolean | null;
+};
+
+  // The hero's columns, minus `area` — see the note on the query below.
+  const HERO_COLUMNS =
+    "slug, name, type, address, borough, postcode, opened, scanned, catalogue_id, hero_image, is_free, is_covered";
+
   const [{ data: featuredParks }, { data: heroPool }, { data: foundObjectParks }] = await Promise.all([
     db
       .from("parks")
@@ -61,12 +86,29 @@ export default async function Home() {
     // then fetch by offset) is two round trips to save a handful of rows on a
     // catalogue this size. Columns are named rather than *, so the payload is
     // only what the hero renders; worth revisiting if the table grows large.
-    db
-      .from("parks")
-      .select("slug, name, type, address, postcode, opened, scanned, catalogue_id, hero_image, is_free, is_covered")
-      .eq("published", true)
-      .not("hero_image", "is", null)
-      .neq("hero_image", ""),
+    // `area` arrives with migration 010, and naming a column PostgREST does not
+    // know is a 400 for the whole query — whose failure mode here is silent:
+    // the pool comes back empty, `featured` is null, and the entire hero
+    // section is skipped, so the page renders logo straight to intro with no
+    // error anywhere on it. Rather than make the homepage depend on migration
+    // order, this asks for `area` and falls back to the same select without it.
+    // The fallback can go once 010 is applied everywhere.
+    (async (): Promise<{ data: HeroPark[] | null }> => {
+      const pool = (columns: string) =>
+        db
+          .from("parks")
+          .select(columns)
+          .eq("published", true)
+          .not("hero_image", "is", null)
+          .neq("hero_image", "");
+      const withArea = await pool(`${HERO_COLUMNS}, area`);
+      const res = withArea.error ? await pool(HERO_COLUMNS) : withArea;
+      // The column list is a runtime string, so the client cannot infer a row
+      // type from it the way a literal select does. HeroPark is that type,
+      // declared once above; `area` is optional on it precisely because the
+      // fallback branch does not return it.
+      return { data: (res.data as unknown as HeroPark[] | null) ?? null };
+    })(),
     // Found Object reads its park facts from here rather than carrying its own
     // copies. Two rows, named columns: the name for the display type, the
     // postcode and region for the field notation, the coordinates for the
@@ -82,7 +124,21 @@ export default async function Home() {
   // A different park per request. Nothing is remembered between visits, so the
   // same park can repeat — that's the intent, not a shuffle through the set.
   const pool = heroPool ?? [];
-  const featured = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+
+  // ...except in development, where ?park=<slug> pins the hero to one record.
+  // The frame is meant to hold every park without per-park tuning, and a random
+  // hero makes that unreviewable: comparing two widths, or a change against the
+  // state before it, needs the same park in both frames. Same shape as the
+  // ?fixtures=<n> gate on /parks (see lib/devParkFixtures) — NODE_ENV is
+  // inlined at build time, so in production this branch is a literal false and
+  // the hero is random for every visitor, as before. An unknown slug falls
+  // through to the random pick rather than rendering nothing.
+  const pinnedSlug = (await searchParams).park;
+  const pinned =
+    process.env.NODE_ENV !== "production"
+      ? pool.find((p) => p.slug === pinnedSlug)
+      : undefined;
+  const featured = pinned ?? (pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null);
 
 
   // Derive tag list from structured fields
@@ -108,20 +164,36 @@ export default async function Home() {
           data-hero-entrance={firstVisit ? "" : undefined}
           style={{
             position: "relative",
-            // Matches hero-01.webp's native 2560×1440. The old `height: 78vh`
-            // made the box 2.29:1 at desktop, so object-fit: cover scaled to
-            // width and clipped ~110px off the top and bottom of every frame.
-            // minHeight only binds below ~750px wide, where 16:9 is too short
-            // to hold the meta block — a crop returns there, see the note.
-            aspectRatio: "16 / 9",
-            minHeight: 420,
+            // 16:9 as a floor, not as a fixed height. It matches hero-01.webp's
+            // native 2560×1440, so at the widths where the frame holds its
+            // content the image is uncropped — that was the point of the
+            // `aspect-ratio: 16 / 9` this replaces, and it is unchanged for
+            // every park whose name fits on one line.
+            //
+            // aspect-ratio *is* a fixed height, though: it derives the box from
+            // the width and content overflows it. With the title group free to
+            // wrap, a two-line name at a mid width pushed the catalogue mark
+            // past the top of the section and `overflow: hidden` cut it off —
+            // measured at 820px on CRYSTAL PALACE, 10px of the mark gone. As a
+            // minimum the ratio still shapes the frame and the section grows
+            // instead, trading a little crop on the photograph for content that
+            // is never clipped. 420px stays as the floor below ~750px wide,
+            // where 16:9 alone is too short to hold the block at all.
+            minHeight: "var(--frame-height)",
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-end",
             // Vertical only — the horizontal inset is now the .contained
             // layers inside, so the hero's copy lines up with the body column
             // below it rather than with the narrower gutter.
-            padding: "8rem 0 3rem",
+            //
+            // The foot is the frame's defining proportion, not spare space: the
+            // reference leaves roughly a seventh of the hero as open image below
+            // the location chip, so the title group reads as sitting *in* the
+            // photograph rather than on its bottom edge. 3rem left 48px there
+            // and the block looked dropped out of the frame. Fluid, so the
+            // proportion holds rather than the pixel count.
+            padding: "8rem 0 clamp(2.5rem, 8vw, 7.5rem)",
             // Pull up by the nav's real height so the image reaches the very top
             // of the viewport behind the transparent nav. Was a hardcoded -44px,
             // which left a strip of page background once the bar measured 50px.
@@ -167,42 +239,48 @@ export default async function Home() {
               muddying by another route. */}
 
 
-          {/* Postcode badge — anchored to the contained column's right edge,
-              not the viewport's, so it stacks with the meta block below it.
-              The wrapper is inset:0 with .contained's auto margins, which
-              centres it on the hero exactly as the body column is centred. */}
+          {/* Crosshair texture — the frame's ground, behind everything.
+
+              Same column system as the Found Object graticule below: the marks
+              sit on the reading column's own edges and its quarters, with one
+              step between each, so the hero and that module are reading off one
+              grid rather than two. z-index 1 puts it over the photograph and
+              under the zIndex:2 copy; it takes no pointer events and is not in
+              the accessibility tree. */}
+          <div className="fbs-hero-grid fbs-he-grid" aria-hidden="true">
+            <span /><span /><span /><span /><span /><span /><span /><span /><span />
+          </div>
+
+          {/* Postcode badge — the frame's upper-right anchor. It sits below the
+              bar and inside the column's right edge by half a grid step, so it
+              reads as an object in the open part of the photograph rather than
+              as something hanging off the header.
+
+              Not aria-hidden. The outward code is the only place the featured
+              park's postcode appears on this page — the thumbnail strip below
+              prints one per card, but for those parks, not this one — so
+              hiding it removed a fact rather than a decoration. The crosshair
+              layer and the title's arrow stay hidden, because both of those
+              carry nothing a reader would otherwise miss. pointer-events stays
+              off: it is not a control, it is just readable.
+
+              It used to centre itself on a flex row the height of the logo, so
+              that it tracked the mark across breakpoints. The mark is smaller
+              now and the badge is larger, so that ratio no longer holds and the
+              two are sized independently — both fluidly, so neither needs
+              re-tuning per breakpoint. */}
           {featured.postcode && (
-            <div className="contained" aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 2, pointerEvents: "none" }}>
-            {/* A flex row on the logo's own band rather than absolute
-                coordinates of its own. The logo is position:fixed in Nav, so
-                it can't be a flex sibling — the spacer reserves its published
-                width instead, and the row's height is the logo's height. Both
-                come from --logo-w / --logo-h, which Nav measures and
-                publishes, so the badge tracks the logo across every
-                breakpoint instead of being re-tuned against it. */}
-            <div className="fbs-he-badge-row" style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              gap: 24, height: "var(--logo-h, 96px)",
-            }}>
-            <div aria-hidden style={{ width: "var(--logo-w, 262px)", flexShrink: 0 }} />
-            {/* Snaps in with the catalogue badge while the image is still
-                wiping — a circle this size can't carry a wipe of its own
-                without reading as a flicker. */}
-            <div className="fbs-he-badge" style={{
-              width: "calc(var(--logo-h, 96px) * 1.05)", aspectRatio: "1",
-              borderRadius: "50%", background: "var(--accent)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, pointerEvents: "none",
-            }}>
-              {/* Display face, not --font-heading: the badge is a display mark
-                  like the park name beside it, so it takes MSCHN italic rather
-                  than Rubik. Sized off the circle so it holds ~60% of the
-                  diameter as the logo — and so the badge — resizes. */}
-              <span style={{ fontFamily: "var(--font-display), Arial, sans-serif", fontSize: "calc(var(--logo-h, 96px) * 0.3)", fontWeight: 400, fontStyle: "italic", color: "#fff", letterSpacing: "0", textTransform: "uppercase" }}>
-                {featured.postcode.split(" ")[0]}
-              </span>
-            </div>
-            </div>
+            <div className="fbs-hero-badge">
+              {/* Snaps in with the catalogue mark while the image is still
+                  wiping — a circle this size can't carry a wipe of its own
+                  without reading as a flicker. */}
+              <div className="fbs-he-badge fbs-hero-badge__disc">
+                {/* Display face, not --font-heading: the badge is a display mark
+                    like the park name below it, so it takes MSCHN italic rather
+                    than Rubik. Sized off the circle so it holds ~30% of the
+                    diameter as the badge resizes. */}
+                <span>{featured.postcode.split(" ")[0]}</span>
+              </div>
             </div>
           )}
 
@@ -212,10 +290,12 @@ export default async function Home() {
             <ParkHeroMeta
               catalogueId={featured.catalogue_id ?? undefined}
               name={featured.name}
-              address={featured.address}
-              postcode={featured.postcode}
-              opened={featured.opened}
-              scanned={featured.scanned}
+              address={featured.address ?? undefined}
+              area={featured.area}
+              borough={featured.borough}
+              postcode={featured.postcode ?? undefined}
+              opened={featured.opened ?? undefined}
+              scanned={featured.scanned ?? undefined}
               slug={featured.slug}
             />
           </div>
@@ -416,30 +496,142 @@ export default async function Home() {
       <FoundObject parks={foundObjectParks ?? []} />
 
       <style>{`
-        /* The postcode badge's band, at every width.
+        /* ── Frame ground: the crosshair lattice ─────────────────────────
+           One step of the grid. The Found Object graticule below draws the
+           reading column's edges and its quarters — the PARKS grid's four
+           columns — so this halves that step and marks every crossing, which
+           makes the two modules the same grid at two densities rather than two
+           inventions.
 
-           It used to sit on var(--logo-top) on desktop — the logo's own band —
-           on the theory that sharing the mark's band tied the two together.
-           But --logo-top is 56px and the 44px theme control ends at 56px too
-           (12px of nav padding + 44), so the badge's circle, being 5% taller
-           than the row it centres in, started ~1.6px *above* that line. On
-           desktop the badge read as hanging off the theme control rather than
-           as part of the photograph, which is the same fault narrow widths
-           were already fixed for.
+           Written from the two tokens .contained is built from, so the pitch is
+           exact at every width with nothing measured: the column is
+           min(max-width, usable width) less its two paddings, and --vw is the
+           usable width Nav publishes. */
+        .fbs-hero-grid {
+          --hg: calc(
+            (min(var(--content-max-width), var(--vw, 100vw)) - 2 * var(--content-padding)) / 8
+          );
+          /* Half a step up from the foot, so the bottom row sits inside the
+             open image below the title group rather than on the hero's edge. */
+          --hg-phase: calc(var(--hg) / 2);
+          /* White, not --border: this layer sits on a photograph rather than
+             on the page, so the theme's hairline colour would describe the
+             wrong surface — the same reason the nav label is pinned dark over
+             the hero. 0.7 is where the marks stay legible over pale concrete,
+             which is most of Scout's photography, without becoming a lattice
+             drawn on top of the picture. */
+          --hg-ink: rgba(255,255,255,0.7);
+          position: absolute;
+          top: 0; bottom: 0;
+          z-index: 1;
+          pointer-events: none;
+          /* The reading column, rebuilt inside the full-bleed hero from the
+             same expression .fbs-fo-grid-marks uses. */
+          left: max(var(--content-padding),
+            calc((100% - var(--content-max-width)) / 2 + var(--content-padding)));
+          right: max(var(--content-padding),
+            calc((100% - var(--content-max-width)) / 2 + var(--content-padding)));
+          /* Texture, not structure: it fades in over the hero's upper negative
+             space so the open top of the frame stays open, and only reaches
+             full strength around the title group. Masked rather than faded per
+             mark, so the marks themselves stay 1px and stay sharp — the same
+             call .fbs-fo-grid makes at its own two ends. */
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 28%, #000 52%);
+          mask-image: linear-gradient(to bottom, transparent 0, transparent 28%, #000 52%);
+        }
+        /* One span per vertical, each carrying that vertical's whole run of
+           marks as a repeating background rather than one element per crossing.
+           The hero's height is fluid and its row count is therefore not knowable
+           in markup; a repeat is, and it costs nine nodes instead of fifty.
 
-           So the narrow rule is now the only rule: measure down from the bar
-           itself, --nav-height + 20px, rather than from the logo. The bar's
-           bottom edge is the thing the badge has to clear, and --nav-height is
-           published from the bar's measured height, so this tracks the bar if
-           the bar ever changes rather than being a desktop number of its own.
-           It leaves ~30px between the theme control's bottom and the top of
-           the badge at desktop and ~31px at narrow — the badge sits on the
-           hero, clear of the header, at both.
+           Two layers, both tiled at the pitch: a 1px-wide strip whose ink is its
+           top 11px (the mark's stem) and an 11px-wide strip whose ink is its
+           top 1px (its bar). Each tile is narrow in the axis it is not drawing, so
+           the pair composes a cross without needing a 2D image. The half-pixel
+           offsets centre each arm on the crossing, exactly as .fbs-fo-mark does
+           against the lines it sits on. */
+        .fbs-hero-grid > span {
+          position: absolute;
+          top: 0; bottom: 0;
+          width: 11px;
+          margin-left: -5px;
+          background-image:
+            linear-gradient(to bottom, var(--hg-ink) 0 11px, transparent 11px),
+            linear-gradient(to bottom, var(--hg-ink) 0 1px, transparent 1px);
+          background-size: 1px var(--hg), 11px var(--hg);
+          background-repeat: repeat-y, repeat-y;
+          background-position:
+            left 5px bottom calc(var(--hg-phase) + 5.5px),
+            left 0   bottom calc(var(--hg-phase) + 0.5px);
+        }
+        .fbs-hero-grid > span:nth-child(1) { left: 0; }
+        .fbs-hero-grid > span:nth-child(2) { left: 12.5%; }
+        .fbs-hero-grid > span:nth-child(3) { left: 25%; }
+        .fbs-hero-grid > span:nth-child(4) { left: 37.5%; }
+        .fbs-hero-grid > span:nth-child(5) { left: 50%; }
+        .fbs-hero-grid > span:nth-child(6) { left: 62.5%; }
+        .fbs-hero-grid > span:nth-child(7) { left: 75%; }
+        .fbs-hero-grid > span:nth-child(8) { left: 87.5%; }
+        .fbs-hero-grid > span:nth-child(9) { left: 100%; }
 
-           Mobile is untouched: it was already this expression, so the value it
-           computes there is unchanged. Right alignment, size, type and colour
-           are untouched everywhere. */
-        .fbs-he-badge-row { margin-top: calc(var(--nav-height, 68px) + 20px); }
+        /* ── Postcode badge ──────────────────────────────────────────────
+           Charcoal, not accent. Orange is the CTA and the wordmark; a filled
+           accent circle this size was the loudest object in the frame and put
+           the brand colour on a piece of metadata. Same ink and the same
+           translucency as the chips in the title group, so the frame's two
+           dark objects are one family.
+
+           Sized against the viewport rather than against the logo. The two used
+           to share --logo-h so the badge tracked the mark; the mark is smaller
+           now and the badge is larger, so a ratio between them would have to be
+           re-tuned rather than tracked. A clamp does the same job on its own. */
+        .fbs-hero-badge {
+          --pc-d: clamp(56px, 6.2vw, 90px);
+          position: absolute;
+          z-index: 2;
+          /* Below the bar, measured from the bar's own published height so it
+             follows if the bar ever changes. */
+          top: calc(var(--nav-height, 68px) + clamp(18px, 3.4vw, 50px));
+          /* Inside the column's right edge by half a grid step, so it reads as
+             an object placed in the photograph rather than as another element
+             on the frame's right inset with the CTA. */
+          right: calc(
+            max(var(--content-padding),
+              calc((100% - var(--content-max-width)) / 2 + var(--content-padding)))
+            + (min(var(--content-max-width), var(--vw, 100vw)) - 2 * var(--content-padding)) / 16
+          );
+          pointer-events: none;
+        }
+        .fbs-hero-badge__disc {
+          width: var(--pc-d);
+          height: var(--pc-d);
+          border-radius: var(--radius-circle);
+          background: rgba(20,18,15,0.82);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .fbs-hero-badge__disc > span {
+          font-family: var(--font-display), Arial, sans-serif;
+          font-size: calc(var(--pc-d) * 0.3);
+          font-weight: 400;
+          font-style: italic;
+          color: #fff;
+          letter-spacing: 0;
+          text-transform: uppercase;
+        }
+
+        /* The lattice drops to the Found Object grid's own mobile density here
+           — column edges and midpoint only — for the same reason that module
+           drops its quarters: the catalogue grid is two columns wide at this
+           width, so a finer step is clutter in a phone gutter rather than
+           structure. Same 700px threshold, so there is one number for both. */
+        @media (max-width: 700px) {
+          .fbs-hero-grid { --hg: calc(
+            (min(var(--content-max-width), var(--vw, 100vw)) - 2 * var(--content-padding)) / 4
+          ); }
+          .fbs-hero-grid > span:nth-child(2n) { display: none; }
+        }
 
         .fbs-thumb-img { color: transparent; transition: filter 0.4s ease; }
         /* .fbs-colour was the opt-out from the grayscale default. Nothing in

@@ -10,7 +10,7 @@ import ParkViewerModal from "./ParkViewerModal";
 import ParkHeroDetails from "./ParkHeroDetails";
 import ParkReturnLink from "./ParkReturnLink";
 import {
-  BwIcon, ArIcon, ExitIcon, PrevIcon, NextIcon,
+  BwIcon, ArIcon, ExitIcon, OrbitIcon, PrevIcon, NextIcon,
   ViewerControlBar, ViewerCluster, ViewerClusterButton, ViewerClusterDivider, ViewerReadout,
   VIEWER_CONTROLS_CSS,
 } from "./ViewerControls";
@@ -19,6 +19,7 @@ import { carryDirectoryOrigin } from "./parksGridState";
 import { catalogueIndexLabel } from "@/lib/catalogue";
 import { lockPageScroll } from "@/lib/scrollLock";
 import CTAButton from "./CTAButton";
+import type { CameraBounds } from "@/lib/heroCamera";
 
 // Session-scoped, deliberately: the instructions should feel learned within a
 // visit, not taught from scratch on every open, but nothing here is worth
@@ -54,8 +55,12 @@ type Props = {
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
+  /** Per-park orbit window for an ENCLOSED park — Southbank's undercroft, and
+   *  whatever interior is scanned next. Null/undefined outdoors, where nothing
+   *  changes. One pair of numbers governs both the manual drag clamp and the
+   *  range the automatic rotation plays within; see CameraBounds. */
+  cameraBounds?: CameraBounds | null;
   debug?: boolean;
   /** see the gate in app/parks/[slug]/page.tsx */
   /** Opt-in desktop click-to-expand overlay. Off everywhere unless the page
@@ -83,6 +88,10 @@ type Props = {
   nextPark?: { slug: string; name: string };
   name: string;
   address?: string[];
+  /** See lib/parkArea. Threaded through to both the hero details row and the
+   *  viewer modal so the two never disagree about where a park is. */
+  area?: string | null;
+  borough?: string | null;
   location?: string;
   postcode?: string;
   lat?: number;
@@ -97,9 +106,9 @@ type Props = {
 
 export default function ParkHeroShell({
   modelFile, heroImage, preloadImageUrl,
-  cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, viewerOverlay,
+  cameraPos, cameraTarget, modelRotation, autoRotate, debug, viewerOverlay, cameraBounds,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
-  slug, catalogueId, catalogueTotal, prevPark, nextPark, name, address, location, postcode, lat, lng, opened, scanned,
+  slug, catalogueId, catalogueTotal, prevPark, nextPark, name, address, area, borough, location, postcode, lat, lng, opened, scanned,
   glance,
 }: Props) {
   const [bw, setBw] = useState(true);
@@ -111,7 +120,19 @@ export default function ParkHeroShell({
   const [viewerActive, setViewerActive] = useState(false);
   // The entrance and exit are staged rather than switched, so each of these
   // is granted or withdrawn at its own moment — see openViewer/closeViewer.
-  const [spinning, setSpinning] = useState(true);
+  //
+  // FALSE, and it starts false for the whole life of the page until someone
+  // activates the viewer. This used to be `true`, which is what made the scan
+  // turn on its own the moment the GLB landed — before there was any way to
+  // stop it, and whether or not the reader had asked for a live model. The
+  // three things that are allowed to write this are: activation (openViewer),
+  // the orbit toggle, and anything that stops it. Nothing starts it on a
+  // timer, on load, or on exit.
+  const [spinning, setSpinning] = useState(false);
+  // Rotation is motion, and motion is opt-out. Same signal the rest of the
+  // site reads (FoundObject, Reveal, RandomPark), watched live rather than
+  // sampled once so a mid-visit change to the OS setting is honoured.
+  const [reduced, setReduced] = useState(false);
   const [canRotate, setCanRotate] = useState(false);
   const [canZoom, setCanZoom] = useState(false);
   const [controlsShown, setControlsShown] = useState(false);
@@ -120,31 +141,31 @@ export default function ParkHeroShell({
   const [instructionsShown, setInstructionsShown] = useState(false);
   // Guards the entrance against a second click landing mid-sequence.
   const [busy, setBusy] = useState(false);
-  // Pointer capability, which is a different question from viewport width and
-  // was never asked before. The entry affordance was gated on a 300ms hover
-  // dwell, so on a touch tablet — which gets the live model, not the still —
-  // it never appeared: the whole hero was a button with nothing saying so.
-  // Resolved after mount for the same reason isMobile is; the server has no
-  // pointer, and rendering a different tree on the first client pass would be
-  // a hydration mismatch.
-  const [coarse, setCoarse] = useState(false);
+  // Pointer capability is no longer asked in JS. It existed to decide whether
+  // the entry affordance was dwell-gated (fine) or resident (coarse); the
+  // status/action area is resident on every pointer now, and the one place the
+  // answer still matters — 44px targets on the viewer controls — is a
+  // `(pointer: coarse)` media query in VIEWER_CONTROLS_CSS, which needs no
+  // React state and cannot disagree with the layout it is sizing.
   // What the scan is actually doing, reported by the viewer itself rather than
   // assumed. The entry affordance used to promise "Click to explore" from the
   // first paint, while the GLB was still downloading — so a reader could be
   // invited into a viewer that had nothing in it yet, and on a failed scan the
   // invitation never withdrew at all.
+  //
+  // "Ready" is now reported when the scene AND its controls are live, not when
+  // the download resolves — see ReadyGate in ParkModel. A failure never
+  // reaches "ready", so the CTA cannot appear over a dead scan.
   const [scanState, setScanState] = useState<"loading" | "ready" | "failed">("loading");
   const onScanReady = useCallback(() => setScanState("ready"), []);
   const onScanFailed = useCallback(() => setScanState("failed"), []);
-  // The hover prompt is dwell-gated, and leaves at two different speeds: a
-  // click is an acknowledgement, a pointer-leave is just the end of a hover.
-  const [promptShown, setPromptShown] = useState(false);
-  const [promptExit, setPromptExit] = useState<"hover" | "click">("hover");
-  // Keeps the prompt in the tree just past the click so its acknowledgement
-  // fade can actually play. Unmounting on activation deleted it instantly, so
-  // the two exit speeds were a distinction with nothing to show for it.
-  const [promptLingering, setPromptLingering] = useState(false);
-  const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The dwell-gated hover prompt is gone. The status/action area is one box
+  // holding one of three labels — LOADING PARK… / EXPLORE 3D / DRAG TO ROTATE
+  // — and a box that reports two of its states outright and hides the third
+  // behind a 300ms hover was not one object changing its text, it was a status
+  // plate that blinked out and a button that had to be found. What the dwell
+  // was protecting (a quiet hero) is now the treatment's job, not the
+  // timer's.
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const collapseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interactedRef = useRef(false);
@@ -172,15 +193,15 @@ export default function ParkHeroShell({
     if (scanState !== "ready") return;
     setBusy(true);
     clearTimers();
-    if (dwellRef.current) clearTimeout(dwellRef.current);
-    setPromptExit("click");
-    setPromptShown(false);
-    setPromptLingering(true);
-    after(160, () => setPromptLingering(false));
     interactedRef.current = false;
 
     setViewerActive(true);
-    setSpinning(false);                 // eases to a stop over ~350ms
+    // THE ONE PLACE ROTATION BEGINS. Not on load, not on a timer, not on exit
+    // — as a direct consequence of this click, its keyboard equivalent, or the
+    // orbit toggle, and nowhere else. Under reduced motion the viewer still
+    // opens and everything still works; it simply opens paused, and the toggle
+    // is there for anyone who wants it anyway.
+    setSpinning(!reduced);
 
     after(150, () => { setBw(false); setCanRotate(true); });
     // Straight after the prompt's click fade, so the instructions rise out of
@@ -192,13 +213,17 @@ export default function ParkHeroShell({
     after(450, () => setControlsShown(true));
     after(700, () => setCanZoom(true));
     after(900, () => setBusy(false));
-  }, [busy, viewerActive, scanState, clearTimers, after]);
+  }, [busy, viewerActive, scanState, reduced, clearTimers, after]);
 
   // ── Exit ──────────────────────────────────────────────────────────────
   // Interaction is withdrawn at once so there is no half-live window, then
-  // colour and the idle spin come back over the top of the zoom-out. Nothing
-  // re-homes the camera: the scan stays at the angle it was left at, and the
-  // ambient rotation picks up from there.
+  // colour comes back over the top of the zoom-out. Nothing re-homes the
+  // camera: the scan stays at the angle it was left at.
+  //
+  // Rotation is stopped and stays stopped. It used to be handed back 350ms
+  // after the exit, which meant leaving the viewer started the model turning
+  // again — the same bug as starting it on load, at the other end of the
+  // sequence. Exiting returns the hero to Ready, and Ready is still.
   const closeViewer = useCallback(() => {
     clearTimers();
     if (collapseRef.current) clearTimeout(collapseRef.current);
@@ -208,44 +233,38 @@ export default function ParkHeroShell({
     setInstructionsShown(false);
     setViewerActive(false);
     setBusy(false);
+    setSpinning(false);
+    interactedRef.current = false;
 
     after(100, () => setBw(true));
-    after(350, () => setSpinning(true));
-    after(700, () => setInstructionsShown(false));
   }, [clearTimers, after]);
 
-  // ── Hover prompt ──────────────────────────────────────────────────────
-  const armPrompt = useCallback(() => {
-    if (viewerActive || promptShown) return;   // no re-pulse while hovering
-    if (scanState !== "ready") return;        // nothing to invite anyone into yet
-    // On a coarse pointer the prompt is already up and stays up until the
-    // scan is entered — there is no dwell to wait for, and a pointerenter
-    // fired by a tap would just restart a timer the tap has already beaten.
-    if (dwellRef.current) clearTimeout(dwellRef.current);
-    if (coarse) return;
-    dwellRef.current = setTimeout(() => {
-      setPromptExit("hover");
-      setPromptShown(true);
-    }, 300);
-  }, [viewerActive, promptShown, coarse, scanState]);
-  const disarmPrompt = useCallback(() => {
-    if (coarse) return;               // nothing to leave; the prompt is resident
-    if (dwellRef.current) clearTimeout(dwellRef.current);
-    setPromptExit("hover");
-    setPromptShown(false);
-  }, [coarse]);
-
-  // ── First gesture stands the instructions down ────────────────────────
+  // ── Contact stops the rotation; a drag stands the instruction down ────
+  // Two different events, deliberately. Every contact — tap, drag, pinch,
+  // wheel — takes the rotation off the visitor's hands and leaves it off; only
+  // an actual rotation of the model retires the instruction that was asking
+  // for one. A tap does the first and not the second.
+  //
+  // Nothing latches handleInteract: a second tap after a toggle press has to
+  // stop the rotation again.
   const handleInteract = useCallback(() => {
+    setSpinning(false);
+  }, []);
+
+  const handleDrag = useCallback(() => {
     if (interactedRef.current) return;
     interactedRef.current = true;
     markInstructionsSeen();
     collapseRef.current = setTimeout(() => setInstructionsShown(false), 600);
   }, []);
 
+  // The only way rotation ever starts again. Pressing it while paused starts
+  // it under reduced motion too — the preference sets the default, it does not
+  // withhold the control.
+  const toggleSpin = useCallback(() => setSpinning(s => !s), []);
+
   useEffect(() => () => {
     timers.current.forEach(clearTimeout);
-    if (dwellRef.current) clearTimeout(dwellRef.current);
     if (collapseRef.current) clearTimeout(collapseRef.current);
   }, []);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -271,8 +290,8 @@ export default function ParkHeroShell({
   }, []);
 
   useEffect(() => {
-    const mq = window.matchMedia("(pointer: coarse)");
-    const sync = () => setCoarse(mq.matches);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduced(mq.matches);
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
@@ -340,14 +359,15 @@ export default function ParkHeroShell({
   // so wherever it is absent the toggle has to fall back to the pill by the
   // metadata — otherwise turning the scan to colour becomes unreachable.
   const topCluster = !!(viewerOverlay && modelFile && !isMobile);
-  // Fine pointers earn the prompt by dwelling; coarse pointers get it outright
-  // and keep it until the scan is entered. Same element, same plate, same
-  // motion — only what decides it differs.
-  // Loading and failure states are shown outright on every pointer type: they
-  // are status, not an invitation, and hiding a failure behind a hover would
-  // leave a dead scan looking like a photograph. Only the invitation itself
-  // keeps the dwell behaviour on a fine pointer.
-  const ctaShown = scanState !== "ready" ? !viewerActive : (coarse ? !viewerActive : promptShown);
+  // What the status/action area is saying right now. One box, one label, and
+  // this is the only thing that decides which — no pointer type, no dwell, no
+  // timer. `coarse` no longer reaches the status area at all; it is still read
+  // for the mobile branches below.
+  const status: "loading" | "ready" | "active" | "failed" =
+    viewerActive ? "active"
+    : scanState === "ready" ? "ready"
+    : scanState === "failed" ? "failed"
+    : "loading";
 
   return (
     <>
@@ -364,6 +384,8 @@ export default function ParkHeroShell({
         variant="fullscreen"
         catalogueId={catalogueId}
         address={address}
+        area={area}
+        borough={borough}
         postcode={postcode}
         lat={lat}
         lng={lng}
@@ -372,8 +394,8 @@ export default function ParkHeroShell({
         cameraPos={cameraPos}
         cameraTarget={cameraTarget}
         modelRotation={modelRotation}
-        pingPong={pingPong}
         autoRotate={autoRotate}
+        cameraBounds={cameraBounds}
         ambientIntensity={ambientIntensity}
         directionalIntensity={directionalIntensity}
         environmentPreset={environmentPreset}
@@ -397,7 +419,15 @@ export default function ParkHeroShell({
       } : undefined}
       style={{
         position: "relative",
-        height: "78vh",
+        /* The homepage hero's frame, shared — see --frame-height. This was
+           78vh, which sized the viewer off the window's height while the hero
+           was sized off its width, so the two disagreed by 75px at 1453x941 and
+           moved opposite ways as the window changed shape. The token is the
+           hero's own rule, so the viewer now matches the frame you arrived
+           from rather than the hero being enlarged to match the viewer.
+           Fullscreen is untouched: that is the modal's own sizing.
+           340px stays as this page's floor. */
+        height: "var(--frame-height)",
         minHeight: 340,
         overflow: "hidden",
         // Follows the theme in every state, viewer mode included. This briefly
@@ -441,8 +471,9 @@ export default function ParkHeroShell({
             cameraPos={cameraPos}
             cameraTarget={cameraTarget}
             modelRotation={modelRotation}
-            pingPong={pingPong}
             autoRotate={autoRotate}
+            cameraBounds={cameraBounds}
+            stopOnInteract
             debug={debug}
             ambientIntensity={ambientIntensity}
             directionalIntensity={directionalIntensity}
@@ -453,6 +484,13 @@ export default function ParkHeroShell({
             allowRotate={canRotate}
             allowZoom={canZoom}
             onInteract={handleInteract}
+            onDrag={handleDrag}
+            // The status plate below already says the scan is loading, in the
+            // same box that becomes EXPLORE 3D. ParkModel's own preload note
+            // was printing a second "LOADING SCAN..." a few hundred pixels
+            // under it - one wait, two labels, two registers. The full-screen
+            // viewer keeps its note; it has no plate of its own.
+            showLoadingNote={false}
             onReady={onScanReady}
             onFailed={onScanFailed}
           />
@@ -466,81 +504,30 @@ export default function ParkHeroShell({
       )}
 
       {/* ── Click-to-expand shield ──────────────────────────────────────
-          A transparent button laid over the canvas. It is the entire inline
-          interaction, and it is also what makes the scroll fix free:
-          OrbitControls binds its wheel and pointer listeners to the canvas
-          element itself, and events landing on this layer never reach it, so
-          the inline view stops zooming and orbiting without a single
+          A transparent layer over the canvas. It is what makes the scroll fix
+          free: OrbitControls binds its wheel and pointer listeners to the
+          canvas element itself, and events landing on this layer never reach
+          it, so the inline view stops zooming and orbiting without a single
           conditional inside ParkModel. Nothing here listens for `wheel`, so
           the browser scrolls the page exactly as it would over an image.
 
-          z-index 3 puts it over the scrim (2) and under the hero copy (5) —
-          the control cluster up there re-enables its own pointer events and
-          keeps working, while the pointer-transparent name and meta fall
-          through to this and expand the model, which is where a click over
-          the scan should go anyway. */}
-      {viewerOverlay && modelFile && !isMobile && (!viewerActive || promptLingering) && (
-        <div
-          // Inert the moment the viewer is live: it is still on screen for the
-          // length of the fade, and it sits over the canvas, so it must stop
-          // taking events before the model starts needing them.
-          className={`fbs-expand${viewerActive ? " is-inert" : ""}${scanState !== "ready" ? " is-waiting" : ""}`}
-          onClick={openViewer}
-          onPointerEnter={armPrompt}
-          onPointerLeave={disarmPrompt}
-        >
-          {/* The shared CTA, quiet variant. Not a bespoke chip: this is the
-              same component as VIEW SCAN and EXPLORE, so the glyph, the
-              hover invert and the caret nudge are the site's, not this
-              hero's. The wrapper is what takes the click, so anywhere on the
-              scan activates — the button is the visible affordance, not the
-              only target. */}
-          <span className={`fbs-expand-cta${ctaShown ? " is-shown" : ""}`} data-exit={promptExit}>
-            {/* The eyebrow is coarse-pointer only. On a touch tablet the model
-                is live but stationary and there is no hover to discover it
-                with, so the affordance has to say what the thing IS before it
-                says what to do with it — a still frame of a skatepark and a
-                stationary scan look identical. On a mouse the idle rotation
-                already answers "is this live?", the dwell answers "can I touch
-                it?", and an eyebrow would only be restating both. */}
-            {/* One box, three labels. The states must read as the SAME object
-                changing its text, not as one element leaving and another
-                arriving somewhere else — so the passive states reproduce
-                CTAButton's internal structure exactly rather than approximating
-                it: the same .fbs-cta plate, the same .fbs-cta__label, and the
-                same caret occupying the same space with its ink turned off.
-                Only the characters differ between states.
+          Empty now. The CTA used to live inside it; it has moved to the
+          status/action area below, which is one box across all three states
+          rather than a button in the shield and an instruction somewhere else.
+          The shield is still the whole-hero click target — the status area
+          sits over it and is pointer-transparent apart from the button itself,
+          so a click anywhere on the scan still activates.
 
-                There was an "INTERACTIVE 3D SCAN" eyebrow above this on coarse
-                pointers. It was the main source of the jump — present only when
-                ready, so the pill dropped by its height plus the gap the moment
-                the model arrived — and with "LOADING 3D SCAN…" naming the object
-                a moment earlier, it was saying it twice. */}
-            {scanState === "ready" ? (
-              /* One label on every device. "Click to explore" / "Drag to
-                 explore" described the input rather than the offer, and split
-                 one state into two vocabularies for no functional reason. The
-                 CTA says what you get; the instructions after entry say how to
-                 work it on this device, which is where the pointer type
-                 genuinely matters. */
-              <CTAButton label="Explore 3D" variant="ghost" onClick={openViewer} />
-            ) : (
-              <span className="fbs-cta fbs-cta--ghost fbs-cta--status">
-                <span className="fbs-cta__label">
-                  {scanState === "loading" ? "Loading 3D scan…" : "3D scan unavailable"}
-                </span>
-                {/* Reserves the caret's slot so the plate's metrics are identical
-                    in all three states. Not decoration — it is never drawn. */}
-                <svg className="fbs-cta__arrow" width="9" height="9" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="3"
-                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-                  style={{ visibility: "hidden" }}>
-                  <path d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-            )}
-          </span>
-        </div>
+          Unmounted rather than made inert once the viewer is live: there is no
+          fade left to wait for now that it carries nothing.
+
+          z-index 3 puts it over the scrim (2) and under the hero copy (5). */}
+      {viewerOverlay && modelFile && !isMobile && !viewerActive && (
+        <div
+          aria-hidden
+          className={`fbs-expand${scanState !== "ready" ? " is-waiting" : ""}`}
+          onClick={openViewer}
+        />
       )}
 
       {/* ── Viewer-mode window ─────────────────────────────────────────────
@@ -619,16 +606,46 @@ export default function ParkHeroShell({
                 active={!bw}
                 onClick={() => setBw(b => !b)}
               />
+              {/* ── Automatic rotation ──────────────────────────────────
+                  A real toggle, not a readout: its state is the model's actual
+                  rotation state, and it is the ONLY thing that can start the
+                  rotation again once anything has stopped it. Touching the
+                  model drops it to paused (handleInteract), and nothing —
+                  release, timeout, pointer-leave — puts it back.
+
+                  Here rather than in the status/action area because it is a
+                  control over the view, which is what this cluster is for, and
+                  it has to be reachable for as long as the viewer is live
+                  rather than only while an instruction is showing.
+
+                  Icon carries the state and the label carries the action, the
+                  same split the colour toggle uses. The glyph changes shape
+                  between states, so the accent `active` draws is confirmation
+                  rather than the only difference. Target size and focus ring
+                  come from .vc-btn — 44x44 on a coarse pointer, accent ring on
+                  focus — so this control has both without asking for them. */}
+              <span className={`fbs-hero-livetool${controlsShown ? " is-shown" : ""}`} inert={!controlsShown}>
+                <ViewerClusterButton
+                  label={spinning ? "Pause automatic rotation" : "Start automatic rotation"}
+                  icon={<OrbitIcon rotating={spinning} />}
+                  active={spinning}
+                  onClick={toggleSpin}
+                />
+              </span>
               {/* Exit keeps its slot whether or not it is showing, so the
                   controls beside it do not shift when it fades in — the same
                   reason the old colour toggle reserved this space by hand.
                   `inert` takes it out of the tab order and the a11y tree while
                   it is invisible, which the fade alone would not.
 
+                  Unchanged by this pass: same corner, same glyph, same action.
+                  The orbit toggle is a control beside it, never a replacement
+                  for it.
+
                   Never `active`: exit must stay outside the accent vocabulary
                   the interpretive tools will use for their on-state, or it
                   reads as one more layer you can switch. */}
-              <span className={`fbs-hero-exit${controlsShown ? " is-shown" : ""}`} inert={!controlsShown}>
+              <span className={`fbs-hero-livetool${controlsShown ? " is-shown" : ""}`} inert={!controlsShown}>
                 <ViewerClusterButton
                   label="Exit 3D view"
                   icon={<ExitIcon />}
@@ -641,22 +658,65 @@ export default function ParkHeroShell({
       )}
 
 
-      {/* ── Centered instructions ──────────────────────────────────────────
-          They take over the spot the hover prompt just left, rising the same
-          way it rose, so the two read as one thought continuing rather than a
-          second element arriving. Plain text, deliberately: the prompt was an
-          invitation and earned a plate, this is only describing what the
-          model already does. */}
+      {/* ── Status / action area ───────────────────────────────────────────
+          ONE box, four labels, one position. LOADING PARK… becomes EXPLORE 3D
+          becomes DRAG TO ROTATE in place — the same plate changing its text,
+          not a status disappearing and a button arriving somewhere else. It
+          replaces two elements that happened to be centred at the same
+          padding-bottom and were kept in step by hand.
+
+          Pointer-transparent apart from the CTA, so once the viewer is live a
+          drag across the middle of the hero reaches the model through it. */}
       {topCluster && (
-        <div className={`fbs-hero-instructions${instructionsShown ? " is-shown" : ""}`} aria-hidden={!instructionsShown}>
-          {/* The CTA's own classes, not a copy of its values: same plate,
-              border, blur, radius and type as "Click to explore" by
-              construction, so the two cannot drift. No arrow and no hover
-              state — the wrapper is pointer-transparent, so this reads as the
-              same object settling into a passive role rather than a second
-              button appearing. */}
-          <span className="fbs-cta fbs-cta--ghost">
-            {coarse ? "Drag to rotate · Pinch to zoom" : "Drag to rotate · Scroll to zoom"}
+        <div className="fbs-hero-status">
+          <span className="fbs-hero-status__box">
+            {/* Width reservation, never drawn. The labels are different
+                lengths and the box is centred, so without this it would resize
+                about its own centre at exactly the moments the eye is on it —
+                the scan becoming ready, and the CTA becoming the instruction.
+                This carries the longest label through every state and
+                reproduces the plate's horizontal metrics around it (16px each
+                side, the 7px gap and the 9px caret the CTA adds), so the box
+                is sized by the widest state by construction rather than by a
+                measured constant that goes stale the next time a label is
+                reworded. */}
+            <span className="fbs-hero-status__sizer" aria-hidden="true">3D scan unavailable</span>
+
+            {status === "ready" && (
+              /* The site's primary CTA, unmodified — same component as VIEW
+                 SCAN and EXPLORE. No stroke and no blur: this is the one state
+                 here that is an offer rather than a report, and it takes the
+                 orange plate plainly. A <button>, so Enter and Space activate
+                 it without anything being added here. */
+              <CTAButton label="Explore 3D" variant="accent" onClick={openViewer} />
+            )}
+
+            {(status === "loading" || status === "failed") && (
+              /* Quiet, and not focusable — a report, not a control. Flat
+                 plate: no outline, no backdrop blur, no text shadow. */
+              <span className="fbs-hero-status__plate is-shown" role="status">
+                {status === "loading" ? "Loading park…" : "3D scan unavailable"}
+              </span>
+            )}
+
+            {status === "active" && (
+              /* One wording on every device. "Drag to rotate · Scroll to zoom"
+                 / "· Pinch to zoom" split one state into two vocabularies and
+                 spent the width saying what the second gesture does before
+                 anyone has tried the first.
+
+                 It stays up until the model is actually rotated — see
+                 handleDrag, and ParkModel for what counts. A tap stops the
+                 rotation without retiring the instruction, which is the point:
+                 the instruction is still true. */
+              <span
+                className={`fbs-hero-status__plate${instructionsShown ? " is-shown" : ""}`}
+                role="status"
+                aria-hidden={!instructionsShown}
+              >
+                Drag to rotate
+              </span>
+            )}
           </span>
         </div>
       )}
@@ -734,6 +794,8 @@ export default function ParkHeroShell({
           name={name}
           catalogueId={catalogueId}
           address={address}
+          area={area}
+          borough={borough}
           postcode={postcode}
           lat={lat}
           lng={lng}
@@ -864,8 +926,8 @@ export default function ParkHeroShell({
           .fbs-hero-navgroup{ display:none; }
         }
 
-        /* Exit occupies its slot in BOTH states. It is always laid out; only
-           its ink changes. That is what keeps the catalogue nav and the colour
+        /* The live tools — automatic rotation, then exit — occupy their slots
+           in BOTH states. They are always laid out; only their ink changes. That is what keeps the catalogue nav and the colour
            toggle physically still when the viewer is entered — the cluster is
            an anchored instrument whose available functions change, not a
            toolbar that grows.
@@ -876,69 +938,89 @@ export default function ParkHeroShell({
            inert (on the element itself) keeps it out of the tab order and the
            accessibility tree while it is invisible, so reserving the space
            costs nothing to a keyboard or a screen reader. */
-        .fbs-hero-exit{
+        .fbs-hero-livetool{
           display:inline-flex;
           opacity:0;
           transition:opacity 140ms ease;
         }
-        .fbs-hero-exit.is-shown{ opacity:1; }
+        .fbs-hero-livetool.is-shown{ opacity:1; }
         @media (prefers-reduced-motion: reduce){
-          .fbs-hero-exit{ transition-duration:.01ms; }
-        }
-
-        /* ── Centered instructions ─────────────────────────────────────
-           Same box as the hover prompt, so they occupy the spot it just left
-           rather than appearing somewhere new; same upward entrance, so the
-           handover reads as one movement. No plate — see the note in the JSX. */
-        /* Positioning and motion only — the pill itself comes from .fbs-cta on
-           the span inside. */
-        .fbs-hero-instructions{
-          position:absolute; inset:0; z-index:6; pointer-events:none;
-          display:flex; align-items:center; justify-content:center;
-          padding-bottom:14vh; white-space:nowrap;
-          opacity:0; transform:translateY(6px);
-          transition:opacity 180ms ease, transform 180ms ease;
-        }
-        .fbs-hero-instructions.is-shown{ opacity:1; transform:none; }
-        @media (prefers-reduced-motion: reduce){
-          .fbs-hero-instructions{ transition-duration:.01ms; }
+          .fbs-hero-livetool{ transition-duration:.01ms; }
         }
 
         .fbs-expand{
           box-sizing:border-box; cursor:pointer;
           position:absolute; inset:0; z-index:3;
-          /* Centred on the scan, above the metadata band so the two never
-             stack on top of each other. */
-          display:flex; align-items:center; justify-content:center;
-          padding-bottom:14vh;
         }
-        /* Shown by a dwell timer, not by :hover — the prompt should answer a
-           pointer that has come to rest, not one passing through. Two exit
-           speeds, and they mean different things: leaving is 140ms, clicking
-           is 110ms and reads as the input being taken rather than the hover
-           ending. */
-        .fbs-expand.is-inert{ pointer-events:none; }
         /* Still swallows the tap — a click on a scan that is not ready should do
            nothing, not fall through to whatever is underneath — but stops
            advertising itself as pressable. */
         .fbs-expand.is-waiting{ cursor:default; }
-        .fbs-cta--status{ cursor:default; pointer-events:none; }
-        /* One child in every state, so nothing here can move the plate
-           vertically between them. The column layout and its 8px gap existed
-           only for the eyebrow; both went with it. */
-        .fbs-expand-cta{
-          display:flex;
-          opacity:0; transform:translateY(6px);
-          transition:opacity 180ms ease, transform 180ms ease;
+
+        /* ── Status / action area ──────────────────────────────────────
+           The one box that carries LOADING PARK… / EXPLORE 3D / DRAG TO
+           ROTATE. Positioned exactly where the old prompt and instructions
+           both sat, so nothing on screen has moved.
+
+           Pointer-transparent. Only the CTA inside it takes events back, and
+           only while it exists — everything else lets a drag through to the
+           canvas underneath. */
+        .fbs-hero-status{
+          position:absolute; inset:0; z-index:6; pointer-events:none;
+          display:flex; align-items:center; justify-content:center;
+          padding-bottom:14vh; white-space:nowrap;
         }
-        .fbs-expand-cta.is-shown{ opacity:1; transform:none; }
-        .fbs-expand-cta[data-exit="hover"]:not(.is-shown){ transition-duration:140ms; }
-        .fbs-expand-cta[data-exit="click"]:not(.is-shown){ transition-duration:110ms; }
-        .fbs-expand:focus-within .fbs-expand-cta{ opacity:1; transform:none; }
-        /* Keyboard focus keeps the accent ring. That is not the hover cue
-           coming back: focus has to be visibly located, and there is no
-           pointer under it to imply where it is. */
-        .fbs-expand:focus-visible{ box-shadow:inset 0 0 0 2px var(--accent); }
+        /* Grid rather than flex so the sizer and the live label occupy the
+           SAME cell: the sizer sets the width, the label fills it, and neither
+           is offset by the other. This is what holds the box still across
+           every state. */
+        .fbs-hero-status__box{
+          display:grid; justify-items:center; align-items:center;
+        }
+        .fbs-hero-status__box > *{ grid-area:1/1; }
+        /* Reproduces the CTA's horizontal box around the longest label. Hidden
+           with visibility, not display, because a display:none element has no
+           width to lend. */
+        .fbs-hero-status__sizer{
+          visibility:hidden; pointer-events:none;
+          font-family:var(--font-mono); font-size:11px; font-weight:500;
+          letter-spacing:.5px; text-transform:uppercase; line-height:1.5;
+          white-space:nowrap;
+          padding:7px 16px; border:1px solid transparent;
+          /* The caret's slot and the gap before it. */
+          padding-right:calc(16px + 7px + 9px);
+        }
+        /* Fills the width the sizer reserved, with the label centred in it. */
+        .fbs-hero-status .fbs-cta{
+          width:100%; justify-content:center; pointer-events:auto;
+        }
+        /* ── The passive states ────────────────────────────────────────
+           Metrics copied from .fbs-cta exactly — same padding, size, weight,
+           tracking and line-height — so the box cannot change height when the
+           label changes. What is NOT copied is the ghost variant's 1px outline
+           and 6px backdrop blur, which this used to borrow: a plate that is
+           only reporting does not need a stroke to be read, the blur was the
+           one piece of glass in a hero built out of flat surfaces, and the
+           three states disagreeing about whether they had a border was the
+           inconsistency. No text-shadow, per the standing rule in
+           app/colors_and_type.css. */
+        .fbs-hero-status__plate{
+          display:inline-flex; align-items:center; justify-content:center;
+          width:100%;
+          padding:7px 16px;
+          border:none; border-radius:3px;
+          background:rgba(20,18,15,0.58);
+          color:rgba(255,255,255,0.88);
+          font-family:var(--font-mono); font-size:11px; font-weight:500;
+          letter-spacing:.5px; text-transform:uppercase; line-height:1.5;
+          white-space:nowrap;
+          cursor:default; pointer-events:none;
+          opacity:0; transition:opacity 180ms ease;
+        }
+        .fbs-hero-status__plate.is-shown{ opacity:1; }
+        @media (prefers-reduced-motion: reduce){
+          .fbs-hero-status__plate{ transition-duration:.01ms; }
+        }
 
         /* Hover lift. The cue is on the scan itself, not on a border drawn
            around it — an accent ring read as a validation state and put the
@@ -949,22 +1031,20 @@ export default function ParkHeroShell({
            is full-bleed and clips to its own edges, so an outer shadow would
            have no gap to fall into and nothing to fall onto. The scale is the
            whole lift here. */
-        [data-hero-root]:has(.fbs-expand:hover) .fbs-hero-media{ transform:scale(1.012); }
+        /* Two selectors, one cue. The CTA is no longer a child of the shield
+           — it sits in the status area above it — so hovering the button is
+           not a hover on .fbs-expand and the lift would drop out exactly where
+           the pointer is most likely to be. */
+        [data-hero-root]:has(.fbs-expand:hover) .fbs-hero-media,
+        [data-hero-root]:has(.fbs-hero-status .fbs-cta:hover) .fbs-hero-media{ transform:scale(1.012); }
         .fbs-hero-media{ transition:transform .25s ease; }
         @media (prefers-reduced-motion: reduce){
           .fbs-hero-media, .fbs-hero-zoom, .fbs-hero-frame{ transition-duration:.01ms; }
-          [data-hero-root]:has(.fbs-expand:hover) .fbs-hero-media{ transform:none; }
+          [data-hero-root]:has(.fbs-expand:hover) .fbs-hero-media,
+          [data-hero-root]:has(.fbs-hero-status .fbs-cta:hover) .fbs-hero-media{ transform:none; }
           /* The push-in is the interaction's whole motion, so it is reduced
              rather than removed — without it nothing marks the state change. */
           .viewer-active .fbs-hero-zoom{ transform:scale(1.02); }
-        }
-
-        /* Hover only — this is a discoverability cue, not a state. On touch
-           there is no hover and the mobile button covers that path already. */
-
-
-        @media (prefers-reduced-motion: reduce){
-          .fbs-expand-cta{ transition-duration:.01ms; }
         }
 
         /* The content layer is pointer-transparent (see above) — only the

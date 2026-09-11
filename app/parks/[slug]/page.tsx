@@ -169,7 +169,9 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         cameraPos={park.camera_pos?.length ? park.camera_pos : undefined}
         cameraTarget={park.camera_target?.length ? park.camera_target : undefined}
         modelRotation={park.model_rotation?.length ? park.model_rotation : undefined}
-        pingPong={park.ping_pong ?? undefined}
+        /* `ping_pong` is no longer read — per-park camera bounds replaced it.
+           See the note where PingPongCamera used to live in ParkModel. */
+        cameraBounds={park.viewer_settings?.cameraBounds ?? undefined}
         autoRotate={park.auto_rotate ?? false}
         debug={isDebug}
         viewerOverlay={viewerOverlay}
@@ -184,6 +186,8 @@ const galleryRows: GalleryRow[] = park.gallery_rows ?? [];
         nextPark={nextPark ?? undefined}
         name={park.name}
         address={park.address}
+        area={park.area}
+        borough={park.borough}
         location={park.location}
         postcode={park.postcode}
         lat={park.lat}

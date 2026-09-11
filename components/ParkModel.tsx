@@ -6,7 +6,8 @@ import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import type { Group } from "three";
 import {
-  MODEL_FLOOR_Y, clampTarget, heroFrame, limitsForAuthoredFrame, type HeroLimits,
+  MODEL_FLOOR_Y, DEG, clampTarget, hasAzimuthSweep, heroFrame, limitsForAuthoredFrame,
+  type CameraBounds, type HeroLimits,
 } from "@/lib/heroCamera";
 
 // Coerce to numbers — Supabase numeric[] returns strings
@@ -77,50 +78,24 @@ function Model({ onLoad, onBounds, modelFile, modelRotation }: {
   );
 }
 
-// ── Ping-pong camera ───────────────────────────────────────────────────────
-function PingPongCamera({ posA, posB, target }: {
-  posA: [number, number, number];
-  posB: [number, number, number];
-  target: [number, number, number];
-}) {
-  const { camera } = useThree();
-  const vA      = useRef(new THREE.Vector3(...posA));
-  const vB      = useRef(new THREE.Vector3(...posB));
-  const vT      = useRef(new THREE.Vector3(...target));
-  const elapsed = useRef(0);
-  const PERIOD  = 60;
-
-  useFrame((_, delta) => {
-    elapsed.current = (elapsed.current + delta) % PERIOD;
-    const t    = elapsed.current / PERIOD;
-    const tri  = t < 0.5 ? t * 2 : 2 - t * 2;
-    const ease = 0.5 - Math.cos(tri * Math.PI) * 0.5;
-
-    const relA = vA.current.clone().sub(vT.current);
-    const relB = vB.current.clone().sub(vT.current);
-    const rxzA = Math.sqrt(relA.x * relA.x + relA.z * relA.z);
-    const rxzB = Math.sqrt(relB.x * relB.x + relB.z * relB.z);
-    const thA  = Math.atan2(relA.x, relA.z);
-    const thB  = Math.atan2(relB.x, relB.z);
-
-    let dTh = thB - thA;
-    if (dTh >  Math.PI) dTh -= 2 * Math.PI;
-    if (dTh < -Math.PI) dTh += 2 * Math.PI;
-    dTh = dTh > 0 ? dTh - 2 * Math.PI : dTh + 2 * Math.PI; // force correct arc
-
-    const rxz   = rxzA + (rxzB - rxzA) * ease;
-    const y     = relA.y + (relB.y - relA.y) * ease;
-    const theta = thA + dTh * ease;
-
-    camera.position.set(
-      vT.current.x + Math.sin(theta) * rxz,
-      vT.current.y + y,
-      vT.current.z + Math.cos(theta) * rxz,
-    );
-    camera.lookAt(vT.current);
-  });
-  return null;
-}
+// ── Ping-pong camera — REMOVED ────────────────────────────────────────────
+// This was a two-point camera loop that wrote camera.position every frame. It
+// existed for one reason: Southbank is an interior, and something had to stop
+// the view swinging round behind the undercroft's shell. It did that by taking
+// the camera away from OrbitControls altogether — which is why the single
+// `pingPong` prop also had to switch off rotate, zoom and pan, skip the spin
+// ease and skip the pan clamp. One park's framing problem cost that park its
+// entire viewer: it could not be dragged, zoomed or paused, and it moved on
+// its own from the moment it loaded.
+//
+// Per-park azimuth bounds replace it, and do the same job the right way round:
+// the limits belong to the controls, so manual drag and automatic rotation are
+// constrained by the same pair of numbers, and the rotation turns round at the
+// ends instead of being animated between two poses. See CameraBounds in
+// lib/heroCamera and the sweep logic in SpinEase.
+//
+// The `ping_pong` column is left alone and simply no longer read. Nothing is
+// lost by clearing it; nothing breaks by leaving it.
 
 // ── Pan clamp — tightened to keep model centred in frame ──────────────────
 // The vertical range starts at the floor, not at 0. maxPolarAngle keeps the
@@ -156,28 +131,113 @@ function PanClamp({ controlsRef, limits }: {
 // elsewhere, but only calls back when the rounded value actually moves —
 // otherwise this would set React state 60 times a second for no visible
 // difference.
-// Eases the idle rotation up and down instead of switching it. Cutting
-// autoRotate off the moment someone clicks stops the model dead, which reads
-// as a glitch rather than a handover; easing autoRotateSpeed toward zero lets
-// it settle. Nothing here touches the camera's angle, so whatever orientation
-// it coasts to is where interaction begins — and where it resumes from on the
-// way back out.
+// Eases the automatic rotation up and down instead of switching it. Starting
+// or stopping it on a class flip reads as a glitch rather than a handover;
+// easing autoRotateSpeed lets it settle. Nothing here touches the camera's
+// angle, so whatever orientation it coasts to is where interaction begins.
 //
 // tau of 0.12s puts it within a few percent of the target in ~350ms, which is
 // the window the timing spec allows for the settle.
-function SpinEase({ controlsRef, spinning, speed }: {
+//
+// TWO THINGS THIS HAS TO GET RIGHT, and they pull in opposite directions:
+//
+//  1. The ease is for *deliberate* changes — activating the viewer, and the
+//     orbit toggle. A gesture is not one of those: the brief is explicit that
+//     touching the model stops the rotation immediately, so `haltRef` short
+//     circuits the ease and writes zero.
+//  2. The speed starts wherever drei left it (2.0, its default), so without
+//     the one-time initialise below a viewer that mounts with spinning=false
+//     would spin for the ~350ms it takes to ease down to zero — which is the
+//     "rotates before you activate it" bug in its smallest form.
+//
+// `haltRef` is a ref rather than state because it is set from OrbitControls'
+// pointerdown, and the React update that follows it is a frame or two behind.
+// Without it, those frames see `spinning` still true and ease the speed back
+// UP before the state lands. It is cleared by the only things allowed to start
+// rotation: an activation or a toggle press, both of which are a false→true
+// transition of `spinning`.
+function SpinEase({ controlsRef, spinning, speed, haltRef, limits }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   controlsRef: React.RefObject<any>;
   spinning: boolean;
   speed: number;
+  haltRef: React.MutableRefObject<boolean>;
+  limits: HeroLimits;
 }) {
+  const initialised = useRef(false);
+  const wasSpinning = useRef(spinning);
+  // +1 / -1. Only meaningful on a park with an azimuth sweep; an open-air park
+  // never flips and turns one way forever, exactly as before.
+  const dir = useRef(1);
   useFrame((_, dt) => {
     const c = controlsRef.current;
     if (!c) return;
-    const goal = spinning ? speed : 0;
+    if (!initialised.current) {
+      initialised.current = true;
+      c.autoRotateSpeed = spinning ? speed : 0;
+    }
+    if (spinning && !wasSpinning.current) haltRef.current = false;
+    wasSpinning.current = spinning;
+
+    if (haltRef.current) { c.autoRotateSpeed = 0; return; }
+
+    // ── Turning round at the ends ──────────────────────────────────────
+    // OrbitControls' azimuth clamp DOES apply while autoRotate is running,
+    // but its behaviour there is to drive into the limit and sit against it —
+    // the scan stops dead facing the edge of its own window and stays there.
+    // Reversing is this component's job.
+    //
+    // The bounds are the ones the manual drag clamps to. There is deliberately
+    // no second range for the rotation to play within: "how far this park can
+    // turn" is one number pair, set once, read by both.
+    //
+    // getAzimuthalAngle() is the CLAMPED angle, so it reaches the bound
+    // exactly. The guard is the distance the ease needs to shed the current
+    // speed (v·tau) — derived rather than picked, so it stays correct if the
+    // speed is ever retuned, and it starts the turn just early enough that the
+    // scan decelerates into the end rather than hitting it.
+    //
+    // MIND THE SIGN. OrbitControls rotates by `sphericalDelta.theta -= angle`,
+    // so a POSITIVE autoRotateSpeed makes the azimuth DECREASE. dir +1 is
+    // therefore travel towards minAzimuth, and that is the bound it has to
+    // turn at. Getting this backwards does not look like a reversed animation,
+    // it looks like nothing happening: the rotation drives into the near limit
+    // and sits against it, which is the exact behaviour the bounds exist to
+    // replace.
+    if (hasAzimuthSweep(limits)) {
+      const vel   = Math.abs(2 * Math.PI / 60 * speed);   // rad/s at full speed
+      const guard = vel * 0.12;
+      const az    = c.getAzimuthalAngle();
+      if (dir.current > 0 && az <= limits.minAzimuth + guard) dir.current = -1;
+      else if (dir.current < 0 && az >= limits.maxAzimuth - guard) dir.current = 1;
+    }
+
+    const goal = spinning ? speed * dir.current : 0;
     const k = 1 - Math.exp(-Math.min(dt, 0.1) / 0.12);
     const next = c.autoRotateSpeed + (goal - c.autoRotateSpeed) * k;
     c.autoRotateSpeed = Math.abs(next - goal) < 0.001 ? goal : next;
+  });
+  return null;
+}
+
+// "Ready" means activatable, not downloaded.
+//
+// onLoad used to fire from the mesh effect, which is the moment the GLB has
+// parsed — but the thing a visitor is invited to do on Ready is drag the
+// model, and that is OrbitControls' job, not the mesh's. Firing on the first
+// frame where both the model and the controls exist is the difference between
+// a CTA that promises interaction and one that has it.
+function ReadyGate({ controlsRef, modelLoaded, onReady }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  controlsRef: React.RefObject<any>;
+  modelLoaded: boolean;
+  onReady?: () => void;
+}) {
+  const fired = useRef(false);
+  useFrame(() => {
+    if (fired.current || !modelLoaded || !controlsRef.current) return;
+    fired.current = true;
+    onReady?.();
   });
   return null;
 }
@@ -213,10 +273,19 @@ export type CamReadout = {
   /** Camera is at or below the top of the scan, so it may clip through it.
    *  Advisory only — nothing corrects this, it just says the shot is risky. */
   insideModel: boolean;
+  /** Live orbit angles in DEGREES, which is the unit the camera-bounds fields
+   *  are authored in. Under ?debug=1 the bounds are lifted, so these can be
+   *  swung to the edges of what the room can stand and read straight off. */
+  azimuthDeg: number;
+  polarDeg:   number;
 };
 
 const trip = (v: THREE.Vector3): [number, number, number] =>
   [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)];
+
+// Orbit radius, for composing a park's min/max distance the same way.
+const DIST = (p: [number, number, number], t: [number, number, number]) =>
+  Math.hypot(p[0] - t[0], p[1] - t[1], p[2] - t[2]).toFixed(1);
 
 function LivePos({ onPos, controlsRef, limits, modelTopY }: {
   onPos: (r: CamReadout) => void;
@@ -231,6 +300,7 @@ function LivePos({ onPos, controlsRef, limits, modelTopY }: {
     const t = controlsRef.current?.target;
     if (!t) return;
     const hero = heroFrame(camera.position, t, limits);
+    const ctrl = controlsRef.current;
     const next: CamReadout = {
       pos:         trip(camera.position),
       tgt:         trip(t),
@@ -238,6 +308,8 @@ function LivePos({ onPos, controlsRef, limits, modelTopY }: {
       heroTgt:     trip(hero.target),
       constrained: hero.constrained,
       insideModel: modelTopY != null && camera.position.y <= modelTopY,
+      azimuthDeg:  +DEG(ctrl.getAzimuthalAngle()).toFixed(1),
+      polarDeg:    +DEG(ctrl.getPolarAngle()).toFixed(1),
     };
     // Diff on the rounded payload, not the raw floats — otherwise this sets
     // React state every frame for sub-pixel drift nobody can see.
@@ -344,7 +416,6 @@ export default function ParkModel({
   // (bloblands: y 4.01) already sit here.
   cameraTarget         = [0, MODEL_FLOOR_Y, 0] as [number, number, number],
   modelRotation        = [-Math.PI / 2, 0, 0] as [number, number, number],
-  pingPong,
   autoRotate           = false,
   debug                = false,
   fov                  = 45,
@@ -358,7 +429,11 @@ export default function ParkModel({
   spinning            = true,
   allowRotate         = true,
   allowZoom           = true,
+  showLoadingNote     = true,
   onInteract,
+  onDrag,
+  stopOnInteract      = false,
+  cameraBounds,
 }: {
   modelFile: string;
   preloadImage?: string;
@@ -366,7 +441,6 @@ export default function ParkModel({
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
   debug?: boolean;
   fov?: number;
@@ -387,9 +461,34 @@ export default function ParkModel({
    *  drag comes live early, zoom only once the sequence has finished. */
   allowRotate?: boolean;
   allowZoom?: boolean;
-  /** First pointer or wheel gesture on the model, per OrbitControls' own
-   *  start event. Drives the instruction collapse upstream. */
+  /** Whether the preload reassurance below is this surface's job.
+   *
+   *  False where the caller already says the scan is loading. The park page's
+   *  hero does: the plate that becomes EXPLORE 3D reads "LOADING 3D SCAN…"
+   *  first, and this note was printing "LOADING SCAN…" a few hundred pixels
+   *  under it — one wait described twice, in two registers, in one frame.
+   *  The full-screen viewer has no label of its own and keeps this.
+   *
+   *  Only the preload note is gated. The no-preload plate further down is the
+   *  only thing on screen in that case and always renders. */
+  showLoadingNote?: boolean;
+  /** Every pointer, touch or wheel contact with the model, per OrbitControls'
+   *  own start event — a plain tap included. Not latched here: the caller
+   *  decides what is once-only. */
   onInteract?: () => void;
+  /** The model was actually ROTATED, as distinct from touched. See the
+   *  handlers below for what counts and why it is not a pixel threshold. */
+  onDrag?: () => void;
+  /** Whether a gesture permanently ends the automatic rotation.
+   *
+   *  On for the inline hero, where the orbit toggle is the way back. Off by
+   *  default, and therefore in the full-screen viewer, which has no toggle —
+   *  latching the rotation off there would take a behaviour away with nothing
+   *  offered in its place. */
+  stopOnInteract?: boolean;
+  /** Per-park orbit window for an ENCLOSED park. Undefined outdoors, where it
+   *  changes nothing. See CameraBounds in lib/heroCamera. */
+  cameraBounds?: CameraBounds | null;
 }) {
   // When grayscale prop is provided externally, use it; otherwise fall back to internal toggle.
   const [viewMode,    setViewMode]    = useState<"bw" | "colour">("bw");
@@ -417,6 +516,67 @@ export default function ParkModel({
   const captureRef   = useRef<(() => void) | undefined>(undefined);
   const snapRef      = useRef<(() => void) | undefined>(undefined);
 
+  // ── Gesture ────────────────────────────────────────────────────────────
+  // Read by SpinEase — see the note there for why it is a ref and not state.
+  const haltRef    = useRef(false);
+  // Per gesture, not per viewer: the caller can be entered, left and entered
+  // again without this component remounting, and a latch that lived for the
+  // life of the instance would report the first drag of the session and never
+  // another.
+  const gestureRef = useRef({ active: false, fired: false, theta: 0, phi: 0 });
+
+  // Contact — pointer, touch or wheel. OrbitControls dispatches `start` for
+  // all three, so this is the one place the "any interaction" rule is stated.
+  const handleStart = useCallback(() => {
+    const c = controlsRef.current;
+    if (c) {
+      if (stopOnInteract) {
+        // Immediately, and that means the inertia too. Damping does not zero
+        // autoRotate's accumulated delta when the speed goes to zero — it
+        // decays it about 5% a frame — so the model would carry on turning by
+        // itself for a good half second after being touched, which is exactly
+        // the thing the brief separates from drag inertia. Toggling damping
+        // off for one update() applies the residue in a single step (~1° at
+        // this speed, invisible) and zeroes it, which also gives the drag test
+        // below a still camera to measure against.
+        c.autoRotateSpeed = 0;
+        const damping = c.enableDamping;
+        c.enableDamping = false;
+        c.update();
+        c.enableDamping = damping;
+        haltRef.current = true;
+      }
+      // Recorded AFTER the flush, so the baseline is the camera at rest.
+      gestureRef.current = {
+        active: true, fired: false,
+        theta: c.getAzimuthalAngle(), phi: c.getPolarAngle(),
+      };
+    }
+    onInteract?.();
+  }, [onInteract, stopOnInteract]);
+
+  // What counts as "the visitor dragged the model".
+  //
+  // NOT a pixel or duration threshold — OrbitControls has none to borrow, and
+  // inventing one here would be a second, private definition of a gesture the
+  // controls already own. The question this asks instead is the one that
+  // actually matters: did the ORBIT ANGLE move while a gesture was in
+  // progress? A tap leaves theta and phi exactly where they were (the deltas
+  // were flushed on contact, and autoRotate is stopped), so it never reads as
+  // a drag; a zoom changes distance and not angle, so it does not either.
+  const handleChange = useCallback(() => {
+    const g = gestureRef.current;
+    if (!g.active || g.fired) return;
+    const c = controlsRef.current;
+    if (!c) return;
+    if (c.getAzimuthalAngle() !== g.theta || c.getPolarAngle() !== g.phi) {
+      g.fired = true;
+      onDrag?.();
+    }
+  }, [onDrag]);
+
+  const handleEnd = useCallback(() => { gestureRef.current.active = false; }, []);
+
   // Note: nothing here re-homes the camera. Closing used to send it back to
   // its start position, which snapped the scan to a default orientation in
   // front of the visitor; the timing spec asks for the angle to survive both
@@ -431,7 +591,7 @@ export default function ParkModel({
     : (viewMode === "bw" ? "grayscale(1)" : "none");
   const filterRef   = useRef(filter);
   filterRef.current = filter;
-  const canvasStart = pingPong ? n(pingPong[0]) : startPos;
+  const canvasStart = startPos;
 
   // The park's own orbit limits, widened to contain the frame it was authored
   // with. This is what stops the hero silently correcting a composed angle —
@@ -439,15 +599,23 @@ export default function ParkModel({
   // moves it on the first frame.
   const [tx, ty, tz] = n(cameraTarget);
   const [sx, sy, sz] = startPos;
+  // Serialised so a fresh object literal from the caller each render does not
+  // rebuild the limits — and with them the OrbitControls props — every frame.
+  const boundsKey = JSON.stringify(cameraBounds ?? null);
   const heroLimits = useMemo(
-    () => limitsForAuthoredFrame(new THREE.Vector3(sx, sy, sz), new THREE.Vector3(tx, ty, tz)),
-    [sx, sy, sz, tx, ty, tz],
+    () => limitsForAuthoredFrame(
+      new THREE.Vector3(sx, sy, sz), new THREE.Vector3(tx, ty, tz),
+      JSON.parse(boundsKey) as CameraBounds | null,
+    ),
+    [sx, sy, sz, tx, ty, tz, boundsKey],
   );
+  // The GLB has parsed and the still can go. Note that this deliberately does
+  // NOT call onLoad — that is ReadyGate's, one frame later, once the controls
+  // exist too.
   const handleLoad = useCallback(() => {
     if (preloadRef.current) preloadRef.current.style.opacity = "0";
     setModelLoaded(true);
-    onLoad?.();
-  }, [onLoad]);
+  }, []);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -492,6 +660,18 @@ export default function ParkModel({
             <div style={{ marginBottom: 12 }}>
               <div>pos [{camPos.pos.join(", ")}]</div>
               <div>tgt [{camPos.tgt.join(", ")}]</div>
+
+              {/* ── Camera bounds, for enclosed parks ────────────────────
+                  Degrees, matching the admin's Camera bounds fields exactly,
+                  so composing a limit is: swing to the edge of what the room
+                  can stand, read the number, paste it. Debug lifts the bounds
+                  themselves, so this can be swung past wherever they are
+                  currently set. */}
+              <div style={{ marginTop: 8, color: "#7fd67f" }}>
+                <div>azimuth {camPos.azimuthDeg}°</div>
+                <div>polar&nbsp;&nbsp; {camPos.polarDeg}°</div>
+                <div>dist&nbsp;&nbsp;&nbsp;&nbsp; {DIST(camPos.pos, camPos.tgt)}</div>
+              </div>
 
               {/* The whole point of the panel. While this is showing, the
                   numbers above are NOT what the hero will render — pasting
@@ -585,13 +765,13 @@ export default function ParkModel({
           as a stall exactly when the visitor is most likely to give up. The
           preload still is already doing the reassuring; this is a backstop for
           slow connections, so it says something is happening and nothing more. */}
-      {preloadImage && !modelLoaded && (
+      {preloadImage && !modelLoaded && showLoadingNote && (
         <div className="fbs-loading-note" style={{
           position: "absolute", left: "50%", bottom: "24%", transform: "translateX(-50%)",
           zIndex: 5, pointerEvents: "none",
           fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em",
           textTransform: "uppercase", color: "rgba(255,255,255,0.72)",
-          textShadow: "0 1px 10px rgba(0,0,0,0.5)",
+          // No textShadow — see the standing rule in app/colors_and_type.css.
         }}>
           Loading scan…
         </div>
@@ -651,20 +831,12 @@ export default function ParkModel({
           />
         </Suspense>
 
-        {pingPong && !debug && (
-          <PingPongCamera
-            posA={n(pingPong[0])}
-            posB={n(pingPong[1])}
-            target={n(cameraTarget)}
-          />
-        )}
-
         <OrbitControls
           ref={controlsRef}
           target={n(cameraTarget)}
-          enablePan={debug || !pingPong}
-          enableZoom={(debug || !pingPong) && allowZoom}
-          enableRotate={(!pingPong || debug) && allowRotate}
+          enablePan
+          enableZoom={debug || allowZoom}
+          enableRotate={debug || allowRotate}
           // Left on and driven by speed instead, so stopping is a deceleration
           // rather than a cut.
           //
@@ -676,8 +848,10 @@ export default function ParkModel({
           // The viewer already withdraws the spin by setting `spinning` false,
           // and the shield stops anyone reaching an idle model, so the flag was
           // both redundant and the bug.
-          autoRotate={modelLoaded && !debug && !pingPong}
-          onStart={() => onInteract?.()}
+          autoRotate={modelLoaded && !debug}
+          onStart={handleStart}
+          onChange={handleChange}
+          onEnd={handleEnd}
           minDistance={debug ? 1 : heroLimits.minDistance}
           maxDistance={debug ? 500 : heroLimits.maxDistance}
           minPolarAngle={debug ? 0 : heroLimits.minPolar}
@@ -686,17 +860,28 @@ export default function ParkModel({
           // floor + distance·cos(76°), so it stays over the deck at every
           // zoom level. Debug unlocks both to tune camera positions.
           maxPolarAngle={debug ? Math.PI : heroLimits.maxPolar}
+          // ±Infinity outdoors — OrbitControls' own default, so an open-air
+          // park is byte-for-byte unchanged. Debug unlocks them to compose.
+          minAzimuthAngle={debug ? -Infinity : heroLimits.minAzimuth}
+          maxAzimuthAngle={debug ?  Infinity : heroLimits.maxAzimuth}
         />
 
-        {!pingPong && !debug && (
-          <SpinEase controlsRef={controlsRef} spinning={spinning} speed={0.5} />
+        {!debug && (
+          <SpinEase
+            controlsRef={controlsRef} spinning={spinning} speed={0.5}
+            haltRef={haltRef} limits={heroLimits}
+          />
         )}
 
-        {!pingPong && !debug && <PanClamp controlsRef={controlsRef} limits={heroLimits} />}
+        <ReadyGate controlsRef={controlsRef} modelLoaded={modelLoaded} onReady={onLoad} />
+
+
+        {!debug && <PanClamp controlsRef={controlsRef} limits={heroLimits} />}
 
         {onZoomChange && <ZoomReporter controlsRef={controlsRef} onZoom={onZoomChange} />}
 
         {debug && <LivePos onPos={setCamPos} controlsRef={controlsRef} limits={heroLimits} modelTopY={modelTopY} />}
+
 
       </Canvas>
       </div>

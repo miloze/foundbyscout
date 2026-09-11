@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import ParkModelClient from "./ParkModelClient";
 import ParkHeroMobile from "./ParkHeroMobile";
+import type { CameraBounds } from "@/lib/heroCamera";
 
 type Props = {
   modelFile: string;
@@ -11,7 +12,6 @@ type Props = {
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
   debug?: boolean;
   forceViewer?: boolean;
@@ -35,8 +35,20 @@ type Props = {
   /** Granted separately during the entrance: drag early, zoom last. */
   allowRotate?: boolean;
   allowZoom?: boolean;
-  /** First pointer or wheel gesture on the model. */
+  /** Passed through to ParkModel. The park page's hero sets this false because
+   *  its EXPLORE 3D plate already reads "LOADING 3D SCAN…" while the GLB
+   *  resolves; the full-screen viewer has no such label and leaves it on. */
+  showLoadingNote?: boolean;
+  /** Every pointer, touch or wheel contact with the model — a plain tap
+   *  included. Not latched; the caller decides what is once-only. */
   onInteract?: () => void;
+  /** The model was actually rotated, as distinct from touched. */
+  onDrag?: () => void;
+  /** A gesture permanently ends the automatic rotation. See ParkModel. */
+  stopOnInteract?: boolean;
+  /** Per-park orbit window for an ENCLOSED park — see CameraBounds in
+   *  lib/heroCamera. Undefined outdoors, where it changes nothing. */
+  cameraBounds?: CameraBounds | null;
   /** The GLB is parsed and on screen. Drives the entry affordance — see
    *  ParkHeroShell: nothing may be explored before this fires. */
   onReady?: () => void;
@@ -46,9 +58,9 @@ type Props = {
 
 export default function ParkHeroViewer({
   modelFile, heroImage, preloadImageUrl,
-  cameraPos, cameraTarget, modelRotation, pingPong, autoRotate, debug, forceViewer,
+  cameraPos, cameraTarget, modelRotation, autoRotate, debug, forceViewer,
   ambientIntensity, directionalIntensity, environmentPreset, environmentIntensity,
-  grayscale, onZoomChange, inOverlay, spinning, allowRotate, allowZoom, onInteract,
+  grayscale, onZoomChange, inOverlay, spinning, allowRotate, allowZoom, showLoadingNote, onInteract, onDrag, stopOnInteract, cameraBounds,
   onReady, onFailed,
 }: Props) {
   // ── Server and first client render must agree ─────────────────────────
@@ -121,7 +133,6 @@ export default function ParkHeroViewer({
           cameraPos={cameraPos}
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}
-          pingPong={pingPong}
           autoRotate={autoRotate}
           ambientIntensity={ambientIntensity}
           directionalIntensity={directionalIntensity}
@@ -145,7 +156,11 @@ export default function ParkHeroViewer({
           spinning={spinning}
           allowRotate={allowRotate}
           allowZoom={allowZoom}
+          showLoadingNote={showLoadingNote}
           onInteract={onInteract}
+          onDrag={onDrag}
+          stopOnInteract={stopOnInteract}
+          cameraBounds={cameraBounds}
           onLoad={onReady}
           onFailed={onFailed}
           modelFile={modelFile}
@@ -153,7 +168,6 @@ export default function ParkHeroViewer({
           cameraPos={cameraPos}
           cameraTarget={cameraTarget}
           modelRotation={modelRotation}
-          pingPong={pingPong}
           autoRotate={autoRotate}
           debug={debug}
           ambientIntensity={ambientIntensity}

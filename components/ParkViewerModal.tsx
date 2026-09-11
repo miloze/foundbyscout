@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import ParkHeroViewer from "./ParkHeroViewer";
 import ParkHeroDetails from "./ParkHeroDetails";
 import { catalogueMark } from "@/lib/catalogue";
+import type { CameraBounds } from "@/lib/heroCamera";
 import { BwIcon, ExitIcon, ViewerCluster, ViewerClusterDivider, ViewerClusterButton, VIEWER_CONTROLS_CSS } from "./ViewerControls";
 
 type Props = {
@@ -14,8 +15,11 @@ type Props = {
   cameraPos?: [number, number, number];
   cameraTarget?: [number, number, number];
   modelRotation?: [number, number, number];
-  pingPong?: [[number, number, number], [number, number, number]];
   autoRotate?: boolean;
+  /** Per-park orbit window for an enclosed park. The full-screen viewer reads
+   *  the SAME bounds as the inline hero — one pair of numbers for "how far
+   *  this park can turn", on every surface. */
+  cameraBounds?: CameraBounds | null;
   ambientIntensity?: number;
   directionalIntensity?: number;
   environmentPreset?: string;
@@ -39,6 +43,9 @@ type Props = {
    *  block with one small park-name label, which on mobile read as the text
    *  disappearing the moment you opened the scan. */
   address?: string[];
+  /** See lib/parkArea. */
+  area?: string | null;
+  borough?: string | null;
   postcode?: string;
   lat?: number;
   lng?: number;
@@ -51,7 +58,7 @@ type Props = {
 
 export default function ParkViewerModal({
   parkName, onClose, variant = "fullscreen", catalogueId,
-  address, postcode, lat, lng, scanned, preloadImageUrl, ...viewerProps
+  address, area, borough, postcode, lat, lng, scanned, preloadImageUrl, ...viewerProps
 }: Props) {
   const isTakeover = variant === "takeover";
   // The viewfinder window. Clicking out is measured against this rather than
@@ -238,6 +245,8 @@ export default function ParkViewerModal({
               name={parkName}
               catalogueId={catalogueId}
               address={address}
+              area={area}
+              borough={borough}
               postcode={postcode}
               lat={lat}
               lng={lng}
@@ -297,8 +306,8 @@ export default function ParkViewerModal({
           cameraPos={viewerProps.cameraPos}
           cameraTarget={viewerProps.cameraTarget}
           modelRotation={viewerProps.modelRotation}
-          pingPong={viewerProps.pingPong}
           autoRotate={viewerProps.autoRotate}
+          cameraBounds={viewerProps.cameraBounds}
           ambientIntensity={viewerProps.ambientIntensity}
           directionalIntensity={viewerProps.directionalIntensity}
           environmentPreset={viewerProps.environmentPreset}

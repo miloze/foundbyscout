@@ -185,7 +185,7 @@ export default function ParksDirectoryAccordion() {
              198, so there is 37px of headroom. 264 was also tested and fits,
              but with only 21px spare it starts reading as cramped rather than
              deliberate, and the 16px of map it buys back is not worth that. */
-          --pda-list-col:280px; --pda-gutter:clamp(16px, 4vw, 56px);
+          --pda-list-col:280px; --pda-gutter:var(--frame-inset);
           --pda-ease: cubic-bezier(0.16, 1, 0.3, 1);
           --pda-font-mono: 'DM Mono', ui-monospace, monospace;
           --pda-font-ui: 'Rubik', Arial, sans-serif;

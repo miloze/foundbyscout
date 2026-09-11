@@ -27,33 +27,29 @@ function isCurrentSection(pathname: string | null, href: string): boolean {
 // showing the mode a press moves *to* - a moon while the site is light, a sun
 // while it is dark.
 //
-// Fill is --card rather than --background. With no border and no shadow the
-// fill is the only thing separating the control from the bar behind it, and
-// --background is that bar's exact colour in both modes, so the button would
-// read as a floating icon rather than a control. --card is already the
-// palette's "one step off the page" surface in both themes, so this adds no
-// new colour.
-//
 // Icons are inline SVG. Nothing else here pulls in an icon package and two
 // glyphs do not earn the dependency.
 const TOGGLE_BOX = 44;
 
-function ThemeToggle({ theme, onToggle }: { theme: string; onToggle: () => void }) {
+// Fill and ink live in .fbs-nav-toggle in globals.css rather than in this style
+// object — including the note on why the rest state is --card. Only the box is
+// inline: the control needs a second appearance over a full-bleed photograph,
+// and an inline style cannot express a variant any more than it could express
+// the nav link's hover state.
+function ThemeToggle({ theme, onToggle, onPhoto }: { theme: string; onToggle: () => void; onPhoto?: boolean }) {
   const dark = theme === "dark";
   return (
     <button
       onClick={onToggle}
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      className={`fbs-nav-toggle${onPhoto ? " fbs-nav-toggle--on-photo" : ""}`}
       style={{
         width: TOGGLE_BOX, height: TOGGLE_BOX,
         borderRadius: 13,
-        background: "var(--card)",
-        color: "var(--foreground)",
         border: "none",
         display: "flex", alignItems: "center", justifyContent: "center",
         cursor: "pointer",
-        transition: "background 0.2s, color 0.2s",
         flexShrink: 0,
         padding: 0,
       }}
@@ -180,7 +176,11 @@ export default function Nav() {
             // and the hero's negative margin, so letting overlay change the bar's
             // height would jog the whole page when the nav flips solid on scroll.
             paddingTop: "12px", paddingBottom: "12px",
-            paddingLeft: "clamp(16px, 4vw, 56px)", paddingRight: "clamp(16px, 4vw, 56px)",
+            // --frame-inset, not --content-padding: above 1400px of usable
+            // width the body column is centred inside the viewport, so the
+            // raw padding put the bar ~19px outside the column it sits over.
+            // See the token in colors_and_type.css.
+            paddingLeft: "var(--frame-inset)", paddingRight: "var(--frame-inset)",
             borderBottom: "none",
             transition: "background 0.2s, border-color 0.2s",
           }}
@@ -218,7 +218,7 @@ export default function Nav() {
               navigation list it was announced as one. */}
           <div className="fbs-nav-utility">
             <span className="fbs-nav-rule" aria-hidden="true" />
-            <ThemeToggle theme={theme} onToggle={toggle} />
+            <ThemeToggle theme={theme} onToggle={toggle} onPhoto={overlay && overlayTone === "photo"} />
           </div>
         </nav>
 
@@ -268,10 +268,11 @@ export default function Nav() {
         className="logo-overhang"
         style={{
           position: "absolute",
-          // 56 everywhere the homepage lockup exists: the postcode badge
-          // centres its row on --logo-top / --logo-h so it travels with the
-          // mark, and raising the pair puts the badge through the PARKS/ABOUT
-          // row — measured at 1517 wide, top:40 overlapped it by 18px.
+          // 56 everywhere except /parks. The homepage's postcode badge measures
+          // down from --nav-height rather than from the mark now, so this no
+          // longer sets the badge's band — but the mark still shares the hero's
+          // upper-left corner with it, and 40 there puts the two closer than
+          // the frame's own inset.
           //
           // /parks has no badge and does have a floor to protect: its sticky
           // bar pads itself down to --logo-bottom, so every pixel above the
@@ -279,7 +280,10 @@ export default function Nav() {
           // anchored to it. 40 there buys the map 16px with nothing to trade
           // against it.
           top: pathname?.startsWith("/parks") ? 40 : 56,
-          left: "clamp(16px, 4vw, 56px)",
+          // Same inset as the bar above it and the hero title group below it —
+          // see --frame-inset. This was --content-padding's expression, which
+          // is the body column's edge only while the column is gutter-bound.
+          left: "var(--frame-inset)",
           zIndex: 30,
           display: "block",
         }}
@@ -293,15 +297,17 @@ export default function Nav() {
           aria-hidden
           style={{
             display: "block",
-            // Scaled down 15% from clamp(48px, 6.5vw, 78px), which itself sat
-            // between the original clamp(44px, 6vw, 68px) and the oversized
-            // clamp(56px, 7.5vw, 96px) that replaced it. All three terms are
-            // scaled by the same factor, so the viewport at which the mark
-            // stops growing is unchanged at 1200px. --logo-h/--logo-w and the
-            // rest are published from the measured box, so the nav scrim, the
-            // homepage postcode badge and the /parks sticky bar all follow
-            // without their own tuning.
-            height: "clamp(41px, 5.5vw, 66px)",
+            // Scaled down a further 17% from clamp(41px, 5.5vw, 66px), which
+            // was itself 15% off clamp(48px, 6.5vw, 78px). The mark was
+            // competing with the hero rather than sitting on it: at 1440 it ran
+            // a fifth of the way across the frame, while the park name below it
+            // is the thing meant to carry that width.
+            //
+            // All three terms take the same factor every time, so the viewport
+            // at which the mark stops growing is still 1200px. --logo-h and the
+            // rest are published from the measured box, so the nav scrim and
+            // the /parks sticky bar follow without their own tuning.
+            height: "clamp(34px, 4.58vw, 55px)",
             aspectRatio: "500 / 130",
             background: "var(--accent)",
             maskImage: "url(/scout.svg)",

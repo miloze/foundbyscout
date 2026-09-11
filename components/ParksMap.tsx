@@ -798,6 +798,10 @@ export default function ParksMap({
     <div
       ref={overlayRef}
       className={`pms-sheet pms-peek${shortView ? " pms-peek--short" : ""}${cutout && showArt ? " pms-peek--art" : ""}`}
+      /* The stepper above the bar sits on the basemap, and the satellite
+         basemap is photography — it has no theme for the ink to follow. See
+         .pms-sheet[data-satellite]. */
+      data-satellite={satellite ? "" : undefined}
       style={{ position:"absolute", left:0, right:0, bottom:0, zIndex:25, isolation:"isolate" }}
     >
       <ParkStepper
@@ -942,6 +946,19 @@ export default function ParksMap({
       style={{
         height: "100%",
         ["--pms-edge" as string]: shortView ? "14px" : "28px",
+        // The gutter for chrome measured from the *map canvas* edge — the
+        // selected-park strip, the floating overlay buttons, Leaflet's zoom.
+        //
+        // Deliberately not --pda-gutter. That token is the body column's inner
+        // edge (--frame-inset), which above 1400px of viewport includes the
+        // column's centring margin — correct for the list column and the header
+        // row, which line up with the logo and the nav, and wrong for anything
+        // inside the map, which is full-bleed and already inset. The strip was
+        // subtracting that centring term from its own width twice: measured at
+        // 1600 the strip padded itself 148px a side and the text column fell to
+        // 143px; at 1920 it would have gone to zero, which is the one-character
+        // -per-line wrap. The plain page gutter is what this always wanted.
+        ["--pms-chrome-gutter" as string]: "var(--content-padding)",
         // How far Leaflet's own bottom-corner controls have to be lifted to
         // clear the preview. Published as a custom property because those
         // controls are Leaflet's DOM rather than this component's, so a
@@ -965,7 +982,7 @@ export default function ParksMap({
            bottom offset is the same clearance the detail card uses, so neither
            can run off a short window. Attribution keeps Leaflet's own corner. */
         .leaflet-bottom.leaflet-right .leaflet-control-zoom{
-          margin-right:var(--pda-gutter, 24px);
+          margin-right:var(--pms-chrome-gutter, 24px);
           margin-bottom:var(--pms-edge, 28px);
         }
         /* ── Keeping Leaflet's bottom corner above the preview ─────────────
@@ -1015,7 +1032,25 @@ export default function ParksMap({
              a line. */
           --pms-ink-h: clamp(58px, 15vw, 100px);
           --pms-art-w: calc(var(--pms-ink-h) * 2.55);
-          --pms-ink-base: 2px;
+          /* 50px, not 2px, on a phone. --pms-ink-base is how far the
+             silhouette's foot stands above the bar's floor, and at 2px the
+             artwork sat entirely inside the bar: measured at 390, the visible
+             ink ran 765-823 against a bar starting at 730, so it was 35px shy
+             of the top edge it is meant to cross. Note that is the *ink*, not
+             the image box — the export carries transparent alpha above and
+             below the park, and measuring the box flatters the gap by 17px.
+
+             The silhouette is 58px against a 105px bar, so standing on the
+             floor and crossing the top edge cannot both be true; it has to
+             ride up. 50px lifts it until the ink crosses the top edge by 14px
+             while its foot still sits 45px inside the bar — the artwork reads
+             as rising out of the bar, which is the documented behaviour, and
+             its base still overlaps. Nothing else moves: the reserved column,
+             the bar's height and the park name's 97px are all untouched.
+
+             Restored to 2px at 600px and up, where the artwork is already
+             large enough to clear the edge from the floor. */
+          --pms-ink-base: 50px;
           /* Tighter than the bar's, both of them. The sheet has less height to
              spend and the same three rows to show, and at this type size 3px
              is still a clear step between the mark, the name and the place —
@@ -1095,7 +1130,7 @@ export default function ParksMap({
           grid-template-columns:auto minmax(0, 1fr) auto;
           grid-template-areas:"art id action";
           column-gap:clamp(12px, 1.8vw, 30px);
-          padding:11px var(--pda-gutter, 24px);
+          padding:11px var(--pms-chrome-gutter, 24px);
           background:var(--pda-bg);
           border-top:1px solid var(--pda-line);
           /* The artwork crosses this edge. Nothing here may clip it; the map's
@@ -1144,7 +1179,16 @@ export default function ParksMap({
            that. It costs a row of height, which is why it is the second step
            and not the first. */
         @container pms-map (max-width: 1040px){
-          .pms-strip{ --pms-ink-h:clamp(88px, 13cqi, 120px); }
+          /* Same correction the phone sheet makes, for the same reason. The
+             silhouette is scaled down here to keep the name readable, and at
+             the original 12px base that left it inside the bar: measured at a
+             1024 viewport, the visible ink ran 666-756 against a bar starting
+             at 603, so it was 64px shy of the edge. 90px lifts it until the
+             ink crosses by 14px with its foot still 75px inside the bar's
+             176px — it rises out of the bar and still overlaps it. The
+             artwork column, the bar's height and the name's 96px are
+             unchanged. */
+          .pms-strip{ --pms-ink-h:clamp(88px, 13cqi, 120px); --pms-ink-base:90px; }
           .pms-strip-cta .fbs-cta{ display:none; }
           .pms-strip-cta .pcard-open{ display:flex; }
         }
@@ -1302,7 +1346,10 @@ export default function ParksMap({
            sheet's top edge. It gets its own scale rather than a compromise
            between the two. */
         @media (min-width: 600px){
-          .pms-sheet{ --pms-ink-h: clamp(110px, 19vw, 150px); }
+          /* The artwork is large enough here to cross the bar's top edge while
+             standing on the floor — measured at 768, the ink rises 40px over
+             the edge at the original base — so the phone's lift is undone. */
+          .pms-sheet{ --pms-ink-h: clamp(110px, 19vw, 150px); --pms-ink-base: 2px; }
         }
 
         /* ── The sheet's reserved areas ────────────────────────────────────
@@ -1409,13 +1456,71 @@ export default function ParksMap({
         }
 
         /* On the sheet it sits above the bar, on the map, where the dots were.
-           White, because there it is over the map rather than on the bar. */
+
+           Theme ink, not white. This was pinned to white on the reasoning that
+           it sits over the map rather than on the bar. The map is not a colour
+           it can rely on: in light mode the basemap is near-white, and the
+           control disappeared into it completely — on an iPhone in light mode
+           the arrows and the count were simply not there. Dark ink would fail
+           the same way in dark mode, so neither constant works and the right
+           answer is the pair the rest of this component already uses.
+
+           --pda-muted / --pda-fg resolve to --muted / --foreground, which flip
+           with the theme, so the ink is dark over the light basemap and light
+           over the dark one. It is the same pair the desktop strip's stepper
+           uses, which is why that one stayed legible on a tablet while this one
+           vanished on a phone.
+
+           No plate. The control stays quiet by construction — mono at the
+           metadata's size, no fill, no border — as it was designed. The one
+           surface this does not answer for is the satellite basemap, which is
+           photography and has no theme; see the note below.
+        */
         .pms-step--sheet{
           justify-content:center; padding-bottom:2px;
-          --pda-muted:rgba(255,255,255,.75); --pda-fg:#fff;
         }
+        /* Centred on the bar *beside* the artwork, not on the whole bar.
+
+           The lifted silhouette rises through this row, and centring the
+           cluster on the full width put the previous-park button underneath
+           it. Measured by sampling the artwork's own alpha over the button's
+           box at 390: Stockwell covered 30% of it in fully opaque pixels, The
+           Grove 21%, Crystal Palace 8% — so the control was genuinely obscured,
+           not merely overlapped by a transparent bounding box.
+
+           Reserving the artwork column and centring in what is left moves the
+           cluster clear of the widest silhouette (Stockwell's ink ends at the
+           column's right edge) without moving the artwork, changing the column,
+           the bar's height or the park name. It applies only where a cutout is
+           actually raised: --art is set for a cutout park with artwork shown,
+           and a park with a rectangular photograph keeps the contained
+           treatment and the centred row it always had. */
+        .pms-peek--art .pms-step--sheet{ padding-left:var(--pms-art-w); }
         .pms-step--sheet .pms-step-btn{ width:44px; height:36px; }
-        .pms-step--sheet .pms-step-count{ color:rgba(255,255,255,.85); }
+
+        /* Over the satellite basemap the ink stops following the theme.
+
+           The theme pair is right over the vector basemap, which is near-white
+           in light mode and near-black in dark. Satellite is neither: it is
+           aerial photography, mostly dark roofs, road and tree canopy, and in
+           light mode the #6D6D6D the theme supplies disappeared into it — at
+           390 the chevrons were barely discernible and the count was lost.
+
+           So the ink is pinned light here, in both themes, because what is
+           behind it is the imagery rather than the page. This is the same move
+           .fbs-nav-link--on-photo makes over the hero photograph, in reverse.
+           No plate, no shadow, no outline and no glow: the site carries none
+           on text, and this is a colour decision, not an effect.
+
+           Disabled keeps a lower opacity so an unavailable end of the list
+           still reads as unavailable, but .3 of light ink over photography is
+           not a state, it is an absence — .5 keeps it clearly weaker than the
+           live control while remaining legible. */
+        .pms-sheet[data-satellite] .pms-step--sheet{
+          --pda-muted:rgba(243,239,236,.92); --pda-fg:#F3EFEC;
+        }
+        .pms-sheet[data-satellite] .pms-step--sheet .pms-step-count{ color:#F3EFEC; }
+        .pms-sheet[data-satellite] .pms-step--sheet .pms-step-btn:disabled{ opacity:.5; }
 
         @media (prefers-reduced-motion: reduce){
           .pms-strip, .pms-peek-body{ animation:none; transition:none; }
@@ -1632,14 +1737,14 @@ export default function ParksMap({
             <>
               {/* Satellite — search and the List/Map toggle now live in the
                   always-visible header above the map, not floating here. */}
-              <div style={{ position:"absolute", top:16, right:"var(--pda-gutter, 24px)", zIndex:21 }}>
+              <div style={{ position:"absolute", top:16, right:"var(--pms-chrome-gutter, 24px)", zIndex:21 }}>
                 <button onClick={() => setSatellite(v => !v)} title="Satellite" style={{ width:44, height:44, borderRadius:"50%", background: satellite ? "#141414" : (theme === "dark" ? "rgba(30,30,30,0.95)" : "#fff"), border:"none", boxShadow:"0 4px 14px rgba(0,0,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : (theme === "dark" ? "#fff" : "#141414") }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m11 19-1.106-.552a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0l4.212 2.106a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619V12"/><path d="M15 5.764V12"/><path d="M18 15v6"/><path d="M21 18h-6"/><path d="M9 3.236v15"/></svg>
                 </button>
               </div>
 
               {/* Locate — floating, bottom-right of the map canvas, clear of the card */}
-              <div style={{ position:"absolute", bottom: selectedPark ? overlayH + 40 : 20, right:"var(--pda-gutter, 24px)", zIndex:21, transition:"bottom 0.3s" }}>
+              <div style={{ position:"absolute", bottom: selectedPark ? overlayH + 40 : 20, right:"var(--pms-chrome-gutter, 24px)", zIndex:21, transition:"bottom 0.3s" }}>
                 {(locateTip || locateError) && (
                   <div style={{ position:"absolute", bottom:"calc(100% + 8px)", right:0, background: locateError ? "var(--accent)" : "#141414", color:"#fff", fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.04em", padding:"6px 10px", borderRadius:6, whiteSpace:"nowrap", boxShadow:"0 4px 12px rgba(0,0,0,0.35)" }}>
                     {locateError || "Recenter map"}
@@ -1655,7 +1760,7 @@ export default function ParksMap({
           ) : (
             <>
               {/* Satellite + Locate — floating side by side, top-right of the map canvas */}
-              <div style={{ position:"absolute", top:20, right:"var(--pda-gutter, 24px)", zIndex:12, display:"flex", gap:8 }}>
+              <div style={{ position:"absolute", top:20, right:"var(--pms-chrome-gutter, 24px)", zIndex:12, display:"flex", gap:8 }}>
                 <button onClick={()=>setSatellite(v=>!v)} title="Satellite"
                   style={{ width:38, height:38, borderRadius:4, background: satellite ? "var(--accent)" : "var(--card)", border:`1px solid ${satellite ? "var(--accent)" : "var(--border)"}`, boxShadow:"0 2px 8px rgba(0,0,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color: satellite ? "#fff" : "var(--foreground)" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m11 19-1.106-.552a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0l4.212 2.106a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619V12"/><path d="M15 5.764V12"/><path d="M18 15v6"/><path d="M21 18h-6"/><path d="M9 3.236v15"/></svg>

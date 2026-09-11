@@ -266,6 +266,55 @@ body {
   .fbs-nav-link__label::after { transition: none; }
 }
 
+/* ── Theme toggle ────────────────────────────────────────────────────────
+   Lifted out of Nav.tsx's inline style object for the same reason the nav
+   link was: the control needs a second appearance over a photograph, and an
+   inline style cannot express one.
+
+   Rest state is --card rather than --background. With no border and no shadow
+   the fill is the only thing separating the control from the bar behind it,
+   and --background is that bar's exact colour in both modes, so the button
+   would read as a floating icon rather than a control. --card is already the
+   palette's "one step off the page" surface in both themes, so this adds no
+   new colour. */
+.fbs-nav-toggle {
+  background: var(--card);
+  color: var(--foreground);
+  transition: background 0.2s, color 0.2s;
+}
+
+/* Over a full-bleed photograph — the homepage hero, the same condition
+   .fbs-nav-link--on-photo answers.
+
+   --card there is a solid beige plate, and against the hero it was the
+   brightest, hardest-edged object in the frame: a utility outranking the park
+   name. This subdues it to a translucent plate that lets the photograph
+   through, with the ink pinned to the same #14120f the nav label takes over an
+   image — Scout's hero photography is pale concrete whatever the theme, so
+   --foreground stops describing what is behind the glyph. Icon size, stroke,
+   box and 44px target are untouched, so the control is no less legible and no
+   harder to hit; only its plate is quieter.
+
+   The blur is what keeps a 1.6px stroke readable over graffiti rather than a
+   heavier fill would: the same 6px backdrop the ghost CTA already uses over
+   imagery, so this introduces no new treatment. */
+.fbs-nav-toggle--on-photo {
+  background: rgba(243, 239, 236, 0.42);
+  color: #14120f;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+@media (hover: hover) {
+  .fbs-nav-toggle--on-photo:hover { background: rgba(243, 239, 236, 0.62); }
+}
+.fbs-nav-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fbs-nav-toggle { transition: none; }
+}
+
 /* Utility cluster. The theme toggle used to sit in an <li> inside the
    navigation list, evenly spaced from the links by the same gap — so a control
    read as a destination, and as the only filled object in the header it read
@@ -274,7 +323,22 @@ body {
    14px, not the cluster's full height: it should divide the two, not draw a
    column in the header. */
 .fbs-nav-utility { display: flex; align-items: center; gap: 16px; margin-left: 16px; }
-.fbs-nav-rule { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+/* The hairline is deliberately NOT a themed token. It was var(--border), which
+   is #dddad4 in light and #333333 in dark - each one a near-match for the
+   background it sits on (1.22:1 and 1.29:1), so the divider all but vanished in
+   both themes, and over a hero photograph it kept whichever of those two the
+   theme happened to be while the bar behind it went transparent. Three
+   different backgrounds, one colour that suited none of them.
+
+   #888888 is the existing neutral grey - the dark theme's --muted, and the
+   value the map stepper already leans on - written literally rather than as
+   var(--muted) so it does not follow the theme, and set on background rather
+   than inherited from currentColor so the on-photo nav treatment cannot reach
+   it. Fully opaque, one value, every context: 3.10:1 on the light background,
+   4.60:1 on the dark, and mid-grey against photography. Width, height and the
+   cluster's 16px gaps are unchanged - this is colour only. The PARKS link and
+   the theme toggle keep their own colour behaviour, including on photo. */
+.fbs-nav-rule { width: 1px; height: 14px; background: #888888; flex-shrink: 0; }
 
 /* ── View transitions ────────────────────────────────────────────────────
    The site's one navigation transition: a restrained crossfade, 260ms on the
